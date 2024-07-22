@@ -6,7 +6,7 @@ endif()
 
 # project information
 project(unit_tests
-        VERSION 1.7.0
+        VERSION 1.7.3
 	      DESCRIPTION "Unit tests for app-seed-tool Ledger Application"
         LANGUAGES C)
 
@@ -98,7 +98,7 @@ find_package(cmocka QUIET)
 include(FetchContent)
 FetchContent_Declare(
     cmocka
-    GIT_REPOSITORY https://git.cryptomilk.org/projects/cmocka.git
+    GIT_REPOSITORY https://gitlab.com/cmocka/cmocka.git
     GIT_TAG        cmocka-1.1.7
     GIT_SHALLOW    1
 )

@@ -143,9 +143,9 @@ static int16_t sskr_deserialize_shard(const uint8_t *source,
     shard->value_len = source_len - SSKR_METADATA_LENGTH_BYTES;
     memcpy(shard->value, source + SSKR_METADATA_LENGTH_BYTES, shard->value_len);
 
-    int16_t err = sskr_check_secret_length(shard->value_len);
-    if (err) {
-        return err;
+    int16_t error = sskr_check_secret_length(shard->value_len);
+    if (error) {
+        return error;
     }
     return shard->value_len;
 }
@@ -231,9 +231,9 @@ static int16_t sskr_generate_shards_internal(uint8_t group_threshold,
                                              uint16_t shards_size,
                                              unsigned char *(*random_generator)(uint8_t *,
                                                                                 size_t)) {
-    int16_t err = sskr_check_secret_length(master_secret_len);
-    if (err) {
-        return err;
+    int16_t error = sskr_check_secret_length(master_secret_len);
+    if (error) {
+        return error;
     }
 
     // Figure out how many shards we are dealing with
@@ -314,9 +314,9 @@ int16_t sskr_generate_shards(uint8_t group_threshold,
                              uint8_t *output,
                              uint16_t buffer_size,
                              unsigned char *(*random_generator)(uint8_t *, size_t)) {
-    int16_t err = sskr_check_secret_length(master_secret_len);
-    if (err) {
-        return err;
+    int16_t error = sskr_check_secret_length(master_secret_len);
+    if (error) {
+        return error;
     }
 
     // Figure out how many shards we are dealing with
@@ -331,8 +331,6 @@ int16_t sskr_generate_shards(uint8_t group_threshold,
     if (buffer_size < shard_length * total_shards) {
         return SSKR_ERROR_INSUFFICIENT_SPACE;
     }
-
-    int16_t error = 0;
 
     // allocate space for shard representations
     sskr_shard_t shards[SSS_MAX_SHARE_COUNT * SSKR_MAX_GROUP_COUNT];

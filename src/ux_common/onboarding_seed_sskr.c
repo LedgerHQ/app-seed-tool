@@ -10,25 +10,25 @@
 
 // Return the CRC-32 checksum of the input buffer in network byte order (big endian).
 #if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-#define crc32_nbo(...) cx_crc32_hw(__VA_ARGS__)
+#define crc32_nbo(...) cx_crc32(__VA_ARGS__)
 #elif __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-#define crc32_nbo(...) os_swap_u32(cx_crc32_hw(__VA_ARGS__))
+#define crc32_nbo(...) os_swap_u32(cx_crc32(__VA_ARGS__))
 #else
 #error "What kind of system is this?"
 #endif
 
-unsigned int bolos_ux_sskr_size_get(uint8_t bip39_onboarding_kind,
-                                    uint8_t groups_threshold,
-                                    unsigned int *group_descriptor,
-                                    uint8_t groups_len,
-                                    uint8_t *share_len) {
+int16_t bolos_ux_sskr_size_get(uint8_t bip39_onboarding_kind,
+                               uint8_t groups_threshold,
+                               unsigned int *group_descriptor,
+                               uint8_t groups_len,
+                               uint8_t *share_len) {
     sskr_group_descriptor_t groups[SSKR_MAX_GROUP_COUNT];
     for (uint8_t i = 0; i < groups_len; i++) {
         groups[i].threshold = *(group_descriptor + i * sizeof(*(group_descriptor)) / groups_len);
         groups[i].count = *(group_descriptor + 1 + i * sizeof(*(group_descriptor)) / groups_len);
     }
 
-    unsigned int share_count_expected = sskr_count_shards(groups_threshold, groups, groups_len);
+    int16_t share_count_expected = sskr_count_shards(groups_threshold, groups, groups_len);
     *share_len = bip39_onboarding_kind * 4 / 3 + SSKR_METADATA_LENGTH_BYTES;
 
     return share_count_expected;
@@ -93,7 +93,7 @@ unsigned int bolos_ux_sskr_generate(uint8_t groups_threshold,
                                     unsigned char *share_buffer,
                                     unsigned int share_buffer_len,
                                     uint8_t share_len_expected,
-                                    uint8_t share_count_expected) {
+                                    int16_t share_count_expected) {
     sskr_group_descriptor_t groups[SSKR_MAX_GROUP_COUNT];
 
     for (uint8_t i = 0; i < (uint8_t) groups_len; i++) {
@@ -108,24 +108,28 @@ unsigned int bolos_ux_sskr_generate(uint8_t groups_threshold,
 
     PRINTF("SSKR generate input:\n %.*H\n", seed_len, seed);
     // convert seed to SSKR shares
-    int share_count = sskr_generate_shards(groups_threshold,
-                                           groups,
-                                           groups_len,
-                                           seed,
-                                           seed_len,
-                                           share_len,
-                                           share_buffer,
-                                           share_buffer_len,
-                                           cx_rng);
+    int16_t share_count = sskr_generate_shards(groups_threshold,
+                                               groups,
+                                               groups_len,
+                                               seed,
+                                               seed_len,
+                                               share_len,
+                                               share_buffer,
+                                               share_buffer_len,
+                                               cx_rng);
 
-    if ((share_count < 0) || ((unsigned int) share_count != share_count_expected) ||
+    PRINTF("SSKR share count expected: %d\n", share_count_expected);
+    PRINTF("SSKR share count returned: %d\n", share_count);
+    PRINTF("SSKR share length expected: %d\n", share_len_expected);
+    PRINTF("SSKR share length returned: %d\n", *share_len);
+
+    if ((share_count < 0) || (share_count != share_count_expected) ||
         (*share_len != share_len_expected)) {
         memzero(&share_buffer, sizeof(share_buffer));
         return 0;
     }
+
     PRINTF("SSKR generate output:\n %.*H\n", share_buffer_len, share_buffer);
-    PRINTF("SSKR share count:\n %d\n", share_count);
-    PRINTF("SSKR share length :\n %d\n", *share_len);
 
     return share_count;
 }
@@ -173,7 +177,7 @@ unsigned int bolos_ux_bip39_to_sskr_convert(unsigned char *bip39_words_buffer,
         uint8_t groups_len = 1;
         uint8_t groups_threshold = 1;
         uint8_t share_len_expected = 0;
-        uint8_t share_count_expected = bolos_ux_sskr_size_get(bip39_onboarding_kind,
+        int16_t share_count_expected = bolos_ux_sskr_size_get(bip39_onboarding_kind,
                                                               groups_threshold,
                                                               group_descriptor,
                                                               groups_len,
@@ -195,10 +199,10 @@ unsigned int bolos_ux_bip39_to_sskr_convert(unsigned char *bip39_words_buffer,
                                               share_count_expected);
         memzero(seed_buffer, sizeof(seed_buffer));
         if (*share_count > 0) {
-            // CBOR Tag #309 is D9 0135
+            // CBOR Tag #6.40309 is D9 9D75
             // CBOR Major type 2 is 0x40
             // (see https://www.rfc-editor.org/rfc/rfc8949#name-major-types)
-            uint8_t cbor[] = {0xD9, 0x01, 0x35, 0x40, 0x00};
+            uint8_t cbor[] = {0xD9, 0x9D, 0x75, 0x40, 0x00};
             size_t cbor_len = sizeof(cbor);
             if (share_len < 24) {
                 cbor[3] |= (share_len & 0x1F);
@@ -254,7 +258,7 @@ unsigned int bolos_ux_bip39_to_sskr_convert(unsigned char *bip39_words_buffer,
 unsigned int bolos_ux_sskr_hex_check(unsigned char *mnemonic_hex,
                                      unsigned int mnemonic_length,
                                      unsigned int sskr_shares_count) {
-    uint8_t cbor[] = {0xD9, 0x01, 0x35};  // CBOR tag
+    uint8_t cbor[] = {0xD9, 0x9D, 0x75};  // CBOR Tag #6.40309 is D9 9D75
     uint32_t checksum = 0;
     uint8_t checksum_len = sizeof(checksum);
 

@@ -11,6 +11,7 @@
 // Defines
 //-----------------------------------------------------------------------------
 // Those defines can be found in the SDK, in cx_errors.h file:
+#ifndef CX_CHECK
 #define CX_CHECK(call)                                                         \
   do {                                                                         \
     error = call;                                                              \
@@ -18,6 +19,7 @@
       goto end;                                                                \
     }                                                                          \
   } while (0)
+#endif
 
 #define CX_CHECK_IGNORE_CARRY(call)                                            \
   do {                                                                         \
@@ -216,7 +218,7 @@ cx_err_t cx_ecdomain_generator_bn(cx_curve_t cv, cx_ecpoint_t *P);
 unsigned int sys_get_api_level(void);
 cx_err_t cx_get_random_bytes(void *buffer, size_t len);
 cx_err_t cx_trng_get_random_data(void *buffer, size_t len);
-uint32_t cx_crc32_hw(const void *_buf, size_t len);
+uint32_t cx_crc32(const void *_buf, size_t len);
 
 // cx_aes_sdk2.c
 cx_err_t cx_aes_set_key_hw(const cx_aes_key_t *key, uint32_t mode);

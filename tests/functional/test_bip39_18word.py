@@ -367,11 +367,11 @@ def nanos_bip39_18word(backend, navigator):
                         NavInsID.BOTH_CLICK],
                         screen_change_before_first_instruction=False)
     backend.wait_for_text_on_screen("SSKR Share #1", 5)
-    backend.wait_for_text_on_screen("tuna acid epic hard", 1)
+    backend.wait_for_text_on_screen("tuna next keep hard", 1)
     navigator.navigate_until_text(NavInsID.RIGHT_CLICK, [], "SSKR Share #2", 20, screen_change_before_first_instruction=False)
-    backend.wait_for_text_on_screen("tuna acid epic hard", 1)
+    backend.wait_for_text_on_screen("tuna next keep hard", 1)
     navigator.navigate_until_text(NavInsID.RIGHT_CLICK, [], "SSKR Share #3", 20, screen_change_before_first_instruction=False)
-    backend.wait_for_text_on_screen("tuna acid epic hard", 1)
+    backend.wait_for_text_on_screen("tuna next keep hard", 1)
     navigator.navigate_until_text(NavInsID.RIGHT_CLICK, [], "Quit", 20, screen_change_before_first_instruction=False)
 
 @mark.use_on_backend("speculos")

@@ -88,9 +88,9 @@ int16_t sss_split_secret(uint8_t threshold,
                          uint8_t secret_length,
                          uint8_t *result,
                          unsigned char *(*random_generator)(uint8_t *, size_t)) {
-    int16_t err = sss_validate_parameters(threshold, share_count, secret_length);
-    if (err) {
-        return err;
+    int16_t error = sss_validate_parameters(threshold, share_count, secret_length);
+    if (error) {
+        return error;
     }
 
     if (threshold == 1) {
@@ -146,9 +146,9 @@ int16_t sss_recover_secret(uint8_t threshold,
                            const uint8_t **shares,
                            uint8_t share_length,
                            uint8_t *secret) {
-    int16_t err = sss_validate_parameters(threshold, threshold, share_length);
-    if (err) {
-        return err;
+    int16_t error = sss_validate_parameters(threshold, threshold, share_length);
+    if (error) {
+        return error;
     }
 
     uint8_t digest[SSS_MAX_SECRET_SIZE];
