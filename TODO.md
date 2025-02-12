@@ -3,21 +3,25 @@
 ### Todo
 
 - [ ] Improve the efficiency of the method used to perform an inverse operation in GF(256)
-- [ ] Improve the efficiency of the custom cx_bn_gf2_n_mul() function used for Nano S devices
 - [ ] Update automated function tests to test on nanox and nanosp
 - [ ] There is just enough memory available on Nano S to hold the phrases for 10 shares. Maybe just store SSKR Bytewords as shorter two letter minimal Bytewords rather than a 4 letter Byteword plus space for each share. Convert minimal ByteWords back to four letter Bytewords just prior to display.
 
 ### In Progress
 
-- [ ] Add Ledger Stax to list of devices app works on
-  - [x] Add SSKR Generate option to Stax
-  - [ ] Add SSKR Check option to Stax
-  - [ ] Write SSKR to BIP39 functionality
-  - [ ] Functional Test with 29-word SSKR shares
-  - [ ] Functional Test with 46-word SSKR shares
+- [ ] Add BIP85 menus to Stax and Flex
+- [ ] Merge Nano code
+- [ ] Improve the efficiency of the custom cx_bn_gf2_n_mul() function used for Nano S devices
 
 ### Done ✓
 
+- [x] Decouple BAGL / NBGL code
+- [x] Add Ledger Flex to list of devices app works on
+- [x] Add Ledger Stax to list of devices app works on
+  - [x] Add SSKR Generate option to Stax
+  - [x] Add SSKR Check option to Stax
+  - [x] Write SSKR to BIP39 functionality
+  - [x] Functional Test with 29-word SSKR shares
+  - [x] Functional Test with 46-word SSKR shares
 - [x] Changed Shamir interpolate function to use `cx_bn_gf2_n_mul()` syscalls
 - [x] Remove all Variable Length Arrays
 - [x] Save memory by setting the SSKR word buffer (G_bolos_ux_context.sskr_words_buffer) to a sensible size
