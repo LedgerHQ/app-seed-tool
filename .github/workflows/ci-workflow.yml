@@ -54,7 +54,7 @@ jobs:
           name: code-coverage
           path: tests/unit/coverage
       - name: Install codecov dependencies
-        run: apk update && apk add curl gpg
+        run: apt update && apt install -y curl gpg
       - name: Upload to codecov.io
         uses: codecov/codecov-action@v5
         env:

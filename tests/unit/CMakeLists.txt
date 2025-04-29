@@ -6,7 +6,7 @@ endif()
 
 # project information
 project(unit_tests
-        VERSION 1.8.0
+        VERSION 1.8.1
 	      DESCRIPTION "Unit tests for app-seed-tool Ledger Application"
         LANGUAGES C)
 
@@ -33,64 +33,88 @@ if(${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_BINARY_DIR})
   message(FATAL_ERROR "In-source builds not allowed. Please make a new directory (called a build directory) and run CMake from there. You may need to remove CMakeCache.txt. ")
 endif()
 
-# apk install package function
-function(install_apk_packages)
-  foreach(package ${ARGN})
-    execute_process(
-      COMMAND bash -c "apk add ${package}"
-      RESULT_VARIABLE result
-      OUTPUT_VARIABLE output
-      ERROR_VARIABLE error
-    )
-
-    if(${result} EQUAL 0)
-      message(STATUS "Installed ${package} package")
-    else()
-      message(FATAL_ERROR "Failed to install package: ${package}\n"
-                          "Command: ${output}\n"
-                          "Error: ${error}")
-    endif()
-  endforeach()
-endfunction()
+# Detect OS and install packages
+if(EXISTS "/etc/alpine-release")
+    # Alpine Linux
+    function(install_packages)
+        foreach(package ${ARGN})
+            execute_process(
+                COMMAND bash -c "apk add ${package}"
+                RESULT_VARIABLE result
+                OUTPUT_VARIABLE output
+                ERROR_VARIABLE error
+            )
+            if(${result} EQUAL 0)
+                message(STATUS "Installed ${package} package (apk)")
+            else()
+                message(FATAL_ERROR "Failed to install package: ${package}\n"
+                                    "Command: ${output}\n"
+                                    "Error: ${error}")
+            endif()
+        endforeach()
+    endfunction()
+elseif(EXISTS "/etc/debian_version")
+    # Debian/Ubuntu
+    function(install_packages)
+        foreach(package ${ARGN})
+            execute_process(
+                COMMAND bash -c "apt update && apt install -y ${package}"
+                RESULT_VARIABLE result
+                OUTPUT_VARIABLE output
+                ERROR_VARIABLE error
+            )
+            if(${result} EQUAL 0)
+                message(STATUS "Installed ${package} package (apt)")
+            else()
+                message(FATAL_ERROR "Failed to install package: ${package}\n"
+                                    "Command: ${output}\n"
+                                    "Error: ${error}")
+            endif()
+        endforeach()
+    endfunction()
+else()
+    message(FATAL_ERROR "Unsupported OS. Only Alpine and Debian based distributions are supported")
+endif()
 
 # Check if linux-headers package is installed
 if(NOT EXISTS "/usr/include/linux/version.h")
-  install_apk_packages(linux-headers)
+  install_packages(linux-headers)
 else()
   message(STATUS "linux-headers package found")
 endif()
 
 include(ExternalProject)
 if (PRECOMPILED_DEPENDENCIES_DIR)
-  message(STATUS "Using OpenSSL from ${PRECOMPILED_DEPENDENCIES_DIR}")
-  set(INSTALL_DIR ${PRECOMPILED_DEPENDENCIES_DIR})
-  add_library(openssl STATIC IMPORTED)
+    message(STATUS "Using OpenSSL from ${PRECOMPILED_DEPENDENCIES_DIR}")
+    set(INSTALL_DIR ${PRECOMPILED_DEPENDENCIES_DIR})
+    add_library(openssl STATIC IMPORTED)
 else()
-  message(STATUS "Building OpenSSL...")
-  set(INSTALL_DIR ${CMAKE_CURRENT_BINARY_DIR}/install)
+    message(STATUS "Building OpenSSL from Git...")
+    set(INSTALL_DIR ${CMAKE_CURRENT_BINARY_DIR}/install)
 
-  set(OPENSSL_CFLAGS "${CMAKE_C_FLAGS}")
-  get_directory_property(compile_options COMPILE_OPTIONS)
-  foreach (opt ${compile_options})
-    string(APPEND OPENSSL_CFLAGS " ${opt}")
-  endforeach ()
-  if (CMAKE_C_COMPILER_TARGET)
-    string(APPEND OPENSSL_CFLAGS " --target=${CMAKE_C_COMPILER_TARGET}")
-  endif ()
-  if (CMAKE_SYSROOT)
-    string(APPEND OPENSSL_CFLAGS " -isystem${CMAKE_SYSROOT}/include")
-  endif ()
-  string(APPEND OPENSSL_CFLAGS " -Wno-unused-parameter -Wno-missing-field-initializers")
+    set(OPENSSL_CFLAGS "${CMAKE_C_FLAGS}")
+    get_directory_property(compile_options COMPILE_OPTIONS)
+    foreach (opt ${compile_options})
+        string(APPEND OPENSSL_CFLAGS " ${opt}")
+    endforeach ()
+    if (CMAKE_C_COMPILER_TARGET)
+        string(APPEND OPENSSL_CFLAGS " --target=${CMAKE_C_COMPILER_TARGET}")
+    endif ()
+    if (CMAKE_SYSROOT)
+        string(APPEND OPENSSL_CFLAGS " -isystem${CMAKE_SYSROOT}/include")
+    endif ()
+    string(APPEND OPENSSL_CFLAGS " -Wno-unused-parameter -Wno-missing-field-initializers")
 
-  ExternalProject_Add(
-    openssl
-    URL https://www.openssl.org/source/openssl-3.0.13.tar.gz
-    URL_HASH SHA256=88525753f79d3bec27d2fa7c66aa0b92b3aa9498dafd93d7cfa4b3780cdae313
-    CONFIGURE_COMMAND ./Configure "CC=${CMAKE_C_COMPILER}" "CFLAGS=${OPENSSL_CFLAGS}" no-afalgeng no-aria no-asan no-asm no-async no-autoalginit no-autoerrinit no-autoload-config no-bf no-buildtest-c++ no-camellia no-capieng no-cast no-chacha no-cmac no-cms no-comp no-crypto-mdebug no-ct no-deprecated no-des no-devcryptoeng no-dgram no-dh no-dsa no-dso no-dtls no-ec2m no-ecdh no-egd no-engine no-err no-external-tests no-filenames no-fuzz-afl no-fuzz-libfuzzer no-gost no-idea no-makedepend no-md2 no-md4 no-mdc2 no-msan no-multiblock no-nextprotoneg no-ocb no-ocsp no-pinshared no-poly1305 no-posix-io no-psk no-rc2 no-rc4 no-rc5 no-rdrand no-rfc3779 no-scrypt no-sctp no-seed no-shared no-siphash no-sm2 no-sm3 no-sm4 no-sock no-srp no-srtp no-sse2 no-ssl no-ssl3-method no-ssl-trace no-stdio no-tests no-threads no-tls no-ts no-ubsan no-ui-console no-unit-test no-whirlpool no-zlib no-zlib-dynamic linux-armv4 --prefix=${INSTALL_DIR}
-    BUILD_COMMAND make
-    INSTALL_COMMAND make install_sw
-    BUILD_IN_SOURCE 1
-  )
+    ExternalProject_Add(
+        openssl
+        GIT_REPOSITORY https://github.com/openssl/openssl.git
+        GIT_TAG        openssl-3.4.1
+        CONFIGURE_COMMAND ./Configure "CC=${CMAKE_C_COMPILER}" "CFLAGS=${OPENSSL_CFLAGS}" no-afalgeng no-aria no-asan no-asm no-async no-autoalginit no-autoerrinit no-autoload-config no-bf no-buildtest-c++ no-camellia no-capieng no-cast no-chacha no-cmac no-cms no-comp no-crypto-mdebug no-ct no-deprecated no-des no-devcryptoeng no-dgram no-dh no-dsa no-dso no-dtls no-ec2m no-ecdh no-egd no-engine no-err no-external-tests no-filenames no-fuzz-afl no-fuzz-libfuzzer no-gost no-idea no-makedepend no-md2 no-md4 no-mdc2 no-msan no-multiblock no-nextprotoneg no-ocb no-ocsp no-pinshared no-poly1305 no-posix-io no-psk no-rc2 no-rc4 no-rc5 no-rdrand no-rfc3779 no-scrypt no-sctp no-seed no-shared no-siphash no-sm2 no-sm3 no-sm4 no-sock no-srp no-srtp no-sse2 no-ssl no-ssl3-method no-ssl-trace no-stdio no-tests no-threads no-tls no-ts no-ubsan no-ui-console no-unit-test no-whirlpool no-zlib no-zlib-dynamic linux-armv4 --prefix=${INSTALL_DIR}
+        BUILD_COMMAND make
+        INSTALL_COMMAND make install_sw
+        BUILD_IN_SOURCE 1
+        DOWNLOAD_EXTRACT_TIMESTAMP TRUE # Ensure proper timestamp handling
+    )
 endif()
 
 # Fetch cmocka
@@ -112,10 +136,17 @@ FetchContent_MakeAvailable(cmocka)
 add_compile_definitions(TEST DEBUG=0 SKIP_FOR_CMOCKA)
 add_compile_definitions(TARGET_NANOS HAVE_HASH HAVE_HMAC HAVE_SHA224 HAVE_SHA256 HAVE_SHA512 HAVE_PBKDF2 HAVE_ECC HAVE_CRC HAVE_RNG IO_HID_EP_LENGTH=64)
 
+# Set LEDGER_SECURE_SDK only if it's not already set
+if(NOT DEFINED ENV{LEDGER_SECURE_SDK})
+  set(ENV{LEDGER_SECURE_SDK} "/opt/ledger-secure-sdk")
+  message(STATUS "LEDGER_SECURE_SDK set to /opt/ledger-secure-sdk")
+else()
+  message(STATUS "LEDGER_SECURE_SDK already set: $ENV{LEDGER_SECURE_SDK}")
+endif()
+
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/lib $ENV{LEDGER_SECURE_SDK}/include $ENV{LEDGER_SECURE_SDK}/lib_cxng/src $ENV{LEDGER_SECURE_SDK}/lib_cxng/include $ENV{LEDGER_SECURE_SDK}/lib_ux/include $ENV{LEDGER_SECURE_SDK}/lib_bagl/include)
 
 # add src
-install_apk_packages(linux-headers)
 set(ExternalProject_Get_property(openssl INSTALL_DIR))
 set(BOLOS_SOURCES ./lib/bolos/cx_bn.c ./lib/bolos/cx_crc.c ./lib/bolos/cx_mpi.c)
 set(LIBCXNG_SOURCES $ENV{LEDGER_SECURE_SDK}/lib_cxng/src/cx_ram.c $ENV{LEDGER_SECURE_SDK}/lib_cxng/src/cx_hash.c $ENV{LEDGER_SECURE_SDK}/lib_cxng/src/cx_sha256.c $ENV{LEDGER_SECURE_SDK}/lib_cxng/src/cx_sha512.c $ENV{LEDGER_SECURE_SDK}/lib_cxng/src/cx_pbkdf2.c $ENV{LEDGER_SECURE_SDK}/lib_cxng/src/cx_hmac.c $ENV{LEDGER_SECURE_SDK}/lib_cxng/src/cx_utils.c)
