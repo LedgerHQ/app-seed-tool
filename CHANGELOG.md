@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fix threshold validation issue on Stax and Flex
 - Fixed unit tests build to work with Debian based containers
+- Fixed multiple assignment of `sskr_share_count` variable
 
 ## [1.8.0] - 2024-10-28
 

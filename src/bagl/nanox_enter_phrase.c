@@ -448,7 +448,7 @@ void screen_onboarding_restore_word_validate(void) {
                 break;
             case 8:
                 if ((G_bolos_ux_context.sskr_words_buffer[3] & 0x1F) == 24) {
-                    G_bolos_ux_context.sskr_share_count = G_bolos_ux_context.sskr_share_count =
+                    G_bolos_ux_context.sskr_share_count =
                         (G_bolos_ux_context
                              .sskr_words_buffer[G_bolos_ux_context.sskr_words_buffer_length] &
                          0x0F) +
