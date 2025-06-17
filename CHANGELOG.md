@@ -6,13 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## [1.8.1] - 2025-04-29
+## [1.8.1] - 2025-06-17
 
 ### Fixed
 
 - Fix threshold validation issue on Stax and Flex
 - Fixed unit tests build to work with Debian based containers
 - Fixed multiple assignment of `sskr_share_count` variable
+- Refactored Stax and Flex function tests
 
 ## [1.8.0] - 2024-10-28
 
