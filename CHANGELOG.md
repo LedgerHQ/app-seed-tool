@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## [1.8.1] - 2025-06-17
+## [1.8.1] - 2025-07-24
 
 ### Fixed
 
@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed unit tests build to work with Debian based containers
 - Fixed multiple assignment of `sskr_share_count` variable
 - Refactored Stax and Flex function tests
+- Fixed copyriight headers
 
 ## [1.8.0] - 2024-10-28
 
@@ -33,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Some plausible yet wrong mnemonic were deemed valid on NBGL devices
 - Merge Nano code
 - Improve efficiency of `cx_bn_gf2_n_mul()` for Nano S
+- Fixed option to recover BIP39 mnemonics from SSKR shares even if shares do not validate against seed on device
 
 ## [1.7.4] - 2024-06-20
 

@@ -1,6 +1,6 @@
 #*******************************************************************************
-#   Ledger App
-#   (c) 2024 Ledger
+#   Ledger Seed Tool application
+#   (c) 2016-2025 Ledger SAS
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
