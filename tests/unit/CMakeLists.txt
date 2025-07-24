@@ -138,8 +138,8 @@ add_compile_definitions(TARGET_NANOS HAVE_HASH HAVE_HMAC HAVE_SHA224 HAVE_SHA256
 
 # Set LEDGER_SECURE_SDK only if it's not already set
 if(NOT DEFINED ENV{LEDGER_SECURE_SDK})
-  set(ENV{LEDGER_SECURE_SDK} "/opt/ledger-secure-sdk")
-  message(STATUS "LEDGER_SECURE_SDK set to /opt/ledger-secure-sdk")
+  set(ENV{LEDGER_SECURE_SDK} "$ENV{BOLOS_SDK}")
+  message(STATUS "LEDGER_SECURE_SDK set to $ENV{LEDGER_SECURE_SDK}")
 else()
   message(STATUS "LEDGER_SECURE_SDK already set: $ENV{LEDGER_SECURE_SDK}")
 endif()

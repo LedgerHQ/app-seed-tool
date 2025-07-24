@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed multiple assignment of `sskr_share_count` variable
 - Refactored Stax and Flex function tests
 - Fixed copyriight headers
+- Fixed unit test makefiles to work with latest Ledger Application Builder image
 
 ## [1.8.0] - 2024-10-28
 
