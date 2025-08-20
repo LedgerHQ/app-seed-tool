@@ -1,8 +1,12 @@
 from pytest import fixture
 from pytest import mark
 from pytest import skip
+from ledgered.devices import DeviceType
 from ragger.navigator import NavInsID
 from ragger.conftest import configuration
+from ragger.firmware.touch.use_cases import UseCaseHomeExt, UseCaseViewDetails, UseCaseChoice
+from ragger.firmware.touch.layouts import CenteredFooter, LetterOnlyKeyboard, Suggestions, ChoiceList
+from keypad import Keypad
 
 @fixture(scope='session')
 def set_seed():
@@ -843,519 +847,58 @@ def nanos_sskr_128bit(backend, navigator):
     navigator.navigate([NavInsID.RIGHT_CLICK], screen_change_before_first_instruction=False)
     backend.wait_for_text_on_screen("Quit", 1)
 
-def stax_sskr_128bit(backend):
-    backend.wait_for_text_on_screen("Seed Tool", 10)
-    backend.finger_touch(106, 510, 1)
-    backend.wait_for_text_on_screen("SSKR Check", 5)
-    backend.finger_touch(212, 510, 1)
-    backend.wait_for_text_on_screen("Enter Share 1 Word 1", 5)
-    backend.finger_touch(180, 460, 1) # t
-    backend.finger_touch(260, 460, 1) # u
-    backend.finger_touch(220, 580, 1) # n
-    backend.finger_touch(100, 280, 1)
-    backend.finger_touch(220, 580, 1) # n
-    backend.finger_touch(100, 460, 1) # e
-    backend.finger_touch(60, 580, 1) # x
-    backend.finger_touch(100, 280, 1)
-    backend.finger_touch(320, 520, 1) # k
-    backend.finger_touch(100, 460, 1) # e
-    backend.finger_touch(100, 460, 1) # e
-    backend.finger_touch(100, 280, 1)
-    backend.finger_touch(200, 520, 1) # g
-    backend.finger_touch(220, 460, 1) # y
-    backend.finger_touch(140, 460, 1) # r
-    backend.finger_touch(100, 280, 1)
-    backend.finger_touch(380, 460, 1) # p
-    backend.finger_touch(40, 520, 1) # a
-    backend.finger_touch(300, 460, 1) # i
-    backend.finger_touch(100, 280, 1)
-    backend.finger_touch(100, 580, 1) # c
-    backend.finger_touch(360, 520, 1) # l
-    backend.finger_touch(40, 520, 1) # a
-    backend.finger_touch(100, 280, 1)
-    backend.finger_touch(40, 520, 1) # a
-    backend.finger_touch(180, 580, 1) # b
-    backend.finger_touch(360, 520, 1) # l
-    backend.finger_touch(100, 280, 1)
-    backend.finger_touch(40, 520, 1) # a
-    backend.finger_touch(100, 580, 1) # c
-    backend.finger_touch(300, 460, 1) # i
-    backend.finger_touch(100, 280, 1)
-    backend.finger_touch(40, 520, 1) # a
-    backend.finger_touch(180, 580, 1) # b
-    backend.finger_touch(360, 520, 1) # l
-    backend.finger_touch(100, 280, 1)
-    backend.finger_touch(280, 520, 1) # j
-    backend.finger_touch(340, 460, 1) # o
-    backend.finger_touch(60, 460, 1) # w
-    backend.finger_touch(100, 280, 1)
-    backend.finger_touch(100, 580, 1) # c
-    backend.finger_touch(240, 520, 1) # h
-    backend.finger_touch(100, 460, 1) # e
-    backend.finger_touch(100, 280, 1)
-    backend.finger_touch(120, 520, 1) # d
-    backend.finger_touch(140, 460, 1) # r
-    backend.finger_touch(260, 460, 1) # u
-    backend.finger_touch(100, 280, 1)
-    backend.finger_touch(280, 520, 1) # j
-    backend.finger_touch(260, 460, 1) # u
-    backend.finger_touch(120, 520, 1) # d
-    backend.finger_touch(100, 280, 1)
-    backend.finger_touch(380, 460, 1) # p
-    backend.finger_touch(340, 460, 1) # o
-    backend.finger_touch(340, 460, 1) # o
-    backend.finger_touch(100, 280, 1)
-    backend.finger_touch(360, 520, 1) # l
-    backend.finger_touch(300, 460, 1) # i
-    backend.finger_touch(340, 460, 1) # o
-    backend.finger_touch(100, 280, 1)
-    backend.finger_touch(320, 520, 1) # k
-    backend.finger_touch(100, 460, 1) # e
-    backend.finger_touch(100, 460, 1) # e
-    backend.finger_touch(100, 280, 1)
-    backend.finger_touch(300, 460, 1) # i
-    backend.finger_touch(120, 520, 1) # d
-    backend.finger_touch(360, 520, 1) # l
-    backend.finger_touch(100, 280, 1)
-    backend.finger_touch(100, 580, 1) # c
-    backend.finger_touch(260, 460, 1) # u
-    backend.finger_touch(80, 520, 1) # s
-    backend.finger_touch(100, 280, 1)
-    backend.finger_touch(300, 460, 1) # i
-    backend.finger_touch(100, 580, 1) # c
-    backend.finger_touch(100, 460, 1) # e
-    backend.finger_touch(100, 280, 1)
-    backend.finger_touch(140, 460, 1) # r
-    backend.finger_touch(260, 460, 1) # u
-    backend.finger_touch(80, 520, 1) # s
-    backend.finger_touch(100, 280, 1)
-    backend.finger_touch(160, 520, 1) # f
-    backend.finger_touch(40, 520, 1) # a
-    backend.finger_touch(100, 580, 1) # c
-    backend.finger_touch(100, 280, 1)
-    backend.finger_touch(140, 580, 1) # v
-    backend.finger_touch(300, 460, 1) # i
-    backend.finger_touch(100, 460, 1) # e
-    backend.finger_touch(100, 280, 1)
-    backend.finger_touch(180, 460, 1) # t
-    backend.finger_touch(60, 460, 1) # w
-    backend.finger_touch(300, 460, 1) # i
-    backend.finger_touch(100, 280, 1)
-    backend.finger_touch(140, 580, 1) # v
-    backend.finger_touch(100, 460, 1) # e
-    backend.finger_touch(140, 460, 1) # r
-    backend.finger_touch(100, 280, 1)
-    backend.finger_touch(380, 460, 1) # p
-    backend.finger_touch(340, 460, 1) # o
-    backend.finger_touch(80, 520, 1) # s
-    backend.finger_touch(100, 280, 1)
-    backend.finger_touch(100, 460, 1) # e
-    backend.finger_touch(380, 460, 1) # p
-    backend.finger_touch(300, 460, 1) # i
-    backend.finger_touch(100, 280, 1)
-    backend.finger_touch(60, 460, 1) # w
-    backend.finger_touch(240, 520, 1) # h
-    backend.finger_touch(300, 460, 1) # i
-    backend.finger_touch(100, 280, 1)
-    backend.finger_touch(280, 520, 1) # j
-    backend.finger_touch(260, 460, 1) # u
-    backend.finger_touch(260, 580, 1) # m
-    backend.finger_touch(100, 280, 1)
-    backend.finger_touch(280, 520, 1) # j
-    backend.finger_touch(260, 460, 1) # u
-    backend.finger_touch(140, 460, 1) # r
-    backend.finger_touch(100, 280, 1)
-    backend.finger_touch(180, 460, 1) # t
-    backend.finger_touch(260, 460, 1) # u
-    backend.finger_touch(220, 580, 1) # n
-    backend.finger_touch(100, 280, 1)
-    backend.finger_touch(220, 580, 1) # n
-    backend.finger_touch(100, 460, 1) # e
-    backend.finger_touch(60, 580, 1) # x
-    backend.finger_touch(100, 280, 1)
-    backend.finger_touch(320, 520, 1) # k
-    backend.finger_touch(100, 460, 1) # e
-    backend.finger_touch(100, 460, 1) # e
-    backend.finger_touch(100, 280, 1)
-    backend.finger_touch(200, 520, 1) # g
-    backend.finger_touch(220, 460, 1) # y
-    backend.finger_touch(140, 460, 1) # r
-    backend.finger_touch(100, 280, 1)
-    backend.finger_touch(380, 460, 1) # p
-    backend.finger_touch(40, 520, 1) # a
-    backend.finger_touch(300, 460, 1) # i
-    backend.finger_touch(100, 280, 1)
-    backend.finger_touch(100, 580, 1) # c
-    backend.finger_touch(360, 520, 1) # l
-    backend.finger_touch(40, 520, 1) # a
-    backend.finger_touch(100, 280, 1)
-    backend.finger_touch(40, 520, 1) # a
-    backend.finger_touch(180, 580, 1) # b
-    backend.finger_touch(360, 520, 1) # l
-    backend.finger_touch(100, 280, 1)
-    backend.finger_touch(40, 520, 1) # a
-    backend.finger_touch(100, 580, 1) # c
-    backend.finger_touch(300, 460, 1) # i
-    backend.finger_touch(100, 280, 1)
-    backend.finger_touch(40, 520, 1) # a
-    backend.finger_touch(100, 580, 1) # c
-    backend.finger_touch(300, 460, 1) # i
-    backend.finger_touch(100, 280, 1)
-    backend.finger_touch(200, 520, 1) # g
-    backend.finger_touch(140, 460, 1) # r
-    backend.finger_touch(40, 520, 1) # a
-    backend.finger_touch(100, 280, 1)
-    backend.finger_touch(20, 460, 1) # q
-    backend.finger_touch(260, 460, 1) # u
-    backend.finger_touch(40, 520, 1) # a
-    backend.finger_touch(100, 280, 1)
-    backend.finger_touch(320, 520, 1) # k
-    backend.finger_touch(300, 460, 1) # i
-    backend.finger_touch(360, 520, 1) # l
-    backend.finger_touch(100, 280, 1)
-    backend.finger_touch(60, 460, 1) # w
-    backend.finger_touch(40, 520, 1) # a
-    backend.finger_touch(360, 520, 1) # l
-    backend.finger_touch(100, 280, 1)
-    backend.finger_touch(320, 520, 1) # k
-    backend.finger_touch(100, 460, 1) # e
-    backend.finger_touch(380, 460, 1) # p
-    backend.finger_touch(100, 280, 1)
-    backend.finger_touch(120, 520, 1) # d
-    backend.finger_touch(100, 460, 1) # e
-    backend.finger_touch(360, 520, 1) # l
-    backend.finger_touch(100, 280, 1)
-    backend.finger_touch(260, 580, 1) # m
-    backend.finger_touch(300, 460, 1) # i
-    backend.finger_touch(360, 520, 1) # l
-    backend.finger_touch(100, 280, 1)
-    backend.finger_touch(100, 460, 1) # e
-    backend.finger_touch(380, 460, 1) # p
-    backend.finger_touch(300, 460, 1) # i
-    backend.finger_touch(100, 280, 1)
-    backend.finger_touch(140, 460, 1) # r
-    backend.finger_touch(40, 520, 1) # a
-    backend.finger_touch(100, 580, 1) # c
-    backend.finger_touch(100, 280, 1)
-    backend.finger_touch(160, 520, 1) # f
-    backend.finger_touch(260, 460, 1) # u
-    backend.finger_touch(100, 460, 1) # e
-    backend.finger_touch(100, 280, 1)
-    backend.finger_touch(120, 520, 1) # d
-    backend.finger_touch(300, 460, 1) # i
-    backend.finger_touch(100, 580, 1) # c
-    backend.finger_touch(100, 280, 1)
-    backend.finger_touch(180, 580, 1) # b
-    backend.finger_touch(360, 520, 1) # l
-    backend.finger_touch(260, 460, 1) # u
-    backend.finger_touch(100, 280, 1)
-    backend.finger_touch(200, 520, 1) # g
-    backend.finger_touch(40, 520, 1) # a
-    backend.finger_touch(260, 580, 1) # m
-    backend.finger_touch(100, 280, 1)
-    backend.finger_touch(220, 460, 1) # y
-    backend.finger_touch(40, 520, 1) # a
-    backend.finger_touch(220, 580, 1) # n
-    backend.finger_touch(100, 280, 1)
-    backend.finger_touch(160, 520, 1) # f
-    backend.finger_touch(100, 460, 1) # e
-    backend.finger_touch(140, 460, 1) # r
-    backend.finger_touch(100, 280, 1)
-    backend.finger_touch(180, 580, 1) # b
-    backend.finger_touch(260, 460, 1) # u
-    backend.finger_touch(360, 520, 1) # l
-    backend.finger_touch(100, 280, 1)
-    backend.finger_touch(200, 520, 1) # g
-    backend.finger_touch(100, 460, 1) # e
-    backend.finger_touch(40, 520, 1) # a
-    backend.finger_touch(100, 280, 1)
-    backend.finger_touch(280, 520, 1) # j
-    backend.finger_touch(40, 520, 1) # a
-    backend.finger_touch(120, 520, 1) # d
-    backend.finger_touch(100, 280, 1)
-    backend.finger_touch(220, 580, 1) # n
-    backend.finger_touch(40, 520, 1) # a
-    backend.finger_touch(140, 580, 1) # v
-    backend.finger_touch(100, 280, 1)
-    backend.finger_touch(100, 580, 1) # c
-    backend.finger_touch(340, 460, 1) # o
-    backend.finger_touch(80, 520, 1) # s
-    backend.finger_touch(100, 280, 1)
-    backend.wait_for_text_on_screen("Valid Secret", 5)
-    backend.wait_for_text_on_screen("Recovery Phrase", 1)
-    backend.finger_touch(200, 630, 1)
-    backend.wait_for_text_on_screen("Recover BIP39", 5)
-    backend.finger_touch(200, 550, 1)
-    backend.wait_for_text_on_screen("BIP39 Phrase", 5)
-    backend.wait_for_text_on_screen("fly mule excess", 1)
-    backend.wait_for_text_on_screen("resource treat plunge", 1)
-    backend.wait_for_text_on_screen("nose soda reflect adult",1)
-    backend.wait_for_text_on_screen("ramp planet", 1)
-    backend.finger_touch(200, 630,1)
-    backend.wait_for_text_on_screen("Seed Tool", 5)
-    backend.finger_touch(200, 630,1)
+def all_eink_sskr_128bit(backend, device):
+    sskr_shards = ["tuna next keep gyro paid claw able acid able jowl chef drum judo pool lion keep idle cusp iced rust fact view twin very pose epic whiz jump jury",
+                   "tuna next keep gyro paid claw able acid acid gray quad kiln wall kept deli mild epic race fuel dice blue game yank fern bulb gear jade navy cost"]
 
-def flex_sskr_128bit(backend):
+    home_page = UseCaseHomeExt(backend, device)
+#    select_tool = ChoiceList(backend, device)
+    select_footer = CenteredFooter(backend, device)
+    keyboard = LetterOnlyKeyboard(backend, device)
+    suggestion = Suggestions(backend, device)
+    check_result = CenteredFooter(backend, device)
+    keypad = Keypad(backend, device)
+    review = UseCaseViewDetails(backend, device)
+    choice = UseCaseChoice(backend, device)
+
     backend.wait_for_text_on_screen("Seed Tool", 10)
-    backend.finger_touch(240, 440, 1)
+    home_page.action()
     backend.wait_for_text_on_screen("SSKR Check", 5)
-    backend.finger_touch(240, 420, 1)
+#    select_tool.choose(6)
+#   Workaround for https://github.com/LedgerHQ/ragger/issues/247
+    if device.type == DeviceType.STAX:
+        backend.finger_touch(212, 510, 1)
+    elif device.type == DeviceType.FLEX:
+        backend.finger_touch(240, 420, 1)
     backend.wait_for_text_on_screen("Enter Share 1 Word 1", 5)
-    backend.finger_touch(220, 400, 1) # t
-    backend.finger_touch(320, 400, 1) # u
-    backend.finger_touch(270, 560, 1) # n
-    backend.finger_touch(130, 300, 1)
-    backend.finger_touch(270, 560, 1) # n
-    backend.finger_touch(120, 400, 1) # e
-    backend.finger_touch(70, 560, 1) # x
-    backend.finger_touch(130, 300, 1)
-    backend.finger_touch(400, 480, 1) # k
-    backend.finger_touch(120, 400, 1) # e
-    backend.finger_touch(120, 400, 1) # e
-    backend.finger_touch(130, 300, 1)
-    backend.finger_touch(250, 480, 1) # g
-    backend.finger_touch(270, 400, 1) # y
-    backend.finger_touch(170, 400, 1) # r
-    backend.finger_touch(130, 300, 1)
-    backend.finger_touch(470, 400, 1) # p
-    backend.finger_touch(50, 480, 1) # a
-    backend.finger_touch(370, 400, 1) # i
-    backend.finger_touch(130, 300, 1)
-    backend.finger_touch(120, 560, 1) # c
-    backend.finger_touch(450, 480, 1) # l
-    backend.finger_touch(50, 480, 1) # a
-    backend.finger_touch(130, 300, 1)
-    backend.finger_touch(50, 480, 1) # a
-    backend.finger_touch(220, 560, 1) # b
-    backend.finger_touch(450, 480, 1) # l
-    backend.finger_touch(130, 300, 1)
-    backend.finger_touch(50, 480, 1) # a
-    backend.finger_touch(120, 560, 1) # c
-    backend.finger_touch(370, 400, 1) # i
-    backend.finger_touch(130, 300, 1)
-    backend.finger_touch(50, 480, 1) # a
-    backend.finger_touch(220, 560, 1) # b
-    backend.finger_touch(450, 480, 1) # l
-    backend.finger_touch(130, 300, 1)
-    backend.finger_touch(350, 480, 1) # j
-    backend.finger_touch(420, 400, 1) # o
-    backend.finger_touch(70, 400, 1) # w
-    backend.finger_touch(130, 300, 1)
-    backend.finger_touch(120, 560, 1) # c
-    backend.finger_touch(300, 480, 1) # h
-    backend.finger_touch(120, 400, 1) # e
-    backend.finger_touch(130, 300, 1)
-    backend.finger_touch(150, 480, 1) # d
-    backend.finger_touch(170, 400, 1) # r
-    backend.finger_touch(320, 400, 1) # u
-    backend.finger_touch(130, 300, 1)
-    backend.finger_touch(350, 480, 1) # j
-    backend.finger_touch(320, 400, 1) # u
-    backend.finger_touch(150, 480, 1) # d
-    backend.finger_touch(130, 300, 1)
-    backend.finger_touch(470, 400, 1) # p
-    backend.finger_touch(420, 400, 1) # o
-    backend.finger_touch(420, 400, 1) # o
-    backend.finger_touch(130, 300, 1)
-    backend.finger_touch(450, 480, 1) # l
-    backend.finger_touch(370, 400, 1) # i
-    backend.finger_touch(420, 400, 1) # o
-    backend.finger_touch(130, 300, 1)
-    backend.finger_touch(400, 480, 1) # k
-    backend.finger_touch(120, 400, 1) # e
-    backend.finger_touch(120, 400, 1) # e
-    backend.finger_touch(130, 300, 1)
-    backend.finger_touch(370, 400, 1) # i
-    backend.finger_touch(150, 480, 1) # d
-    backend.finger_touch(450, 480, 1) # l
-    backend.finger_touch(130, 300, 1)
-    backend.finger_touch(120, 560, 1) # c
-    backend.finger_touch(320, 400, 1) # u
-    backend.finger_touch(100, 480, 1) # s
-    backend.finger_touch(130, 300, 1)
-    backend.finger_touch(370, 400, 1) # i
-    backend.finger_touch(120, 560, 1) # c
-    backend.finger_touch(120, 400, 1) # e
-    backend.finger_touch(130, 300, 1)
-    backend.finger_touch(170, 400, 1) # r
-    backend.finger_touch(320, 400, 1) # u
-    backend.finger_touch(100, 480, 1) # s
-    backend.finger_touch(130, 300, 1)
-    backend.finger_touch(200, 480, 1) # f
-    backend.finger_touch(50, 480, 1) # a
-    backend.finger_touch(120, 560, 1) # c
-    backend.finger_touch(130, 300, 1)
-    backend.finger_touch(170, 560, 1) # v
-    backend.finger_touch(370, 400, 1) # i
-    backend.finger_touch(120, 400, 1) # e
-    backend.finger_touch(130, 300, 1)
-    backend.finger_touch(220, 400, 1) # t
-    backend.finger_touch(70, 400, 1) # w
-    backend.finger_touch(370, 400, 1) # i
-    backend.finger_touch(130, 300, 1)
-    backend.finger_touch(170, 560, 1) # v
-    backend.finger_touch(120, 400, 1) # e
-    backend.finger_touch(170, 400, 1) # r
-    backend.finger_touch(130, 300, 1)
-    backend.finger_touch(470, 400, 1) # p
-    backend.finger_touch(420, 400, 1) # o
-    backend.finger_touch(100, 480, 1) # s
-    backend.finger_touch(130, 300, 1)
-    backend.finger_touch(120, 400, 1) # e
-    backend.finger_touch(470, 400, 1) # p
-    backend.finger_touch(370, 400, 1) # i
-    backend.finger_touch(130, 300, 1)
-    backend.finger_touch(70, 400, 1) # w
-    backend.finger_touch(300, 480, 1) # h
-    backend.finger_touch(370, 400, 1) # i
-    backend.finger_touch(130, 300, 1)
-    backend.finger_touch(350, 480, 1) # j
-    backend.finger_touch(320, 400, 1) # u
-    backend.finger_touch(320, 560, 1) # m
-    backend.finger_touch(130, 300, 1)
-    backend.finger_touch(350, 480, 1) # j
-    backend.finger_touch(320, 400, 1) # u
-    backend.finger_touch(170, 400, 1) # r
-    backend.finger_touch(130, 300, 1)
-    backend.finger_touch(220, 400, 1) # t
-    backend.finger_touch(320, 400, 1) # u
-    backend.finger_touch(270, 560, 1) # n
-    backend.finger_touch(130, 300, 1)
-    backend.finger_touch(270, 560, 1) # n
-    backend.finger_touch(120, 400, 1) # e
-    backend.finger_touch(70, 560, 1) # x
-    backend.finger_touch(130, 300, 1)
-    backend.finger_touch(400, 480, 1) # k
-    backend.finger_touch(120, 400, 1) # e
-    backend.finger_touch(120, 400, 1) # e
-    backend.finger_touch(130, 300, 1)
-    backend.finger_touch(250, 480, 1) # g
-    backend.finger_touch(270, 400, 1) # y
-    backend.finger_touch(170, 400, 1) # r
-    backend.finger_touch(130, 300, 1)
-    backend.finger_touch(470, 400, 1) # p
-    backend.finger_touch(50, 480, 1) # a
-    backend.finger_touch(370, 400, 1) # i
-    backend.finger_touch(130, 300, 1)
-    backend.finger_touch(120, 560, 1) # c
-    backend.finger_touch(450, 480, 1) # l
-    backend.finger_touch(50, 480, 1) # a
-    backend.finger_touch(130, 300, 1)
-    backend.finger_touch(50, 480, 1) # a
-    backend.finger_touch(220, 560, 1) # b
-    backend.finger_touch(450, 480, 1) # l
-    backend.finger_touch(130, 300, 1)
-    backend.finger_touch(50, 480, 1) # a
-    backend.finger_touch(120, 560, 1) # c
-    backend.finger_touch(370, 400, 1) # i
-    backend.finger_touch(130, 300, 1)
-    backend.finger_touch(50, 480, 1) # a
-    backend.finger_touch(120, 560, 1) # c
-    backend.finger_touch(370, 400, 1) # i
-    backend.finger_touch(130, 300, 1)
-    backend.finger_touch(250, 480, 1) # g
-    backend.finger_touch(170, 400, 1) # r
-    backend.finger_touch(50, 480, 1) # a
-    backend.finger_touch(130, 300, 1)
-    backend.finger_touch(20, 400, 1) # q
-    backend.finger_touch(320, 400, 1) # u
-    backend.finger_touch(50, 480, 1) # a
-    backend.finger_touch(130, 300, 1)
-    backend.finger_touch(400, 480, 1) # k
-    backend.finger_touch(370, 400, 1) # i
-    backend.finger_touch(450, 480, 1) # l
-    backend.finger_touch(130, 300, 1)
-    backend.finger_touch(70, 400, 1) # w
-    backend.finger_touch(50, 480, 1) # a
-    backend.finger_touch(450, 480, 1) # l
-    backend.finger_touch(130, 300, 1)
-    backend.finger_touch(400, 480, 1) # k
-    backend.finger_touch(120, 400, 1) # e
-    backend.finger_touch(470, 400, 1) # p
-    backend.finger_touch(130, 300, 1)
-    backend.finger_touch(150, 480, 1) # d
-    backend.finger_touch(120, 400, 1) # e
-    backend.finger_touch(450, 480, 1) # l
-    backend.finger_touch(130, 300, 1)
-    backend.finger_touch(320, 560, 1) # m
-    backend.finger_touch(370, 400, 1) # i
-    backend.finger_touch(450, 480, 1) # l
-    backend.finger_touch(130, 300, 1)
-    backend.finger_touch(120, 400, 1) # e
-    backend.finger_touch(470, 400, 1) # p
-    backend.finger_touch(370, 400, 1) # i
-    backend.finger_touch(130, 300, 1)
-    backend.finger_touch(170, 400, 1) # r
-    backend.finger_touch(50, 480, 1) # a
-    backend.finger_touch(120, 560, 1) # c
-    backend.finger_touch(130, 300, 1)
-    backend.finger_touch(200, 480, 1) # f
-    backend.finger_touch(320, 400, 1) # u
-    backend.finger_touch(120, 400, 1) # e
-    backend.finger_touch(130, 300, 1)
-    backend.finger_touch(150, 480, 1) # d
-    backend.finger_touch(370, 400, 1) # i
-    backend.finger_touch(120, 560, 1) # c
-    backend.finger_touch(130, 300, 1)
-    backend.finger_touch(220, 560, 1) # b
-    backend.finger_touch(450, 480, 1) # l
-    backend.finger_touch(320, 400, 1) # u
-    backend.finger_touch(130, 300, 1)
-    backend.finger_touch(250, 480, 1) # g
-    backend.finger_touch(50, 480, 1) # a
-    backend.finger_touch(320, 560, 1) # m
-    backend.finger_touch(130, 300, 1)
-    backend.finger_touch(270, 400, 1) # y
-    backend.finger_touch(50, 480, 1) # a
-    backend.finger_touch(270, 560, 1) # n
-    backend.finger_touch(130, 300, 1)
-    backend.finger_touch(200, 480, 1) # f
-    backend.finger_touch(120, 400, 1) # e
-    backend.finger_touch(170, 400, 1) # r
-    backend.finger_touch(130, 300, 1)
-    backend.finger_touch(220, 560, 1) # b
-    backend.finger_touch(320, 400, 1) # u
-    backend.finger_touch(450, 480, 1) # l
-    backend.finger_touch(130, 300, 1)
-    backend.finger_touch(250, 480, 1) # g
-    backend.finger_touch(120, 400, 1) # e
-    backend.finger_touch(50, 480, 1) # a
-    backend.finger_touch(130, 300, 1)
-    backend.finger_touch(350, 480, 1) # j
-    backend.finger_touch(50, 480, 1) # a
-    backend.finger_touch(150, 480, 1) # d
-    backend.finger_touch(130, 300, 1)
-    backend.finger_touch(270, 560, 1) # n
-    backend.finger_touch(50, 480, 1) # a
-    backend.finger_touch(170, 560, 1) # v
-    backend.finger_touch(130, 300, 1)
-    backend.finger_touch(120, 560, 1) # c
-    backend.finger_touch(420, 400, 1) # o
-    backend.finger_touch(100, 480, 1) # s
-    backend.finger_touch(130, 300, 1)
+    words = configuration.OPTIONAL.CUSTOM_SEED
+    for shard in sskr_shards:
+        for word in shard.split():
+            keyboard.write(word[:3])
+            suggestion.choose(1)
     backend.wait_for_text_on_screen("Valid Secret", 5)
     backend.wait_for_text_on_screen("Recovery Phrase", 1)
-    backend.finger_touch(240, 550, 1)
+    check_result.tap()
     backend.wait_for_text_on_screen("Recover BIP39", 5)
-    backend.finger_touch(240, 460, 1)
+    choice.confirm()
     backend.wait_for_text_on_screen("BIP39 Phrase", 5)
     backend.wait_for_text_on_screen("fly mule excess", 1)
     backend.wait_for_text_on_screen("resource treat plunge", 1)
     backend.wait_for_text_on_screen("nose soda reflect adult",1)
     backend.wait_for_text_on_screen("ramp planet", 1)
-    backend.finger_touch(240, 550, 1)
+    review.exit()
     backend.wait_for_text_on_screen("Seed Tool", 5)
-    backend.finger_touch(240, 550, 1)
+    home_page.quit()
 
 @mark.use_on_backend("speculos")
-def test_sskr_128bit(firmware, backend, navigator, set_seed):
-    if firmware.device == "nanos":
+def test_sskr_128bit(device, backend, navigator, set_seed):
+    if device.type == DeviceType.NANOS:
         nanos_sskr_128bit(backend, navigator)
-    elif firmware.device == "nanosp":
+    elif device.type == DeviceType.NANOSP:
         skip("Skipping test for Nano S+ device")
-    elif firmware.device == "nanox":
+    elif device.type == DeviceType.NANOX:
         skip("Skipping test for Nano X device")
-    elif firmware.device == "stax":
-        stax_sskr_128bit(backend)
-    elif firmware.device == "flex":
-        flex_sskr_128bit(backend)
+    elif device.type == DeviceType.STAX:
+        all_eink_sskr_128bit(backend, device)
+    elif device.type == DeviceType.FLEX:
+        all_eink_sskr_128bit(backend, device)
