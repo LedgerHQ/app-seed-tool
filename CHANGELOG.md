@@ -5,9 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0] - 2024-10-28
+
+### Added
+
+- Add Stax layouts for generating SSKR shares
+- Add Stax layouts for checking SSKR shares
+- Add Stax layouts for recovering BIP39 phrase
+- Add screenshots and animations
+- Add demo videos for Stax and Nano S
+- Add Stax function tests
+- Port to Ledger Flex
+- Add Flex function tests
+
+### Fixed
+
+- Some plausible yet wrong mnemonic were deemed valid on NBGL devices
+- Merge Nano code
+- Improve efficiency of `cx_bn_gf2_n_mul()` for Nano S
+
 ## [1.7.4] - 2024-06-20
 
 ### Fixed
+
 - Ensure result does not overlap with operands in calls to `cx_bn_gf2_n_mul()`
 - Give a warning if a user chooses 1-of-m shares when m > 1
 - Use CBOR tag for version 2 `sskr`
@@ -16,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.7.3] - 2024-05-29
 
 ### Fixed
+
 - Changed name of 'Generate BIP39' menus to 'Recover BIP39'
 - Changed Second Montgomery constant used for `cx_bn_gf2_n_mul()` to a more suitable value
 - Improve efficiency of `cx_bn_gf2_n_mul()` for Nano S
@@ -28,7 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Using Ledger SDK `cx_crc32()` function rather than buggy `cx_crc32_hw()`.
 - Fix build with SDK master for Nano S
 
-## [1.7.1] - 2024-03-06
+## [1.7.1] - 2024-04-06
 
 ### Changed
 

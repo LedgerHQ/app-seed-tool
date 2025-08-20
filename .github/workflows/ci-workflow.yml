@@ -19,7 +19,7 @@ jobs:
     uses: LedgerHQ/ledger-app-workflows/.github/workflows/reusable_build.yml@v1
     with:
       upload_app_binaries_artifact: compiled_app_binaries
-      run_for_devices: '["nanos", "nanox", "nanosp", "stax"]'
+      run_for_devices: '["nanos", "nanox", "nanosp", "stax", "flex"]'
 
   ledger_app_test_function:
     name: Run ragger tests using the reusable workflow
@@ -28,7 +28,7 @@ jobs:
     with:
       download_app_binaries_artifact: compiled_app_binaries
       test_dir: tests/functional
-      run_for_devices: '["nanos"]'
+      run_for_devices: '["nanos", "stax", "flex"]'
 
   ledger_app_test_unit:
     name: Unit tests
@@ -53,10 +53,13 @@ jobs:
         with:
           name: code-coverage
           path: tests/unit/coverage
+      - name: Install codecov dependencies
+        run: apk update && apk add curl gpg
       - name: Upload to codecov.io
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v5
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         with:
-          token: ${{ secrets.CODECOV_TOKEN }}
           files: ./tests/unit/coverage.info
           flags: unittests
           name: codecov-app-seed-tool
