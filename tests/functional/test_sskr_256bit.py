@@ -1,8 +1,12 @@
 from pytest import fixture
 from pytest import mark
 from pytest import skip
+from ledgered.devices import DeviceType
 from ragger.navigator import NavInsID
 from ragger.conftest import configuration
+from ragger.firmware.touch.use_cases import UseCaseHomeExt, UseCaseViewDetails, UseCaseChoice
+from ragger.firmware.touch.layouts import CenteredFooter, LetterOnlyKeyboard, Suggestions, ChoiceList
+from keypad import Keypad
 
 @fixture(scope='session')
 def set_seed():
@@ -1217,16 +1221,63 @@ def nanos_sskr_256bit(backend, navigator):
     navigator.navigate([NavInsID.RIGHT_CLICK], screen_change_before_first_instruction=False)        
     backend.wait_for_text_on_screen("Quit", 1)
 
+def all_eink_sskr_256bit(backend, device):
+    sskr_shards = ["tuna next keep hard data love wolf able acid able duty surf belt task judo legs ruby cost belt pose ruby logo iron vows luck bald user lazy tuna belt guru buzz limp exam obey kept task cash saga pool love brag also yawn runs cats",
+                   "tuna next keep hard data love wolf able acid acid barn peck luau keys each duty waxy quad open bias what cusp zaps math kick dark join nail legs oboe also twin yank road very blue gray saga oboe city gear beta belt kiwi hill view"]
+
+    home_page = UseCaseHomeExt(backend, device)
+#    select_tool = ChoiceList(backend, device)
+    select_footer = CenteredFooter(backend, device)
+    keyboard = LetterOnlyKeyboard(backend, device)
+    suggestion = Suggestions(backend, device)
+    check_result = CenteredFooter(backend, device)
+    keypad = Keypad(backend, device)
+    review = UseCaseViewDetails(backend, device)
+    choice = UseCaseChoice(backend, device)
+
+    backend.wait_for_text_on_screen("Seed Tool", 10)
+    home_page.action()
+    backend.wait_for_text_on_screen("SSKR Check", 5)
+#    select_tool.choose(6)
+#   Workaround for https://github.com/LedgerHQ/ragger/issues/247
+    if device.type == DeviceType.STAX:
+        backend.finger_touch(212, 510, 1)
+    elif device.type == DeviceType.FLEX:
+        backend.finger_touch(240, 420, 1)
+    backend.wait_for_text_on_screen("Enter Share 1 Word 1", 5)
+    words = configuration.OPTIONAL.CUSTOM_SEED
+    for shard in sskr_shards:
+        for word in shard.split():
+            keyboard.write(word[:3])
+            suggestion.choose(1)
+    backend.wait_for_text_on_screen("Valid Secret", 5)
+    backend.wait_for_text_on_screen("Recovery Phrase", 1)
+    check_result.tap()
+    backend.wait_for_text_on_screen("Recover BIP39", 5)
+    choice.confirm()
+    backend.wait_for_text_on_screen("BIP39 Phrase", 5)
+    backend.wait_for_text_on_screen("toe priority custom", 1)
+    backend.wait_for_text_on_screen("gauge jacket theme", 1)
+    backend.wait_for_text_on_screen("arrest bargain gloom",1)
+    backend.wait_for_text_on_screen("wide ill fit eagle", 1)
+    backend.wait_for_text_on_screen("prepare capable fish", 1)
+    backend.wait_for_text_on_screen("limb cigar reform other", 1)
+    backend.wait_for_text_on_screen("priority speak rough", 1)
+    backend.wait_for_text_on_screen("imitate", 1)
+    review.exit()
+    backend.wait_for_text_on_screen("Seed Tool", 5)
+    home_page.quit()
+
 @mark.use_on_backend("speculos")
-def test_sskr_256bit(firmware, backend, navigator, set_seed):
-    if firmware.device == "nanos":
+def test_sskr_256bit(device, backend, navigator, set_seed):
+    if device.type == DeviceType.NANOS:
         nanos_sskr_256bit(backend, navigator)
-    elif firmware.device == "nanosp":
+    elif device.type == DeviceType.NANOSP:
         skip("Skipping test for Nano S+ device")
-    elif firmware.device == "nanox":
+    elif device.type == DeviceType.NANOX:
         skip("Skipping test for Nano X device")
-    elif firmware.device == "stax":
-        skip("Skipping test for Stax device")
-    elif firmware.device == "flex":
-        skip("Skipping test for Flex device")
+    elif device.type == DeviceType.STAX:
+        all_eink_sskr_256bit(backend, device)
+    elif device.type == DeviceType.FLEX:
+        all_eink_sskr_256bit(backend, device)
 

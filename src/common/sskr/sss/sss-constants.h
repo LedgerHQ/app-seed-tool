@@ -1,7 +1,7 @@
 //
 //  sss-constants.h
 //
-//  Copyright © 2020 by Blockchain Commons, LLC
+//  Copyright © 2020-2025 by Blockchain Commons, LLC
 //  Licensed under the "BSD-2-Clause Plus Patent License"
 //
 

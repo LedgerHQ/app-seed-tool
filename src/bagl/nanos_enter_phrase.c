@@ -1,5 +1,6 @@
 /*******************************************************************************
- *   (c) 2016-2022 Ledger SAS
+ *   Ledger Seed Tool application
+ *   (c) 2016-2025 Ledger SAS
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -406,7 +407,7 @@ void screen_onboarding_restore_word_validate(void) {
                 break;
             case 8:
                 if ((G_bolos_ux_context.sskr_words_buffer[3] & 0x1F) == 24) {
-                    G_bolos_ux_context.sskr_share_count = G_bolos_ux_context.sskr_share_count =
+                    G_bolos_ux_context.sskr_share_count =
                         (G_bolos_ux_context
                              .sskr_words_buffer[G_bolos_ux_context.sskr_words_buffer_length] &
                          0x0F) +

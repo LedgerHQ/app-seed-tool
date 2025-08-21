@@ -1,3 +1,20 @@
+/*******************************************************************************
+ *   Ledger Seed Tool application
+ *   (c) 2016-2025 Ledger SAS
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ ********************************************************************************/
+
 #include <string.h>
 #include <os.h>
 
@@ -669,7 +686,7 @@ static void sskr_threshold_validate(const uint8_t *thresholdentry, uint8_t lengt
         sskr_threshold_set(10 * sskr_threshold_get() + thresholdentry[i] - '0');
     }
 
-    PRINTF("Threshold value entered is '%d'\n", sskr_sharenum_get());
+    PRINTF("Threshold value entered is '%d'\n", sskr_threshold_get());
 
     if (sskr_threshold_get() < 1) {
         nbgl_useCaseStatus("Threshold value cannot be 0", false, display_select_generate_sskr_page);
@@ -677,8 +694,8 @@ static void sskr_threshold_validate(const uint8_t *thresholdentry, uint8_t lengt
         nbgl_useCaseStatus("Threshold value cannot be greater than number of shares",
                            false,
                            display_select_generate_sskr_page);
-    } else if (sskr_sharenum_get() == 1 && sskr_sharenum_get() > 1) {
-        nbgl_useCaseStatus("1-of-m shares where m > 1 is not supported",
+    } else if (sskr_threshold_get() == 1 && sskr_sharenum_get() > 1) {
+        nbgl_useCaseStatus("1-of-m shares where\nm > 1 is not supported",
                            false,
                            display_select_generate_sskr_page);
     } else {
