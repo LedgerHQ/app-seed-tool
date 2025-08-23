@@ -30,7 +30,7 @@ Not all Ledger devices are equal. The older, less capable devices do not have th
 |[Check Shamir's secret shares](#check-shamirs-secret-shares)|$${\color{green}✓}$$|$${\color{green}✓}$$|$${\color{green}✓}$$|$${\color{green}✓}$$|$${\color{green}✓}$$|
 |[Generate Shamir's secret sharing](#generate-shamirs-secret-sharing)|$${\color{green}✓}$$|$${\color{green}✓}$$|$${\color{green}✓}$$|$${\color{green}✓}$$|$${\color{green}✓}$$|
 |[Recover BIP-39](#recover-bip-39)|$${\color{green}✓}$$|$${\color{green}✓}$$|$${\color{green}✓}$$|$${\color{green}✓}$$|$${\color{green}✓}$$|
-|[Generate BIP-85](#generate-bip-85)|$${\color{red}✗}$$|$${\color{orange}✓}$$|$${\color{orange}✓}$$|$${\color{orange}✓}$$|$${\color{orange}✓}$$|
+|[Generate BIP-85](#generate-bip-85)|$${\color{red}✗}$$|$${\color{orange}✓}$$|$${\color{orange}✓}$$|$${\color{green}✓}$$|$${\color{green}✓}$$|
 </div>
 
 ## Application menu flow
@@ -39,7 +39,7 @@ Not all Ledger devices are equal. The older, less capable devices do not have th
 title: Seed Tool menu flow
 ---
 flowchart LR
-    1 --- 2 --- 3 --- 4
+    1 --- 2 --- 3 --- 4 --- 5
     subgraph 1[BIP-39]
         direction TB
         1.1[Check BIP-39]
@@ -63,13 +63,32 @@ flowchart LR
             2.4.1[Recover BIP-39 Phrases] --> 2.4.2[Display BIP-39 Phrases] --> 2.4.3[Quit]
         end
     end
-    subgraph 3[Version]
+    subgraph 3[BIP-85]
         direction TB
-        3.1[Version]
+        3.1[Select BIP-85 Application] --> 3.2{BIP-85 Application choice}
+        3.2 --> |BIP-39| 3.3
+        3.2 --> |Base64 Password| 3.4
+        3.2 --> |Base85 Password| 3.5
+        subgraph 3.3[BIP-39 Application]
+            direction TB
+            3.3.1[Select phrase length] --> 3.3.2[Enter index] --> 3.3.3[Display BIP-39 phrase] --> 3.3.4[Quit]
         end
-    subgraph 4[Quit]
+        subgraph 3.4[Base64 Password Application]
+            direction TB
+            3.4.1[Enter password length] --> 3.4.2[Enter index] --> 3.4.3[Display password] --> 3.4.4[Quit]
+        end
+        subgraph 3.5[Base85 Password Application]
+            direction TB
+            3.5.1[Enter password length] --> 3.5.2[Enter index] --> 3.5.3[Display password] --> 3.5.4[Quit]
+        end
+	end
+    subgraph 4[Version]
         direction TB
-        4.1[Quit]
+        4.1[Version]
+        end
+    subgraph 5[Quit]
+        direction TB
+        5.1[Quit]
     end
 ```
 > [!TIP]
@@ -122,7 +141,7 @@ Due to the limitations of some of the older and smaller Ledger devices, not all 
 
 ||Nano S|Nano S+|Nano X|Stax|Flex|
 | :--- | :---: | :---: | :---: | :---: | :---: |
-|[BIP-39](https://github.com/bitcoin/bips/blob/master/bip-0085.mediawiki#user-content-BIP-39)|$${\color{red}✗}$$|$${\color{orange}✓}$$|$${\color{orange}✓}$$|$${\color{orange}✓}$$|$${\color{orange}✓}$$|
+|[BIP-39](https://github.com/bitcoin/bips/blob/master/bip-0085.mediawiki#user-content-BIP-39)|$${\color{red}✗}$$|$${\color{orange}✓}$$|$${\color{orange}✓}$$|$${\color{green}✓}$$|$${\color{green}✓}$$|
 |[HEX](https://github.com/bitcoin/bips/blob/master/bip-0085.mediawiki#user-content-HEX)|$${\color{red}✗}$$|$${\color{orange}✓}$$|$${\color{orange}✓}$$|$${\color{orange}✓}$$|$${\color{orange}✓}$$|
 |[PWD BASE64](https://github.com/bitcoin/bips/blob/master/bip-0085.mediawiki#user-content-PWD_BASE64)|$${\color{red}✗}$$|$${\color{orange}✓}$$|$${\color{orange}✓}$$|$${\color{orange}✓}$$|$${\color{orange}✓}$$|
 |[PWD BASE85](https://github.com/bitcoin/bips/blob/master/bip-0085.mediawiki#user-content-PWD_BASE85)|$${\color{red}✗}$$|$${\color{orange}✓}$$|$${\color{orange}✓}$$|$${\color{orange}✓}$$|$${\color{orange}✓}$$|

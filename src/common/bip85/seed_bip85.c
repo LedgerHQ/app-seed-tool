@@ -105,7 +105,7 @@ void bolos_ux_bip85_drng_test(uint8_t* digest, size_t digest_length, unsigned in
     memzero(buffer, BIP85_ENTROPY_LENGTH);
 }
 
-void bolos_ux_bip85_bip39(uint8_t* hex_out, uint8_t language, uint8_t words, unsigned int index) {
+uint8_t bolos_ux_bip85_bip39(uint8_t* hex_out, uint8_t language, uint8_t words, unsigned int index) {
     LEDGER_ASSERT(
         (words >= BIP39_MNEMONIC_SIZE_12) && (words % 3 == 0) && (words <= BIP39_MNEMONIC_SIZE_24),
         "Invalid value for BIP85 BIP89 words");
@@ -127,6 +127,7 @@ void bolos_ux_bip85_bip39(uint8_t* hex_out, uint8_t language, uint8_t words, uns
     memzero(buffer, BIP85_ENTROPY_LENGTH);
 
     PRINTF("BIP85 BIP39 hex output:\n%.*H\n", words * 4 / 3, hex_out);
+    return words * 4 / 3;
 }
 
 void bolos_ux_bip85_hex(uint8_t* hex_out, uint8_t num_bytes, unsigned int index) {
