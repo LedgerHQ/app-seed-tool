@@ -29,7 +29,7 @@ enum UI_STATE uiState;
 //////////////////////////////////////////////////////////////////////
 
 void screen_onboarding_bip39_restore_init(void) {
-    G_bolos_ux_context.onboarding_type = ONBOARDING_TYPE_BIP39;
+    G_bolos_ux_context.tool_type = TOOL_TYPE_BIP39;
     screen_onboarding_restore_word_init(RESTORE_WORD_ACTION_FIRST_WORD);
 }
 
@@ -50,13 +50,13 @@ const char* number_of_bip39_words_getter(unsigned int idx) {
 void number_of_bip39_words_selector(unsigned int idx) {
     switch (idx) {
         case 0:
-            G_bolos_ux_context.onboarding_kind = BIP39_MNEMONIC_SIZE_12;
+            G_bolos_ux_context.bip39_type = BIP39_MNEMONIC_SIZE_12;
             goto word_init;
         case 1:
-            G_bolos_ux_context.onboarding_kind = BIP39_MNEMONIC_SIZE_18;
+            G_bolos_ux_context.bip39_type = BIP39_MNEMONIC_SIZE_18;
             goto word_init;
         case 2:
-            G_bolos_ux_context.onboarding_kind = BIP39_MNEMONIC_SIZE_24;
+            G_bolos_ux_context.bip39_type = BIP39_MNEMONIC_SIZE_24;
             goto word_init;
         word_init:
             screen_onboarding_bip39_restore_init();
@@ -85,7 +85,7 @@ UX_FLOW(ux_bip39_flow, &ux_bip39_instruction_step, &ux_bip39_menu_step);
 //////////////////////////////////////////////////////////////////////
 
 void screen_onboarding_sskr_restore_init(void) {
-    G_bolos_ux_context.onboarding_type = ONBOARDING_TYPE_SSKR;
+    G_bolos_ux_context.tool_type = TOOL_TYPE_SSKR;
     screen_onboarding_restore_word_init(RESTORE_WORD_ACTION_FIRST_WORD);
 }
 
@@ -98,7 +98,7 @@ UX_STEP_CB(ux_sskr_instruction_step,
                "recovery phrase",
            });
 #else
-UX_STEP_CB(ux_sskr_instruction_step, nnn, G_bolos_ux_context.onboarding_type = ONBOARDING_TYPE_SSKR;
+UX_STEP_CB(ux_sskr_instruction_step, nnn, G_bolos_ux_context.tool_type = TOOL_TYPE_SSKR;
            screen_onboarding_restore_word_init(RESTORE_WORD_ACTION_FIRST_WORD);
            ,
            {

@@ -38,11 +38,11 @@ void screen_onboarding_restore_word_display_auto_complete(void);
 
 // bolos ux context (not mandatory if redesigning a bolos ux)
 typedef struct bolos_ux_context {
-    // 12, 18 or 24 word BIP39 onboarding kind
-    unsigned int onboarding_kind;
+    // 12, 18 or 24 word BIP39
+    unsigned int bip39_type;
 
-    // Type of onboarding we are performing (BIP39 or SSKR)
-    unsigned int onboarding_type;
+    // Type of tool we are using (BIP39 or SSKR)
+    unsigned int tool_type;
 
     // State of the dynamic display
     unsigned int current_state;
