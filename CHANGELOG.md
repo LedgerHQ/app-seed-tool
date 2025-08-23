@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Add functions that implement several BIP85 applications
+- Add unit tests for base64 and base85
 
 ## [1.8.1] - 2025-07-24
 

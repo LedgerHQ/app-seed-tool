@@ -6,7 +6,7 @@ endif()
 
 # project information
 project(unit_tests
-        VERSION 1.8.1
+        VERSION 1.9.0
 	      DESCRIPTION "Unit tests for app-seed-tool Ledger Application"
         LANGUAGES C)
 
@@ -134,7 +134,7 @@ set(PICKY_DEVELOPER OFF CACHE BOOL "CMocka: Build with picky developer flags" FO
 FetchContent_MakeAvailable(cmocka)
 
 add_compile_definitions(TEST DEBUG=0 SKIP_FOR_CMOCKA)
-add_compile_definitions(TARGET_NANOS HAVE_HASH HAVE_HMAC HAVE_SHA224 HAVE_SHA256 HAVE_SHA512 HAVE_PBKDF2 HAVE_ECC HAVE_CRC HAVE_RNG IO_HID_EP_LENGTH=64)
+add_compile_definitions(TARGET_NANOS HAVE_HASH HAVE_HMAC HAVE_SHA224 HAVE_SHA256 HAVE_SHA512 HAVE_PBKDF2 HAVE_ECC HAVE_CRC HAVE_RNG IO_HID_EP_LENGTH=64 OS_IO_SEPH_BUFFER_SIZE=272)
 
 # Set LEDGER_SECURE_SDK only if it's not already set
 if(NOT DEFINED ENV{LEDGER_SECURE_SDK})
@@ -144,7 +144,7 @@ else()
   message(STATUS "LEDGER_SECURE_SDK already set: $ENV{LEDGER_SECURE_SDK}")
 endif()
 
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/lib $ENV{LEDGER_SECURE_SDK}/include $ENV{LEDGER_SECURE_SDK}/lib_cxng/src $ENV{LEDGER_SECURE_SDK}/lib_cxng/include $ENV{LEDGER_SECURE_SDK}/lib_ux/include $ENV{LEDGER_SECURE_SDK}/lib_bagl/include)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/lib $ENV{LEDGER_SECURE_SDK}/include $ENV{LEDGER_SECURE_SDK}/lib_cxng/src $ENV{LEDGER_SECURE_SDK}/lib_cxng/include $ENV{LEDGER_SECURE_SDK}/lib_ux/include $ENV{LEDGER_SECURE_SDK}/lib_bagl/include $ENV{LEDGER_SECURE_SDK}/io/include $ENV{LEDGER_SECURE_SDK}/io_legacy/include)
 
 # add src
 set(ExternalProject_Get_property(openssl INSTALL_DIR))
@@ -182,6 +182,12 @@ add_executable(test_words ./tests/words.c ../../src/common/bip39/seed_rom_variab
 target_include_directories(test_words PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common)
 target_link_libraries(test_words PUBLIC cmocka gcov testutils sskr sss)
 
-foreach(target test_sss test_sskr test_bip39 test_roundtrip test_words)
+add_executable(test_base64 tests/base64.c ../../src/common/bip85/seed_rom_variables.c ../../src/common/bip85/base64.c)
+target_link_libraries(test_base64 PUBLIC cmocka gcov)
+
+add_executable(test_base85 tests/base85.c ../../src/common/bip85/seed_rom_variables.c ../../src/common/bip85/base85.c)
+target_link_libraries(test_base85 PUBLIC cmocka gcov)
+
+foreach(target test_sss test_sskr test_bip39 test_roundtrip test_words test_base64 test_base85)
     add_test(NAME ${target} COMMAND ${target})
 endforeach()
