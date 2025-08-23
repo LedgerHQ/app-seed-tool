@@ -8,16 +8,23 @@
 
 typedef struct bip85_buffer_struct {
     // buffer to hold BIP85 app output
-    uint8_t buffer[BIP85_ENTROPY_LENGTH];
+    uint8_t buffer[BASE64_ENCODE_LENGTH];
     uint8_t length;
     // type of BIP85 app we are using
     uint8_t type;
     // BIP85 derivation path index
     unsigned int index;
-
 } bip85_buffer_t;
 
 static bip85_buffer_t app_data = {0};
+
+void bip85_length_set(uint8_t length) {
+    app_data.length = length;
+}
+
+uint8_t bip85_length_get(void) {
+    return app_data.length;
+}
 
 void bip85_type_set(const uint8_t type) {
     app_data.type = type;
@@ -39,8 +46,13 @@ void bip85_app_reset(void) {
     memzero(&app_data, sizeof(app_data));
 }
 
-void bip85_app_bip39_gen(void){
+void bip85_app_bip39_gen(void) {
     app_data.length = bolos_ux_bip85_bip39(app_data.buffer, 0, bip39_mnemonic_final_size_get(), app_data.index);
     bip39_mnemonic_encode(app_data.buffer, app_data.length);
+}
+
+uint8_t* bip85_app_pwd_base64_gen(void) {
+    app_data.length = bolos_ux_bip85_pwd_base64((char *)app_data.buffer, app_data.length, app_data.index);
+    return app_data.buffer;
 }
 #endif

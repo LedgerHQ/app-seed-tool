@@ -10,7 +10,7 @@
 
 - [ ] Add BIP85 menus to Stax and Flex
   - [x] Add BIP85 application menus to generate BIP39 children
-  - [ ] Add BIP85 application menus to generate base64 password children
+  - [x] Add BIP85 application menus to generate base64 password children
   - [ ] Add BIP85 application menus to generate base85 password children
 - [ ] Merge Nano code
 - [ ] Improve the efficiency of the custom cx_bn_gf2_n_mul() function used for Nano S devices

@@ -143,7 +143,7 @@ Due to the limitations of some of the older and smaller Ledger devices, not all 
 | :--- | :---: | :---: | :---: | :---: | :---: |
 |[BIP-39](https://github.com/bitcoin/bips/blob/master/bip-0085.mediawiki#user-content-BIP-39)|$${\color{red}✗}$$|$${\color{orange}✓}$$|$${\color{orange}✓}$$|$${\color{green}✓}$$|$${\color{green}✓}$$|
 |[HEX](https://github.com/bitcoin/bips/blob/master/bip-0085.mediawiki#user-content-HEX)|$${\color{red}✗}$$|$${\color{orange}✓}$$|$${\color{orange}✓}$$|$${\color{orange}✓}$$|$${\color{orange}✓}$$|
-|[PWD BASE64](https://github.com/bitcoin/bips/blob/master/bip-0085.mediawiki#user-content-PWD_BASE64)|$${\color{red}✗}$$|$${\color{orange}✓}$$|$${\color{orange}✓}$$|$${\color{orange}✓}$$|$${\color{orange}✓}$$|
+|[PWD BASE64](https://github.com/bitcoin/bips/blob/master/bip-0085.mediawiki#user-content-PWD_BASE64)|$${\color{red}✗}$$|$${\color{orange}✓}$$|$${\color{orange}✓}$$|$${\color{green}✓}$$|$${\color{green}✓}$$|
 |[PWD BASE85](https://github.com/bitcoin/bips/blob/master/bip-0085.mediawiki#user-content-PWD_BASE85)|$${\color{red}✗}$$|$${\color{orange}✓}$$|$${\color{orange}✓}$$|$${\color{orange}✓}$$|$${\color{orange}✓}$$|
 |[DICE](https://github.com/bitcoin/bips/blob/master/bip-0085.mediawiki#user-content-DICE)|$${\color{red}✗}$$|$${\color{orange}✓}$$|$${\color{orange}✓}$$|$${\color{orange}✓}$$|$${\color{orange}✓}$$|
 </div>

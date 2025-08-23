@@ -45,7 +45,7 @@ static nbgl_page_t *pageContext;
 static char headerText[HEADER_SIZE] = {0};
 static nbgl_layout_t *layout = 0;
 
-static char item_buffer[25 + BIP85_INDEX_MAX_NUMBER_LENGTH] = {0};
+static char item_buffer[32 + BIP85_INDEX_MAX_NUMBER_LENGTH] = {0};
 static char value_buffer[(SSKR_SHARES_MAX_LENGTH / 16) + 1]= {0};
 
 unsigned int tool_type;
@@ -54,7 +54,7 @@ static void display_home_page(void);
 static void display_check_keyboard_page(void);
 static void display_check_result_page(const bool result);
 static void display_bip39_select_phrase_length_page(void);
-static void display_generic_content(void);
+static void display_generic_review(void);
 static void display_sskr_select_numshares_page(void);
 static void display_sskr_select_threshold_page(void);
 static void display_bip85_select_app_page(void);
@@ -161,7 +161,7 @@ static void select_recover_bip39_choice(bool bip39_rec) {
         strncpy(value_buffer, bip39_mnemonic_get(), bip39_mnemonic_length_get());
         // Ensure null termination
         value_buffer[bip39_mnemonic_length_get()] = '\0';
-        display_generic_content();
+        display_generic_review();
     } else {
         display_home_page();
     }
@@ -622,7 +622,7 @@ static void review_done(void) {
     display_home_page();
 }
 
-static void display_generic_content() {
+static void display_generic_review() {
     static nbgl_layoutTagValue_t pairs[1];
     static const nbgl_content_t content[1] = {
         {.type = TAG_VALUE_LIST,
@@ -635,8 +635,8 @@ static void display_generic_content() {
                                                           .contentsList = content,
                                                           .nbContents = 1};
 
-    pairs[0].item = item_buffer;
-    pairs[0].value = value_buffer;
+    pairs[0].item = PIC(item_buffer);
+    pairs[0].value = PIC(value_buffer);
 
     nbgl_useCaseGenericReview(&genericContent, "Done", review_done);
 }
@@ -655,14 +655,14 @@ static void review_sskr_shares_contentGetter(uint8_t index, nbgl_content_t *gene
     // Ensure null termination
     item_buffer[sskr_sharecount_get() > 9 ? sizeof(item_buffer) - 1 : sizeof(item_buffer) - 2] =
         '\0';
-    pairs[0].item = item_buffer;
+    pairs[0].item = PIC(item_buffer);
 
     strncpy(value_buffer,
             sskr_shares_get() + (index * sskr_shares_length_get() / sskr_sharecount_get()),
             sskr_shares_length_get() / sskr_sharecount_get());
     // Ensure null termination
     value_buffer[sskr_shares_length_get() / sskr_sharecount_get()] = '\0';
-    pairs[0].value = value_buffer;
+    pairs[0].value = PIC(value_buffer);
 }
 
 static void display_sskr_shares(void) {
@@ -744,15 +744,25 @@ static void bip85_index_validate(const uint8_t *indexentry, uint8_t length) {
     PRINTF("BIP85 index entered is '%d'\n", bip85_index_get());
 
     if (bip85_index_get() <= (UINT32_MAX >> 1)) {
-        if (bip85_type_get() == BIP85_APP_BIP39 >> 1) {
-            bip85_app_bip39_gen();
-            SPRINTF(item_buffer, "BIP39 Phrase (Index #%d)", bip85_index_get());
-            strncpy(value_buffer, bip39_mnemonic_get(), bip39_mnemonic_length_get());
-            // Ensure null termination
-            value_buffer[bip39_mnemonic_length_get()] = '\0';
-            display_generic_content();
-        } else {
-            display_bip85_select_app_page();
+        switch (bip85_type_get()) {
+            case BIP85_APP_BIP39:
+                bip85_app_bip39_gen();
+                SPRINTF(item_buffer, "BIP39 Phrase (Index #%d)", bip85_index_get());
+                strncpy(value_buffer, bip39_mnemonic_get(), bip39_mnemonic_length_get());
+                // Ensure null termination
+                value_buffer[bip39_mnemonic_length_get()] = '\0';
+                display_generic_review();
+                break;
+            case BIP85_APP_PWD_BASE64:
+                SPRINTF(item_buffer, "Base64 Password (Index #%d)", bip85_index_get());
+                strncpy(value_buffer, (const char *)bip85_app_pwd_base64_gen(), bip85_length_get());
+                // Ensure null termination
+                value_buffer[bip85_length_get()] = '\0';
+                display_generic_review();
+                break;
+            default:
+                display_bip85_select_app_page();
+                break;
         }
     } else {
         nbgl_useCaseStatus("BIP85 index must be between 0 and 2,147,483,647",
@@ -781,6 +791,50 @@ void display_bip85_select_index_page() {
                              bip85_index_entry_cb);
 }
 
+static void bip85_password_length_validate(const uint8_t *lengthentry, uint8_t length) {
+    // Code to validate BIP85 index
+
+    bip85_length_set(0);
+
+    for (uint8_t i = 0; i < length; i++) {
+        bip85_length_set(10 * bip85_length_get() + lengthentry[i] - '0');
+    }
+    PRINTF("BIP85 password length entered is '%d'\n", bip85_length_get());
+
+    uint8_t password_length_min = 20;
+    uint8_t password_length_max = 86;
+    char message[50] = {0};
+
+    if ((bip85_length_get() >= password_length_min) && (bip85_length_get() <= password_length_max)) {
+        display_bip85_select_index_page();
+    } else {
+        snprintf(message, sizeof(message), "BIP85 password length must be between %d and %d",
+                 password_length_min, password_length_max);
+        nbgl_useCaseStatus((const char *)message,
+                           false,
+                           display_bip85_select_app_page);
+    }
+}
+
+static void bip85_password_length_entry_cb(int token, uint8_t index) {
+    UNUSED(index);
+    // Callback for the key navigation (back key mainly)
+    if (token == SELECT_BIP85_APP_BACK_BUTTON_INDEX) {
+        display_bip85_select_app_page();
+    }
+}
+void display_bip85_select_password_length_page() {
+    // Draw the keypad
+    nbgl_useCaseKeypadDigits("Enter password length",
+                             1,
+                             2,
+                             SELECT_BIP85_APP_BACK_BUTTON_INDEX,
+                             false,
+                             TUNE_TAP_CASUAL,
+                             bip85_password_length_validate,
+                             bip85_password_length_entry_cb);
+}
+
 static void select_bip85_app_callback(nbgl_obj_t *obj, nbgl_touchType_t eventType) {
     nbgl_obj_t **screenChildren = nbgl_screenGetElements(0);
     if (eventType != TOUCHED) {
@@ -793,7 +847,7 @@ static void select_bip85_app_callback(nbgl_obj_t *obj, nbgl_touchType_t eventTyp
         display_bip39_select_phrase_length_page();
     } else if (obj == screenChildren[SELECT_BIP85_APP_BUTTON_PWD_BASE64_INDEX]) {
         bip85_type_set(BIP85_APP_PWD_BASE64);
-        nbgl_useCaseStatus("Under Construction\nComing soon", false, display_bip85_select_app_page);
+        display_bip85_select_password_length_page();
     } else if (obj == screenChildren[SELECT_BIP85_APP_BUTTON_PWD_BASE85_INDEX]) {
         bip85_type_set(BIP85_APP_PWD_BASE85);
         nbgl_useCaseStatus("Under Construction\nComing soon", false, display_bip85_select_app_page);

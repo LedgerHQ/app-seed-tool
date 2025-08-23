@@ -1,5 +1,5 @@
 /*******************************************************************************
- *   (c) 2016-2022 Ledger SAS
+ *   (c) 2016-2025 Ledger SAS
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -25,6 +25,17 @@ enum __attribute__((packed)) bip85_app_type {
 };
 
 /*
+ * Sets the length of the data in the app buffer
+ */
+void bip85_length_set(const uint8_t length);
+
+
+/*
+ * Returns the length of the data in the app buffer
+ */
+uint8_t bip85_length_get(void);
+
+/*
  * Sets the BIP85 app type we are using
  */
 void bip85_type_set(const uint8_t type);
@@ -43,6 +54,7 @@ void bip85_index_set(const uint32_t index);
  * Returns the BIP85 derivation path index
  */
 uint32_t bip85_index_get(void);
+
 /*
  * Erase all BIP85 app information
  */
@@ -53,4 +65,18 @@ void bip85_app_reset(void);
  */
 void bip85_app_bip39_gen(void);
 
+/*
+ * Sets the BIP85 child password length
+ */
+void bip85_password_length_set(const uint8_t length);
+
+/*
+ * Gets the BIP85 child password length
+ */
+uint8_t bip85_get_get();
+
+/*
+ * Generate base64 password and return pointer to password
+ */
+uint8_t* bip85_app_pwd_base64_gen(void);
 #endif  // SCREEN_SIZE_WALLET

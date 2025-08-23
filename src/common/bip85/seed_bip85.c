@@ -152,7 +152,7 @@ void bolos_ux_bip85_hex(uint8_t* hex_out, uint8_t num_bytes, unsigned int index)
     PRINTF("BIP85 HEX output:\n%.*H\n", num_bytes, hex_out);
 }
 
-void bolos_ux_bip85_pwd_base64(char* pwd, uint8_t pwd_len, unsigned int index) {
+uint8_t bolos_ux_bip85_pwd_base64(char* pwd, uint8_t pwd_len, unsigned int index) {
     LEDGER_ASSERT((pwd_len >= 20) && (pwd_len <= BASE64_ENCODE_LENGTH - 2),
                   "Invalid value for BIP85 PWD BASE64 length");
 
@@ -170,12 +170,13 @@ void bolos_ux_bip85_pwd_base64(char* pwd, uint8_t pwd_len, unsigned int index) {
                   "Base64 encoding failed");
 
     memcpy(pwd, buffer_pwd, pwd_len);
-    pwd[pwd_len] = '\0';  // Add string termination character
 
     memzero(buffer_ent, BIP85_ENTROPY_LENGTH);
     memzero(buffer_pwd, BASE64_ENCODE_LENGTH);
 
     PRINTF("BIP85 PWD BASE64 output: %s\n", pwd);
+
+    return pwd_len;
 }
 
 void bolos_ux_bip85_pwd_base85(char* pwd, uint8_t pwd_len, unsigned int index) {
