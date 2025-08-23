@@ -222,12 +222,11 @@ const bagl_element_t *screen_onboarding_restore_word_keyboard_callback(unsigned 
                     // update the slider's possible words
                     // account for the extra clear word, and clear any previous word items (go back
                     // in the onboarding process)
-                    bolos_ux_hslider3_init(
-                        G_bolos_ux_context.onboarding_words_checked +
-                        MIN(G_bolos_ux_context.onboarding_step + 1,
-                            (G_bolos_ux_context.tool_type == TOOL_TYPE_BIP39)
-                                ? RESTORE_BIP39_WORD_MAX_BACKWARD_STEPS
-                                : RESTORE_SSKR_WORD_MAX_BACKWARD_STEPS));
+                    bolos_ux_hslider3_init(G_bolos_ux_context.onboarding_words_checked +
+                                           MIN(G_bolos_ux_context.onboarding_step + 1,
+                                               (G_bolos_ux_context.tool_type == TOOL_TYPE_BIP39)
+                                                   ? RESTORE_BIP39_WORD_MAX_BACKWARD_STEPS
+                                                   : RESTORE_SSKR_WORD_MAX_BACKWARD_STEPS));
                     screen_onboarding_restore_word_display_word_selection();
                 }
                 return NULL;

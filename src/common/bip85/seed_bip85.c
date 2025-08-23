@@ -105,7 +105,10 @@ void bolos_ux_bip85_drng_test(uint8_t* digest, size_t digest_length, unsigned in
     memzero(buffer, BIP85_ENTROPY_LENGTH);
 }
 
-uint8_t bolos_ux_bip85_bip39(uint8_t* hex_out, uint8_t language, uint8_t words, unsigned int index) {
+uint8_t bolos_ux_bip85_bip39(uint8_t* hex_out,
+                             uint8_t language,
+                             uint8_t words,
+                             unsigned int index) {
     LEDGER_ASSERT(
         (words >= BIP39_MNEMONIC_SIZE_12) && (words % 3 == 0) && (words <= BIP39_MNEMONIC_SIZE_24),
         "Invalid value for BIP85 BIP89 words");
@@ -179,7 +182,7 @@ uint8_t bolos_ux_bip85_pwd_base64(char* pwd, uint8_t pwd_len, unsigned int index
     return pwd_len;
 }
 
-void bolos_ux_bip85_pwd_base85(char* pwd, uint8_t pwd_len, unsigned int index) {
+uint8_t bolos_ux_bip85_pwd_base85(char* pwd, uint8_t pwd_len, unsigned int index) {
     LEDGER_ASSERT((pwd_len >= 10) && (pwd_len <= BASE85_ENCODE_LENGTH),
                   "Invalid value for BIP85 PWD BASE85 length");
 
@@ -203,6 +206,8 @@ void bolos_ux_bip85_pwd_base85(char* pwd, uint8_t pwd_len, unsigned int index) {
     memzero(buffer_pwd, BASE85_ENCODE_LENGTH);
 
     PRINTF("BIP85 PWD BASE85 output: %s\n", pwd);
+
+    return pwd_len;
 }
 
 void bolos_ux_bip85_dice(uint32_t* out, uint32_t sides, uint32_t rolls, unsigned int index) {

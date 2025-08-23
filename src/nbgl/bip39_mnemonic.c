@@ -140,8 +140,7 @@ void bip39_mnemonic_from_sskr_shares(unsigned char* seed) {
     }
 }
 
-void bip39_mnemonic_encode(const uint8_t *seed, uint8_t seed_len) {
-
+void bip39_mnemonic_encode(const uint8_t* seed, uint8_t seed_len) {
     // convert input bytes to a mnemonic phrase return 0 if mnemonic is invalid
     mnemonic.length = bolos_ux_bip39_mnemonic_encode(seed,
                                                      seed_len,

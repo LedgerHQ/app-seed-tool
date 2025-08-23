@@ -47,12 +47,19 @@ void bip85_app_reset(void) {
 }
 
 void bip85_app_bip39_gen(void) {
-    app_data.length = bolos_ux_bip85_bip39(app_data.buffer, 0, bip39_mnemonic_final_size_get(), app_data.index);
+    app_data.length =
+        bolos_ux_bip85_bip39(app_data.buffer, 0, bip39_mnemonic_final_size_get(), app_data.index);
     bip39_mnemonic_encode(app_data.buffer, app_data.length);
 }
 
 uint8_t* bip85_app_pwd_base64_gen(void) {
-    app_data.length = bolos_ux_bip85_pwd_base64((char *)app_data.buffer, app_data.length, app_data.index);
+    app_data.length =
+        bolos_ux_bip85_pwd_base64((char*) app_data.buffer, app_data.length, app_data.index);
+    return app_data.buffer;
+}
+uint8_t* bip85_app_pwd_base85_gen(void) {
+    app_data.length =
+        bolos_ux_bip85_pwd_base85((char*) app_data.buffer, app_data.length, app_data.index);
     return app_data.buffer;
 }
 #endif
