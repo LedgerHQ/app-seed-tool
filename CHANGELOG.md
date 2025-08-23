@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add functions that implement several BIP85 applications
 - Add unit tests for base64 and base85
+- Add BIP85 application menus to generate BIP39 children on Flex and Stax
 
 ## [1.8.1] - 2025-07-24
 

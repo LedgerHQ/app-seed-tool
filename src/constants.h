@@ -20,20 +20,21 @@
 #define ONBOARDING_WORD_COMPLETION_MAX_ITEMS 8
 #define BOLOS_UX_HASH_LENGTH                 4  // as on the blue
 
-#define BIP39_MAX_WORD_LENGTH 8
-#define MAX_NUMBER_LENGTH     2
+#define BIP39_MAX_WORD_LENGTH          8
+#define SSKR_MAX_NUMBER_LENGTH         2
+#define BIP85_INDEX_MAX_NUMBER_LENGTH  7
 
-enum {
+enum __attribute__((packed)) {
     BIP39_MNEMONIC_SIZE_12 = 12,
     BIP39_MNEMONIC_SIZE_18 = 18,
     BIP39_MNEMONIC_SIZE_24 = 24,
 };
 
-// Type of tool we are using (BIP39 or SSKR)
-enum { TOOL_TYPE_BIP39, TOOL_TYPE_SSKR};
+// Type of tool we are using (BIP39, SSKR or BIP85)
+enum __attribute__((packed)) { TOOL_TYPE_BIP39, TOOL_TYPE_SSKR, TOOL_TYPE_BIP85 };
 
 // State of the dynamic display
-enum { STATIC_SCREEN, DYNAMIC_SCREEN };
+enum __attribute__((packed)) { STATIC_SCREEN, DYNAMIC_SCREEN };
 
 #define KEYBOARD_ITEM_VALIDATED \
     1  // callback is called with the entered item index, tmp_element is precharged with element to
