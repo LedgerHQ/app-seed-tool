@@ -44,7 +44,7 @@ static nbgl_page_t *pageContext;
 static char headerText[HEADER_SIZE] = {0};
 static nbgl_layout_t *layout = 0;
 
-unsigned int onboarding_type;
+unsigned int tool_type;
 
 static void display_home_page(void);
 static void display_check_keyboard_page(void);
@@ -82,8 +82,6 @@ enum select_tool {
     SELECT_TOOL_NB_CHILDREN
 };
 
-#define SELECT_TOOL_NB_BUTTONS 3
-
 static const char *toolType[] = {"BIP39 Check", "SSKR Check", "BIP85 Generate"};
 static void select_tool_callback(nbgl_obj_t *obj, nbgl_touchType_t eventType) {
     nbgl_obj_t **screenChildren = nbgl_screenGetElements(0);
@@ -93,11 +91,11 @@ static void select_tool_callback(nbgl_obj_t *obj, nbgl_touchType_t eventType) {
     io_seproxyhal_play_tune(TUNE_TAP_CASUAL);
     if (obj == screenChildren[SELECT_TOOL_BIP39_INDEX]) {
         nbgl_layoutRelease(layout);
-        onboarding_type = ONBOARDING_TYPE_BIP39;
+        tool_type = TOOL_TYPE_BIP39;
         display_bip39_select_phrase_length_page();
     } else if (obj == screenChildren[SELECT_TOOL_SSKR_INDEX]) {
         nbgl_layoutRelease(layout);
-        onboarding_type = ONBOARDING_TYPE_SSKR;
+        tool_type = TOOL_TYPE_SSKR;
         display_check_keyboard_page();
     } else if (obj == screenChildren[SELECT_TOOL_BIP85_INDEX]) {
         nbgl_layoutRelease(layout);
@@ -127,11 +125,11 @@ static void display_select_tool_page(void) {
         "\n\nSelect the tool\nyou wish to use";
     // create nb words buttons
     nbgl_objPoolGetArray(BUTTON,
-                         SELECT_TOOL_NB_BUTTONS,
+                         ARRAYLEN(toolType),
                          0,
                          (nbgl_obj_t **) &screenChildren[SELECT_TOOL_BIP39_INDEX]);
     generic_screen_configure_buttons((nbgl_button_t **) &screenChildren[SELECT_TOOL_BIP39_INDEX],
-                                     SELECT_TOOL_NB_BUTTONS);
+                                     ARRAYLEN(toolType));
     ((nbgl_button_t *) screenChildren[SELECT_TOOL_BIP39_INDEX])->text = toolType[0];
     ((nbgl_button_t *) screenChildren[SELECT_TOOL_BIP39_INDEX])->icon = &C_bip39_stax_32px;
     ((nbgl_button_t *) screenChildren[SELECT_TOOL_SSKR_INDEX])->text = toolType[1];
@@ -207,8 +205,6 @@ enum select_bip39_phrase_length {
     KBD_TEXT_TOKEN
 };
 
-#define SELECT_BIP39_PHRASE_LENGTH_NB_BUTTONS 3
-
 static const char *bip39_passphraseLength[] = {"12 words", "18 words", "24 words"};
 static void select_bip39_phrase_length_callback(nbgl_obj_t *obj, nbgl_touchType_t eventType) {
     nbgl_obj_t **screenChildren = nbgl_screenGetElements(0);
@@ -251,12 +247,12 @@ static void display_bip39_select_phrase_length_page(void) {
     // create nb words buttons
     nbgl_objPoolGetArray(
         BUTTON,
-        SELECT_BIP39_PHRASE_LENGTH_NB_BUTTONS,
+        ARRAYLEN(bip39_passphraseLength),
         0,
         (nbgl_obj_t **) &screenChildren[SELECT_BIP39_PHRASE_LENGTH_BUTTON_12_INDEX]);
     generic_screen_configure_buttons(
         (nbgl_button_t **) &screenChildren[SELECT_BIP39_PHRASE_LENGTH_BUTTON_12_INDEX],
-        SELECT_BIP39_PHRASE_LENGTH_NB_BUTTONS);
+        ARRAYLEN(bip39_passphraseLength));
     ((nbgl_button_t *) screenChildren[SELECT_BIP39_PHRASE_LENGTH_BUTTON_12_INDEX])->text =
         bip39_passphraseLength[0];
     ((nbgl_button_t *) screenChildren[SELECT_BIP39_PHRASE_LENGTH_BUTTON_18_INDEX])->text =
@@ -326,7 +322,7 @@ static void key_press_callback(const char touchedKey) {
         .title = PIC(headerText),
         .text = PIC(textToEnter),
         .numbered = true,
-        .number = onboarding_type == ONBOARDING_TYPE_BIP39
+        .number = tool_type == TOOL_TYPE_BIP39
                       ? bip39_mnemonic_current_word_number_get() + 1
                       : sskr_shares_current_word_number_get() + 1,
         .grayedOut = false,
@@ -341,7 +337,7 @@ static void key_press_callback(const char touchedKey) {
         nbgl_layoutUpdateKeyboardContent(layout, &keyboardContent);
     } else {
         const size_t nbMatchingWords =
-            onboarding_type == ONBOARDING_TYPE_BIP39
+            tool_type == TOOL_TYPE_BIP39
                 ? bolos_ux_bip39_fill_with_candidates((unsigned char *) &(textToEnter[0]),
                                                       strlen(textToEnter),
                                                       wordCandidates,
@@ -354,7 +350,7 @@ static void key_press_callback(const char touchedKey) {
         nbgl_layoutUpdateKeyboardContent(layout, &keyboardContent);
     }
     if (textLen > 0) {
-        mask = onboarding_type == ONBOARDING_TYPE_BIP39
+        mask = tool_type == TOOL_TYPE_BIP39
                    ? bolos_ux_bip39_get_keyboard_mask((unsigned char *) &(textToEnter[0]),
                                                       strlen(textToEnter))
                    : bolos_ux_sskr_get_keyboard_mask((unsigned char *) &(textToEnter[0]),
@@ -417,7 +413,7 @@ static void sskr_keyboard_dispatcher(const int token, uint8_t index) {
 static void display_check_keyboard_page() {
     nbgl_layoutDescription_t layoutDescription = {
         .modal = false,
-        .onActionCallback = onboarding_type == ONBOARDING_TYPE_BIP39 ? &bip39_keyboard_dispatcher
+        .onActionCallback = tool_type == TOOL_TYPE_BIP39 ? &bip39_keyboard_dispatcher
                                                                      : &sskr_keyboard_dispatcher};
     nbgl_layoutKbd_t kbdInfo = {.lettersOnly = true,   // use only letters
                                 .mode = MODE_LETTERS,  // start in letters mode
@@ -426,13 +422,13 @@ static void display_check_keyboard_page() {
     textToEnter[0] = '\0';
     memzero(buttonTexts, sizeof(buttonTexts[0]) * NB_MAX_SUGGESTION_BUTTONS);
     layout = nbgl_layoutGet(&layoutDescription);
-    if (onboarding_type == ONBOARDING_TYPE_BIP39) {
+    if (tool_type == TOOL_TYPE_BIP39) {
         snprintf(headerText,
                  HEADER_SIZE,
                  "Enter word n. %d/%d of your\nBIP39 Recovery Phrase",
                  bip39_mnemonic_current_word_number_get() + 1,
                  bip39_mnemonic_final_size_get());
-    } else if (onboarding_type == ONBOARDING_TYPE_SSKR) {
+    } else if (tool_type == TOOL_TYPE_SSKR) {
         snprintf(headerText,
                  HEADER_SIZE,
                  "Enter Share %d Word %d\nof your Recovery Phrase",
@@ -459,7 +455,7 @@ static void display_check_keyboard_page() {
         .title = PIC(headerText),
         .text = PIC(textToEnter),
         .numbered = true,
-        .number = onboarding_type == ONBOARDING_TYPE_BIP39
+        .number = tool_type == TOOL_TYPE_BIP39
                       ? bip39_mnemonic_current_word_number_get() + 1
                       : sskr_shares_current_word_number_get() + 1,
         .grayedOut = false,
@@ -507,10 +503,10 @@ static void display_home_page() {
  */
 static void check_result_callback(int token __attribute__((unused)),
                                   uint8_t index __attribute__((unused))) {
-    if (onboarding_type == ONBOARDING_TYPE_BIP39 && bip39_mnemonic_check(&seed_match) &&
+    if (tool_type == TOOL_TYPE_BIP39 && bip39_mnemonic_check(&seed_match) &&
         seed_match) {
         display_select_generate_sskr_page();
-    } else if (onboarding_type == ONBOARDING_TYPE_SSKR && sskr_shares_check(&seed_match)) {
+    } else if (tool_type == TOOL_TYPE_SSKR && sskr_shares_check(&seed_match)) {
         display_select_recover_bip39_page();
     } else {
         reset_globals();
@@ -541,7 +537,7 @@ static void display_check_result_page(const bool result) {
     nbgl_pageInfoDescription_t info = {
         .centeredInfo.icon = icons[result + seed_match],
         .centeredInfo.text1 = possible_results[result][0],
-        .centeredInfo.text2 = possible_results[result][1 + (onboarding_type * 2) + seed_match],
+        .centeredInfo.text2 = possible_results[result][1 + (tool_type * 2) + seed_match],
         .centeredInfo.text3 = NULL,
         .centeredInfo.style = LARGE_CASE_INFO,
         .centeredInfo.offsetY = -16,

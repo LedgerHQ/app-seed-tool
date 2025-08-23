@@ -29,8 +29,8 @@ enum {
     BIP39_MNEMONIC_SIZE_24 = 24,
 };
 
-// Type of onboarding we are performing (BIP39 or SSKR)
-enum { ONBOARDING_TYPE_BIP39, ONBOARDING_TYPE_SSKR };
+// Type of tool we are using (BIP39 or SSKR)
+enum { TOOL_TYPE_BIP39, TOOL_TYPE_SSKR};
 
 // State of the dynamic display
 enum { STATIC_SCREEN, DYNAMIC_SCREEN };
