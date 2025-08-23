@@ -73,8 +73,7 @@ void bip39_mnemonic_from_sskr_shares(unsigned char* seed);
 /*
  * Encode BIP39 mnemonic from hex input
  */
-void bip39_mnemonic_encode(const uint8_t *seed, uint8_t seed_len);
-
+void bip39_mnemonic_encode(const uint8_t* seed, uint8_t seed_len);
 /*
  * Returns the mnemonic passphrase
  */

@@ -29,7 +29,6 @@ enum __attribute__((packed)) bip85_app_type {
  */
 void bip85_length_set(const uint8_t length);
 
-
 /*
  * Returns the length of the data in the app buffer
  */
@@ -79,4 +78,9 @@ uint8_t bip85_get_get();
  * Generate base64 password and return pointer to password
  */
 uint8_t* bip85_app_pwd_base64_gen(void);
+
+/*
+ * Generate base85 password and return pointer to password
+ */
+uint8_t* bip85_app_pwd_base85_gen(void);
 #endif  // SCREEN_SIZE_WALLET
