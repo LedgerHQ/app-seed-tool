@@ -18,6 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add Flex and Stax function tests for base64 password application of BIP85
 - Add Flex and Stax function tests for base85 password application of BIP85
 
+### Security
+
+- Wipe text buffers on Stax and Flex as early as possible
+
 ## [1.8.1] - 2025-07-24
 
 ### Fixed
