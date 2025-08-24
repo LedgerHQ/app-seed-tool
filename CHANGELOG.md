@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.9.0] - 2025-08-23
+## [1.9.0] - 2025-08-24
 
 ### Added
 
@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add BIP85 application menus to generate BIP39 children on Flex and Stax
 - Add BIP85 application menus to generate base64 passwords on Flex and Stax
 - Add BIP85 application menus to generate base85 passwords on Flex and Stax
+- Add Flex and Stax function tests for BIP39 application of BIP85
 
 ## [1.8.1] - 2025-07-24
 
