@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add BIP85 application menus to generate base64 passwords on Flex and Stax
 - Add BIP85 application menus to generate base85 passwords on Flex and Stax
 - Add Flex and Stax function tests for BIP39 application of BIP85
+- Add Flex and Stax function tests for base64 password application of BIP85
 
 ## [1.8.1] - 2025-07-24
 
