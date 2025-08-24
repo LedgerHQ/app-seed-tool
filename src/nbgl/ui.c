@@ -42,11 +42,10 @@
 
 static nbgl_page_t *pageContext;
 
-static char headerText[HEADER_SIZE] = {0};
 static nbgl_layout_t *layout = 0;
 
-static char item_buffer[32 + BIP85_INDEX_MAX_NUMBER_LENGTH] = {0};
-static char value_buffer[(SSKR_SHARES_MAX_LENGTH / 16) + 1] = {0};
+static char headerText[HEADER_SIZE] = {0};
+static char reviewText[(SSKR_SHARES_MAX_LENGTH / 16) + 1] = {0};
 
 unsigned int tool_type;
 
@@ -70,6 +69,8 @@ static void reset_globals() {
     sskr_shares_reset();
     bip85_app_reset();
     memzero(buttonTexts, sizeof(buttonTexts[0]) * NB_MAX_SUGGESTION_BUTTONS);
+    memzero(headerText, sizeof(headerText));
+    memzero(reviewText, sizeof(reviewText));
 }
 
 static void on_quit(void) {
@@ -157,10 +158,10 @@ static void display_select_tool_page(void) {
 static void select_recover_bip39_choice(bool bip39_rec) {
     nbgl_layoutRelease(layout);
     if (bip39_rec) {
-        SPRINTF(item_buffer, "BIP39 Phrase");
-        strncpy(value_buffer, bip39_mnemonic_get(), bip39_mnemonic_length_get());
+        SPRINTF(headerText, "BIP39 Phrase");
+        strncpy(reviewText, bip39_mnemonic_get(), bip39_mnemonic_length_get());
         // Ensure null termination
-        value_buffer[bip39_mnemonic_length_get()] = '\0';
+        reviewText[bip39_mnemonic_length_get()] = '\0';
         display_generic_review();
     } else {
         display_home_page();
@@ -376,6 +377,7 @@ static void key_press_callback(const char touchedKey) {
 
 static void bip39_keyboard_dispatcher(const int token, uint8_t index) {
     UNUSED(index);
+    memzero(textToEnter, sizeof(textToEnter));
     nbgl_layoutRelease(layout);
     if (token == CHECK_BACK_BUTTON_TOKEN) {
         if (bip39_mnemonic_word_remove()) {
@@ -400,6 +402,7 @@ static void bip39_keyboard_dispatcher(const int token, uint8_t index) {
 
 static void sskr_keyboard_dispatcher(const int token, uint8_t index) {
     UNUSED(index);
+    memzero(textToEnter, sizeof(textToEnter));
     nbgl_layoutRelease(layout);
     if (token == CHECK_BACK_BUTTON_TOKEN) {
         if (sskr_shares_word_remove()) {
@@ -608,10 +611,7 @@ void display_sskr_select_numshares_page() {
 }
 
 static void review_done(void) {
-    memzero(item_buffer, sizeof(item_buffer));
-    memzero(value_buffer, sizeof(value_buffer));
     reset_globals();
-
     display_home_page();
 }
 
@@ -628,8 +628,8 @@ static void display_generic_review() {
                                                           .contentsList = content,
                                                           .nbContents = 1};
 
-    pairs[0].item = PIC(item_buffer);
-    pairs[0].value = PIC(value_buffer);
+    pairs[0].item = PIC(headerText);
+    pairs[0].value = PIC(reviewText);
 
     nbgl_useCaseGenericReview(&genericContent, "Done", review_done);
 }
@@ -644,18 +644,17 @@ static void review_sskr_shares_contentGetter(uint8_t index, nbgl_content_t *gene
     genericreview->content.tagValueList.wrapping = true;
     genericreview->content.tagValueList.pairs = (nbgl_layoutTagValue_t *) pairs;
 
-    SPRINTF(item_buffer, "SSKR Share #%d", index + 1);
+    SPRINTF(headerText, "SSKR Share #%d", index + 1);
     // Ensure null termination
-    item_buffer[sskr_sharecount_get() > 9 ? sizeof(item_buffer) - 1 : sizeof(item_buffer) - 2] =
-        '\0';
-    pairs[0].item = PIC(item_buffer);
+    headerText[sskr_sharecount_get() > 9 ? sizeof(headerText) - 1 : sizeof(headerText) - 2] = '\0';
+    pairs[0].item = PIC(headerText);
 
-    strncpy(value_buffer,
+    strncpy(reviewText,
             sskr_shares_get() + (index * sskr_shares_length_get() / sskr_sharecount_get()),
             sskr_shares_length_get() / sskr_sharecount_get());
     // Ensure null termination
-    value_buffer[sskr_shares_length_get() / sskr_sharecount_get()] = '\0';
-    pairs[0].value = PIC(value_buffer);
+    reviewText[sskr_shares_length_get() / sskr_sharecount_get()] = '\0';
+    pairs[0].value = PIC(reviewText);
 }
 
 static void display_sskr_shares(void) {
@@ -740,28 +739,24 @@ static void bip85_index_validate(const uint8_t *indexentry, uint8_t length) {
         switch (bip85_type_get()) {
             case BIP85_APP_BIP39:
                 bip85_app_bip39_gen();
-                SPRINTF(item_buffer, "BIP39 Phrase (Index #%d)", bip85_index_get());
-                strncpy(value_buffer, bip39_mnemonic_get(), bip39_mnemonic_length_get());
+                SPRINTF(headerText, "BIP39 Phrase (Index #%d)", bip85_index_get());
+                strncpy(reviewText, bip39_mnemonic_get(), bip39_mnemonic_length_get());
                 // Ensure null termination
-                value_buffer[bip39_mnemonic_length_get()] = '\0';
+                reviewText[bip39_mnemonic_length_get()] = '\0';
                 display_generic_review();
                 break;
             case BIP85_APP_PWD_BASE64:
-                SPRINTF(item_buffer, "Base64 Password (Index #%d)", bip85_index_get());
-                strncpy(value_buffer,
-                        (const char *) bip85_app_pwd_base64_gen(),
-                        bip85_length_get());
+                SPRINTF(headerText, "Base64 Password (Index #%d)", bip85_index_get());
+                strncpy(reviewText, (const char *) bip85_app_pwd_base64_gen(), bip85_length_get());
                 // Ensure null termination
-                value_buffer[bip85_length_get()] = '\0';
+                reviewText[bip85_length_get()] = '\0';
                 display_generic_review();
                 break;
             case BIP85_APP_PWD_BASE85:
-                SPRINTF(item_buffer, "Base85 Password (Index #%d)", bip85_index_get());
-                strncpy(value_buffer,
-                        (const char *) bip85_app_pwd_base85_gen(),
-                        bip85_length_get());
+                SPRINTF(headerText, "Base85 Password (Index #%d)", bip85_index_get());
+                strncpy(reviewText, (const char *) bip85_app_pwd_base85_gen(), bip85_length_get());
                 // Ensure null termination
-                value_buffer[bip85_length_get()] = '\0';
+                reviewText[bip85_length_get()] = '\0';
                 display_generic_review();
                 break;
             default:
