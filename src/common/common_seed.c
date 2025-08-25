@@ -23,7 +23,7 @@
 #include "./bip39/common_bip39.h"
 #if defined(HAVE_NBGL)
 #include "../nbgl/bip39_mnemonic.h"
-extern unsigned int onboarding_type;
+extern unsigned int tool_type;
 #endif
 
 bool compare_recovery_phrase(void) {
@@ -31,11 +31,11 @@ bool compare_recovery_phrase(void) {
     uint8_t buffer[64];
 
 #if defined(HAVE_BAGL)
-    if (G_bolos_ux_context.onboarding_type == ONBOARDING_TYPE_BIP39) {
+    if (G_bolos_ux_context.tool_type == TOOL_TYPE_BIP39) {
         bolos_ux_bip39_mnemonic_to_seed((unsigned char*) G_bolos_ux_context.words_buffer,
                                         G_bolos_ux_context.words_buffer_length,
                                         buffer);
-    } else if (G_bolos_ux_context.onboarding_type == ONBOARDING_TYPE_SSKR) {
+    } else if (G_bolos_ux_context.tool_type == TOOL_TYPE_SSKR) {
         G_bolos_ux_context.words_buffer_length = sizeof(G_bolos_ux_context.words_buffer);
         bolos_ux_sskr_to_seed_convert((unsigned char*) G_bolos_ux_context.sskr_words_buffer,
                                       G_bolos_ux_context.sskr_words_buffer_length,
@@ -45,11 +45,11 @@ bool compare_recovery_phrase(void) {
                                       buffer);
     }
 #elif defined(HAVE_NBGL)
-    if (onboarding_type == ONBOARDING_TYPE_BIP39) {
+    if (tool_type == TOOL_TYPE_BIP39) {
         bolos_ux_bip39_mnemonic_to_seed((const unsigned char *) bip39_mnemonic_get(),
                                         bip39_mnemonic_length_get(),
                                         buffer);
-    } else if (onboarding_type == ONBOARDING_TYPE_SSKR) {
+    } else if (tool_type == TOOL_TYPE_SSKR) {
         bip39_mnemonic_from_sskr_shares(buffer);
     }
 #endif

@@ -33,7 +33,7 @@
 #error "What kind of system is this?"
 #endif
 
-int16_t bolos_ux_sskr_size_get(uint8_t bip39_onboarding_kind,
+int16_t bolos_ux_sskr_size_get(uint8_t bip39_type,
                                uint8_t groups_threshold,
                                unsigned int *group_descriptor,
                                uint8_t groups_len,
@@ -45,7 +45,7 @@ int16_t bolos_ux_sskr_size_get(uint8_t bip39_onboarding_kind,
     }
 
     int16_t share_count_expected = sskr_count_shards(groups_threshold, groups, groups_len);
-    *share_len = bip39_onboarding_kind * 4 / 3 + SSKR_METADATA_LENGTH_BYTES;
+    *share_len = bip39_type * 4 / 3 + SSKR_METADATA_LENGTH_BYTES;
 
     return share_count_expected;
 }
@@ -188,13 +188,13 @@ unsigned int bolos_ux_sskr_byteword_to_hex(unsigned char *byteword) {
 
 unsigned int bolos_ux_bip39_to_sskr_convert(unsigned char *bip39_words_buffer,
                                             unsigned int bip39_words_buffer_length,
-                                            unsigned int bip39_onboarding_kind,
+                                            unsigned int bip39_type,
                                             unsigned int *group_descriptor,
                                             uint8_t *share_count,
                                             unsigned char *share_words_buffer,
                                             unsigned int *share_words_buffer_length) {
     // get seed from bip39 mnemonic
-    uint8_t seed_len = bip39_onboarding_kind * 4 / 3;
+    uint8_t seed_len = bip39_type * 4 / 3;
     uint8_t seed_buffer[SSKR_MAX_STRENGTH_BYTES + 1];
 
     if (bolos_ux_bip39_mnemonic_decode(bip39_words_buffer,
@@ -205,7 +205,7 @@ unsigned int bolos_ux_bip39_to_sskr_convert(unsigned char *bip39_words_buffer,
         uint8_t groups_len = 1;
         uint8_t groups_threshold = 1;
         uint8_t share_len_expected = 0;
-        int16_t share_count_expected = bolos_ux_sskr_size_get(bip39_onboarding_kind,
+        int16_t share_count_expected = bolos_ux_sskr_size_get(bip39_type,
                                                               groups_threshold,
                                                               group_descriptor,
                                                               groups_len,

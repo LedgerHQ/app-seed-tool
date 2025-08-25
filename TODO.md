@@ -8,12 +8,15 @@
 
 ### In Progress
 
-- [ ] Add BIP85 menus to Stax and Flex
 - [ ] Merge Nano code
 - [ ] Improve the efficiency of the custom cx_bn_gf2_n_mul() function used for Nano S devices
 
 ### Done ✓
 
+- [x] Add BIP85 menus to Stax and Flex
+  - [x] Add BIP85 application menus to generate BIP39 children
+  - [x] Add BIP85 application menus to generate base64 password children
+  - [x] Add BIP85 application menus to generate base85 password children
 - [x] Decouple BAGL / NBGL code
 - [x] Add Ledger Flex to list of devices app works on
 - [x] Add Ledger Stax to list of devices app works on

@@ -34,7 +34,7 @@ void bolos_ux_sskr_to_seed_convert(const unsigned char *sskr_shares_hex,
 // convert seed from BIP39 to SSKR
 unsigned int bolos_ux_bip39_to_sskr_convert(unsigned char *bip39_words_buffer,
                                             unsigned int bip39_words_buffer_length,
-                                            unsigned int bip39_onboarding_kind,
+                                            unsigned int bip39_type,
                                             unsigned int *sskr_group_descriptor,
                                             uint8_t *sskr_share_count,
                                             unsigned char *sskr_words_buffer,
