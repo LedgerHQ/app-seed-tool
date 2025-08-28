@@ -7,6 +7,7 @@ from ragger.conftest import configuration
 from ragger.firmware.touch.use_cases import UseCaseHomeExt, UseCaseViewDetails, UseCaseChoice
 from ragger.firmware.touch.layouts import CenteredFooter, LetterOnlyKeyboard, Suggestions, ChoiceList
 from keypad import Keypad
+from genericlayout import GenericLayout
 
 @fixture(scope='session')
 def set_seed():
@@ -852,26 +853,19 @@ def all_eink_sskr_128bit(backend, device):
                    "tuna next keep gyro paid claw able acid acid gray quad kiln wall kept deli mild epic race fuel dice blue game yank fern bulb gear jade navy cost"]
 
     home_page = UseCaseHomeExt(backend, device)
-#    select_tool = ChoiceList(backend, device)
-    select_footer = CenteredFooter(backend, device)
     keyboard = LetterOnlyKeyboard(backend, device)
     suggestion = Suggestions(backend, device)
     check_result = CenteredFooter(backend, device)
     keypad = Keypad(backend, device)
     review = UseCaseViewDetails(backend, device)
     choice = UseCaseChoice(backend, device)
+    genericbuttons = GenericLayout(backend, device)
 
     backend.wait_for_text_on_screen("Seed Tool", 10)
     home_page.action()
     backend.wait_for_text_on_screen("SSKR Check", 5)
-#    select_tool.choose(6)
-#   Workaround for https://github.com/LedgerHQ/ragger/issues/247
-    if device.type == DeviceType.STAX:
-        backend.finger_touch(212, 510, 1)
-    elif device.type == DeviceType.FLEX:
-        backend.finger_touch(240, 420, 1)
+    genericbuttons.choose(2)
     backend.wait_for_text_on_screen("Enter Share 1 Word 1", 5)
-    words = configuration.OPTIONAL.CUSTOM_SEED
     for shard in sskr_shards:
         for word in shard.split():
             keyboard.write(word[:3])

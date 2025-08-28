@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.0] - 2025-08-28
+
+### Added
+
+- Add functions that implement several BIP85 applications
+- Add unit tests for base64 and base85
+- Add BIP85 application menus to generate BIP39 children on Flex and Stax
+- Add BIP85 application menus to generate base64 passwords on Flex and Stax
+- Add BIP85 application menus to generate base85 passwords on Flex and Stax
+- Add Flex and Stax function tests for BIP39 application of BIP85
+- Add Flex and Stax function tests for base64 password application of BIP85
+- Add Flex and Stax function tests for base85 password application of BIP85
+
+### Fixed
+
+- Fix Stax and Flex function tests to work better with generic screen layouts
+
+### Security
+
+- Wipe text buffers on Stax and Flex as early as possible
 
 ## [1.8.1] - 2025-07-24
 

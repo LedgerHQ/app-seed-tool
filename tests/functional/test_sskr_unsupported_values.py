@@ -6,6 +6,7 @@ from ragger.conftest import configuration
 from ragger.firmware.touch.use_cases import UseCaseHomeExt, UseCaseViewDetails, UseCaseChoice
 from ragger.firmware.touch.layouts import CenteredFooter, LetterOnlyKeyboard, Suggestions, ChoiceList
 from keypad import Keypad
+from genericlayout import GenericLayout
 
 @fixture(scope='session')
 def set_seed():
@@ -14,25 +15,21 @@ def set_seed():
 
 def all_eink_unsupported_values(backend, device):
     home_page = UseCaseHomeExt(backend, device)
-#    select_tool = ChoiceList(backend, device)
-    select_footer = CenteredFooter(backend, device)
     keyboard = LetterOnlyKeyboard(backend, device)
     suggestion = Suggestions(backend, device)
     check_result = CenteredFooter(backend, device)
     keypad = Keypad(backend, device)
     review = UseCaseViewDetails(backend, device)
     choice = UseCaseChoice(backend, device)
+    genericbuttons = GenericLayout(backend, device)
 
     backend.wait_for_text_on_screen("Seed Tool", 10)
     home_page.action()
     backend.wait_for_text_on_screen("BIP39 Check", 5)
-#    select_tool.choose(6)
-#   Workaround for https://github.com/LedgerHQ/ragger/issues/247
-    select_footer.tap()
+    genericbuttons.choose(1)
     backend.wait_for_text_on_screen("12 words", 5)
-    select_footer.tap()
+    genericbuttons.choose(1)
     backend.wait_for_text_on_screen("Enter word", 5)
-    words = configuration.OPTIONAL.CUSTOM_SEED
     for word in configuration.OPTIONAL.CUSTOM_SEED.split():
         keyboard.write(word[:4])
         suggestion.choose(1)

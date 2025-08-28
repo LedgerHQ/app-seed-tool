@@ -19,18 +19,18 @@
 
 ---
 
-Use the utilities provided by this Ledger application to check a backed up BIP-39 seed, generate [Shamir's Secret Sharing (SSS)](https://en.wikipedia.org/wiki/Shamir%27s_secret_sharing) for a seed or recover a BIP-39 phrase from a Shamir's Secret Sharing backup.
+Use the utilities provided by this Ledger application to check a backed-up [BIP-39](https://github.com/bitcoin/bips/blob/master/bip-0039.mediawiki) seed, generate [Shamir's Secret Sharing (SSS)](https://en.wikipedia.org/wiki/Shamir%27s_secret_sharing) shares for a seed, recover a [BIP-39](https://github.com/bitcoin/bips/blob/master/bip-0039.mediawiki) phrase from a Shamir's Secret Sharing backup, generate [BIP-85](https://github.com/bitcoin/bips/blob/master/bip-0085.mediawiki) children, and more.
 
 Not all Ledger devices are equal. The older, less capable devices do not have the capacity to provide a full range of seed utilities. The following table lists the seed utilities provided by each devices type:
 <div align="center">
 
 ||Nano S|Nano S+|Nano X|Stax|Flex|
 | :--- | :---: | :---: | :---: | :---: | :---: |
-|[Check BIP39](#check-bip39)|$${\color{green}✓}$$|$${\color{green}✓}$$|$${\color{green}✓}$$|$${\color{green}✓}$$|$${\color{green}✓}$$|
+|[Check BIP-39](#check-bip-39)|$${\color{green}✓}$$|$${\color{green}✓}$$|$${\color{green}✓}$$|$${\color{green}✓}$$|$${\color{green}✓}$$|
 |[Check Shamir's secret shares](#check-shamirs-secret-shares)|$${\color{green}✓}$$|$${\color{green}✓}$$|$${\color{green}✓}$$|$${\color{green}✓}$$|$${\color{green}✓}$$|
 |[Generate Shamir's secret sharing](#generate-shamirs-secret-sharing)|$${\color{green}✓}$$|$${\color{green}✓}$$|$${\color{green}✓}$$|$${\color{green}✓}$$|$${\color{green}✓}$$|
-|[Recover BIP39](#recover-bip39)|$${\color{green}✓}$$|$${\color{green}✓}$$|$${\color{green}✓}$$|$${\color{green}✓}$$|$${\color{green}✓}$$|
-|[Generate BIP85](#generate-bip85)|$${\color{red}✗}$$|$${\color{orange}✓}$$|$${\color{orange}✓}$$|$${\color{orange}✓}$$|$${\color{orange}✓}$$|
+|[Recover BIP-39](#recover-bip-39)|$${\color{green}✓}$$|$${\color{green}✓}$$|$${\color{green}✓}$$|$${\color{green}✓}$$|$${\color{green}✓}$$|
+|[Generate BIP-85](#generate-bip-85)|$${\color{red}✗}$$|$${\color{orange}✓}$$|$${\color{orange}✓}$$|$${\color{green}✓}$$|$${\color{green}✓}$$|
 </div>
 
 ## Application menu flow
@@ -39,15 +39,15 @@ Not all Ledger devices are equal. The older, less capable devices do not have th
 title: Seed Tool menu flow
 ---
 flowchart LR
-    1 --- 2 --- 3 --- 4
-    subgraph 1[BIP39]
+    1 --- 2 --- 3 --- 4 --- 5
+    subgraph 1[BIP-39]
         direction TB
-        1.1[Check BIP39]
-        1.1 --> 1.2.1[Enter 12 Words] --> 1.3{Validate BIP39 Phrases}
+        1.1[Check BIP-39]
+        1.1 --> 1.2.1[Enter 12 Words] --> 1.3{Validate BIP-39 Phrases}
         1.1 --> 1.2.2[Enter 18 Words] --> 1.3
         1.1 --> 1.2.3[Enter 24 Words] --> 1.3
-        1.3 --> |Matching BIP39| 1.4
-        1.3 --> |Invalid BIP39| 1.3.1[Quit]
+        1.3 --> |Matching BIP-39| 1.4
+        1.3 --> |Invalid BIP-39| 1.3.1[Quit]
         subgraph 1.4[Generate SSKR Shares]
             direction TB
             1.4.1[Select number of shares] --> 1.4.2[Select threshold] --> 1.4.3[Generate SSKR Shares] --> 1.4.4[Display SSKR Shares] --> 1.4.5[Quit]
@@ -58,18 +58,37 @@ flowchart LR
         2.1[Check SSKR] --> 2.2[Enter SSKR Shares] --> 2.3{Validate SSKR Shares}
         2.3 --> |Valid SSKR| 2.4
         2.3 --> |Invalid SSKR| 2.3.1[Quit]
-        subgraph 2.4[Recover BIP39 Phrases]
+        subgraph 2.4[Recover BIP-39 Phrases]
             direction TB
-            2.4.1[Recover BIP39 Phrases] --> 2.4.2[Display BIP39 Phrases] --> 2.4.3[Quit]
+            2.4.1[Recover BIP-39 Phrases] --> 2.4.2[Display BIP-39 Phrases] --> 2.4.3[Quit]
         end
     end
-    subgraph 3[Version]
+    subgraph 3[BIP-85]
         direction TB
-        3.1[Version]
+        3.1[Select BIP-85 Application] --> 3.2{BIP-85 Application choice}
+        3.2 --> |BIP-39| 3.3
+        3.2 --> |Base64 Password| 3.4
+        3.2 --> |Base85 Password| 3.5
+        subgraph 3.3[BIP-39 Application]
+            direction TB
+            3.3.1[Select phrase length] --> 3.3.2[Enter index] --> 3.3.3[Display BIP-39 phrase] --> 3.3.4[Quit]
         end
-    subgraph 4[Quit]
+        subgraph 3.4[Base64 Password Application]
+            direction TB
+            3.4.1[Enter password length] --> 3.4.2[Enter index] --> 3.4.3[Display password] --> 3.4.4[Quit]
+        end
+        subgraph 3.5[Base85 Password Application]
+            direction TB
+            3.5.1[Enter password length] --> 3.5.2[Enter index] --> 3.5.3[Display password] --> 3.5.4[Quit]
+        end
+	end
+    subgraph 4[Version]
         direction TB
-        4.1[Quit]
+        4.1[Version]
+        end
+    subgraph 5[Quit]
+        direction TB
+        5.1[Quit]
     end
 ```
 > [!TIP]
@@ -77,7 +96,7 @@ flowchart LR
 > 
 > Alternatively, animations of some of the menu flows on different hardware devices are available [here](tests/functional/screenshots/README.md).
 
-## Check BIP39
+## Check BIP-39
 The application invites the user to type a [BIP-39](https://github.com/bitcoin/bips/blob/master/bip-0039.mediawiki) mnemonic on their Ledger device. The BIP-39 mnemonic is compared to the onboarded seed and the application notifies the user whether both seeds match or not.
 
 ## Generate Shamir's secret sharing
@@ -104,27 +123,48 @@ For more information about SSKR, see [SSKR for Users](https://github.com/Blockch
 ## Check Shamir's secret shares
 The Ledger application also provides an option to confirm the onboarded seed against SSKR shares.
 
-## Recover BIP39
-When the Shamir's secret shares have been validated the user can recover the BIP39 phrase derived from those shares. This option takes advantage of SSKR's ability to perform a BIP39 <-> SSKR round trip. If a user has lost or damaged their original Ledger device they may need to recover their BIP39 phrase on another secure device. A BIP39 phrase may still be recovered even if the SSKR phrases do not match the onboarded seed of a device but are still valid SSKR shares.
+## Recover BIP-39
+When the Shamir's secret shares have been validated the user can recover the BIP-39 phrase derived from those shares. This option takes advantage of SSKR's ability to perform a BIP-39 <-> SSKR round trip. If a user has lost or damaged their original Ledger device they may need to recover their BIP-39 phrase on another secure device. A BIP-39 phrase may still be recovered even if the SSKR phrases do not match the onboarded seed of a device but are still valid SSKR shares.
 
-## Generate [BIP85](https://github.com/bitcoin/bips/blob/master/bip-0085.mediawiki)
-**Coming soon!!!!**
+## Generate [BIP-85](https://github.com/bitcoin/bips/blob/master/bip-0085.mediawiki)
+BIP-85 is a standard built on top of [BIP-32](https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki) that enables the creation of child keys from a single parent seed. The protocol uses derivation paths to index the BIP-85 child keys. This ensures that you will always get the same child key if you follow the same derivation path from the same parent seed.
 
-BIP85 allows you to do crazy stuff like this:
+The BIP-85 standard describes several applications that use a fully hardened derivation path to create child keys supporting various formats such as BIP-39, xprv, hex, base64 passwords, base85 passwords, dice rolls and more.
+
+> [!NOTE]
+> A more detailed description of the BIP-85 standard may be found here:
+> [BIP-85: Deterministic Entropy From BIP-32 Keychains](https://github.com/bitcoin/bips/blob/master/bip-0085.mediawiki)
+
+Due to the limitations of some of the older and smaller Ledger devices, not all BIP-85 applications are supported by all devices. The following table lists the various BIP-85 applications available on different Ledger devices:
+
+<div align="center">
+
+||Nano S|Nano S+|Nano X|Stax|Flex|
+| :--- | :---: | :---: | :---: | :---: | :---: |
+|[BIP-39](https://github.com/bitcoin/bips/blob/master/bip-0085.mediawiki#user-content-BIP-39)|$${\color{red}✗}$$|$${\color{orange}✓}$$|$${\color{orange}✓}$$|$${\color{green}✓}$$|$${\color{green}✓}$$|
+|[PWD BASE64](https://github.com/bitcoin/bips/blob/master/bip-0085.mediawiki#user-content-PWD_BASE64)|$${\color{red}✗}$$|$${\color{orange}✓}$$|$${\color{orange}✓}$$|$${\color{green}✓}$$|$${\color{green}✓}$$|
+|[PWD BASE85](https://github.com/bitcoin/bips/blob/master/bip-0085.mediawiki#user-content-PWD_BASE85)|$${\color{red}✗}$$|$${\color{orange}✓}$$|$${\color{orange}✓}$$|$${\color{green}✓}$$|$${\color{green}✓}$$|
+|[HEX](https://github.com/bitcoin/bips/blob/master/bip-0085.mediawiki#user-content-HEX)|$${\color{red}✗}$$|$${\color{orange}✓}$$|$${\color{orange}✓}$$|$${\color{orange}✓}$$|$${\color{orange}✓}$$|
+|[DICE](https://github.com/bitcoin/bips/blob/master/bip-0085.mediawiki#user-content-DICE)|$${\color{red}✗}$$|$${\color{orange}✓}$$|$${\color{orange}✓}$$|$${\color{orange}✓}$$|$${\color{orange}✓}$$|
+</div>
+
+> [!TIP]
+> Safely, securely and redundantly backup a parent root seed using Shamir's Secret Sharing. Use BIP-85's BIP-39 application to create several child wallets from that parent root seed. Further protect those child wallets using passwords generated using the BIP-85 PWD BASE64 or PWD BASE85 applications. On Ledger devices those wallets can also then be protected by a PIN generated using the BIP-85 DICE application.
+
 ```mermaid
 ---
 title: One Seed to rule them all - Multi wallet
 ---
 flowchart TB
     1.1 --> |Backup| 1.2
-    1 --> |BIP85 Child 0| 2.1.1
-    1 --> |BIP85 Child 1| 2.1.2
-    1 --> |BIP85 Child 2| 2.2.1
-    1 --> |BIP85 Child 3| 2.2.2
-    1 --> |BIP85 Child 4| 2.3.1
-    1 --> |BIP85 Child 5| 2.3.2
-    1 --> |BIP85 Child 6| 2.4.1
-    1 --> |BIP85 Child 7| 2.4.2
+    1 --> |BIP-85 Child 0| 2.1.1
+    1 --> |BIP-85 Child 1| 2.1.2
+    1 --> |BIP-85 Child 2| 2.2.1
+    1 --> |BIP-85 Child 3| 2.2.2
+    1 --> |BIP-85 Child 4| 2.3.1
+    1 --> |BIP-85 Child 5| 2.3.2
+    1 --> |BIP-85 Child 6| 2.4.1
+    1 --> |BIP-85 Child 7| 2.4.2
     subgraph 1[Parent]
         direction TB
         1.1[Root Seed]
@@ -139,22 +179,22 @@ flowchart TB
         direction TB
         subgraph 2.1[Cold Wallet]
             direction LR
-            2.1.1[BIP39 #1]
+            2.1.1[BIP-39 #1]
             2.1.2[Password #1]
             end
             subgraph 2.2[Hardware Wallet]
             direction LR
-            2.2.1[BIP39 #2]
+            2.2.1[BIP-39 #2]
             2.2.2[Password #2]
             end
             subgraph 2.3[Lightning Wallet]
             direction LR
-            2.3.1[BIP39 #3]
+            2.3.1[BIP-39 #3]
             2.3.2[Password #3]
             end
             subgraph 2.4[Phone Wallet]
             direction LR
-            2.4.1[BIP39 #4]
+            2.4.1[BIP-39 #4]
             2.4.2[Password #4]
             end
     end
@@ -165,12 +205,12 @@ title: One Seed to rule them all - MultiSig
 ---
 flowchart TB
     1.1 --> |Backup| 1.2
-    1 --> |BIP85 Child 0| 2.1.1
-    1 --> |BIP85 Child 1| 2.1.2
-    1 --> |BIP85 Child 2| 2.2.1
-    1 --> |BIP85 Child 3| 2.2.2
-    1 --> |BIP85 Child 4| 2.3.1
-    1 --> |BIP85 Child 5| 2.3.2
+    1 --> |BIP-85 Child 0| 2.1.1
+    1 --> |BIP-85 Child 1| 2.1.2
+    1 --> |BIP-85 Child 2| 2.2.1
+    1 --> |BIP-85 Child 3| 2.2.2
+    1 --> |BIP-85 Child 4| 2.3.1
+    1 --> |BIP-85 Child 5| 2.3.2
     2.1 --> 3.1
     2.2 --> 3.2
     2.3 --> 3.3
@@ -188,17 +228,17 @@ flowchart TB
         direction TB
         subgraph 2.1[Wallet #1]
             direction LR
-            2.1.1[BIP39 #1]
+            2.1.1[BIP-39 #1]
             2.1.2[Password #1]
             end
             subgraph 2.2[Wallet #2]
             direction LR
-            2.2.1[BIP39 #2]
+            2.2.1[BIP-39 #2]
             2.2.2[Password #2]
             end
             subgraph 2.3[Wallet #3]
             direction LR
-            2.3.1[BIP39 #3]
+            2.3.1[BIP-39 #3]
             2.3.2[Password #3]
             end
     end

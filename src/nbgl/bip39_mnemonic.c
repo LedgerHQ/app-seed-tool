@@ -140,6 +140,18 @@ void bip39_mnemonic_from_sskr_shares(unsigned char* seed) {
     }
 }
 
+void bip39_mnemonic_encode(const uint8_t* seed, uint8_t seed_len) {
+    // convert input bytes to a mnemonic phrase return 0 if mnemonic is invalid
+    mnemonic.length = bolos_ux_bip39_mnemonic_encode(seed,
+                                                     seed_len,
+                                                     (unsigned char*) bip39_mnemonic_get(),
+                                                     BIP39_MNEMONIC_MAX_LENGTH);
+
+    if (mnemonic.length > 0) {
+        PRINTF("BIP39 mnemonic: %.*s\n", mnemonic.length, bip39_mnemonic_get());
+    }
+}
+
 // Used for BIP39 <-> SSKR roundtrip
 char* bip39_mnemonic_get(void) {
     return mnemonic.buffer;
