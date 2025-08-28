@@ -4,8 +4,9 @@ from pytest import skip
 from ledgered.devices import DeviceType
 from ragger.conftest import configuration
 from ragger.firmware.touch.use_cases import UseCaseHomeExt, UseCaseViewDetails
-from ragger.firmware.touch.layouts import CenteredFooter, ChoiceList
+from ragger.firmware.touch.layouts import ChoiceList
 from keypad import Keypad
+from genericlayout import GenericLayout
 
 @fixture(scope='session')
 def set_seed():
@@ -15,24 +16,16 @@ def set_seed():
 def all_eink_bip85_pwd_base85(backend, device):
     home_page = UseCaseHomeExt(backend, device)
     select_tool = ChoiceList(backend, device)
-    select_footer = CenteredFooter(backend, device)
     keypad = Keypad(backend, device)
     review = UseCaseViewDetails(backend, device)
+    genericbuttons = GenericLayout(backend, device)
 
     backend.wait_for_text_on_screen("Seed Tool", 10)
     home_page.action()
     backend.wait_for_text_on_screen("BIP85 Generate", 5)
-    if device.type == DeviceType.STAX:
-        backend.finger_touch(200, 420, 1)
-    elif device.type == DeviceType.FLEX:
-        backend.finger_touch(240, 320, 1)
-    backend.wait_for_text_on_screen("Which BIP85", 5)    
-#    select_tool.choose(6)
-#   Workaround for https://github.com/LedgerHQ/ragger/issues/247
-    if device.type == DeviceType.STAX:
-        backend.finger_touch(200, 420, 1)
-    elif device.type == DeviceType.FLEX:
-        backend.finger_touch(240, 320, 1)
+    genericbuttons.choose(3)
+    backend.wait_for_text_on_screen("Which BIP85", 5)
+    genericbuttons.choose(3)
     backend.wait_for_text_on_screen("Enter password length", 5)
     keypad.write("1")
     keypad.write("2")

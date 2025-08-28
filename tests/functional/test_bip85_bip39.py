@@ -4,8 +4,9 @@ from pytest import skip
 from ledgered.devices import DeviceType
 from ragger.conftest import configuration
 from ragger.firmware.touch.use_cases import UseCaseHomeExt, UseCaseViewDetails
-from ragger.firmware.touch.layouts import CenteredFooter, ChoiceList
+from ragger.firmware.touch.layouts import ChoiceList
 from keypad import Keypad
+from genericlayout import GenericLayout
 
 @fixture(scope='session')
 def set_seed():
@@ -15,37 +16,23 @@ def set_seed():
 def all_eink_bip85_bip39(backend, device):
     home_page = UseCaseHomeExt(backend, device)
     select_tool = ChoiceList(backend, device)
-    select_footer = CenteredFooter(backend, device)
     keypad = Keypad(backend, device)
     review = UseCaseViewDetails(backend, device)
+    genericbuttons = GenericLayout(backend, device)
 
     backend.wait_for_text_on_screen("Seed Tool", 10)
     home_page.action()
     backend.wait_for_text_on_screen("BIP85 Generate", 5)
-    if device.type == DeviceType.STAX:
-        backend.finger_touch(200, 420, 1)
-    elif device.type == DeviceType.FLEX:
-        backend.finger_touch(240, 320, 1)
-    backend.wait_for_text_on_screen("Which BIP85", 5)    
-#    select_tool.choose(6)
-#   Workaround for https://github.com/LedgerHQ/ragger/issues/247
-    select_footer.tap()
+    genericbuttons.choose(3)
+    backend.wait_for_text_on_screen("Which BIP85", 5)
+    genericbuttons.choose(1)
     backend.wait_for_text_on_screen("Length of BIP39", 5)  
-    select_footer.tap()    
+    genericbuttons.choose(1)
     backend.wait_for_text_on_screen("Enter index", 5)
     keypad.write("0")
     keypad.enter()
     backend.wait_for_text_on_screen("BIP39 Phrase", 5)
-    if device.type == DeviceType.STAX:
-        backend.wait_for_text_on_screen("girl mad pet galaxy", 1)
-        backend.wait_for_text_on_screen("egg matter matrix", 1)
-        backend.wait_for_text_on_screen("prison refuse sense", 1)
-        backend.wait_for_text_on_screen("ordinary nose", 1)
-    elif device.type == DeviceType.FLEX:
-        backend.wait_for_text_on_screen("girl mad pet galaxy egg", 1)
-        backend.wait_for_text_on_screen("matter matrix prison", 1)
-        backend.wait_for_text_on_screen("refuse sense ordinary", 1)
-        backend.wait_for_text_on_screen("nose", 1)
+    backend.wait_for_text_on_screen("girl mad pet galaxy egg matter matrix prison refuse sense ordinary nose", 1)
     review.exit()
     backend.wait_for_text_on_screen("Seed Tool", 5)
     home_page.quit()
