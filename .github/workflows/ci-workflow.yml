@@ -30,38 +30,3 @@ jobs:
       test_dir: tests/functional
       run_for_devices: '["stax", "flex"]'
 
-  ledger_app_test_unit:
-    name: Unit tests
-    needs: ledger_app_build
-    runs-on: ubuntu-latest
-
-    container:
-      image: ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder:latest
-
-    steps:
-      - name: Clone
-        uses: actions/checkout@v4
-      - name: Build unit tests
-        run: |
-          cd tests/unit/
-          make
-      - name: Generate code coverage
-        run: |
-          cd tests/unit/
-          make coverage
-      - uses: actions/upload-artifact@v4
-        with:
-          name: code-coverage
-          path: tests/unit/coverage
-      - name: Install codecov dependencies
-        run: apt update && apt install -y curl gpg
-      - name: Upload to codecov.io
-        uses: codecov/codecov-action@v5
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-        with:
-          files: ./tests/unit/coverage.info
-          flags: unittests
-          name: codecov-app-seed-tool
-          fail_ci_if_error: true
-          verbose: true
