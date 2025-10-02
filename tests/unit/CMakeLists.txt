@@ -134,7 +134,7 @@ set(PICKY_DEVELOPER OFF CACHE BOOL "CMocka: Build with picky developer flags" FO
 FetchContent_MakeAvailable(cmocka)
 
 add_compile_definitions(TEST DEBUG=0 SKIP_FOR_CMOCKA)
-add_compile_definitions(TARGET_NANOS HAVE_HASH HAVE_HMAC HAVE_SHA224 HAVE_SHA256 HAVE_SHA512 HAVE_PBKDF2 HAVE_ECC HAVE_CRC HAVE_RNG IO_HID_EP_LENGTH=64)
+add_compile_definitions(TARGET_NANOS HAVE_HASH HAVE_HMAC HAVE_SHA224 HAVE_SHA256 HAVE_SHA512 HAVE_PBKDF2 HAVE_ECC HAVE_CRC HAVE_RNG IO_HID_EP_LENGTH=64 OS_IO_SEPH_BUFFER_SIZE=300)
 
 # Set LEDGER_SECURE_SDK only if it's not already set
 if(NOT DEFINED ENV{LEDGER_SECURE_SDK})
@@ -144,7 +144,7 @@ else()
   message(STATUS "LEDGER_SECURE_SDK already set: $ENV{LEDGER_SECURE_SDK}")
 endif()
 
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/lib $ENV{LEDGER_SECURE_SDK}/include $ENV{LEDGER_SECURE_SDK}/lib_cxng/src $ENV{LEDGER_SECURE_SDK}/lib_cxng/include $ENV{LEDGER_SECURE_SDK}/lib_ux/include $ENV{LEDGER_SECURE_SDK}/lib_bagl/include)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/lib $ENV{LEDGER_SECURE_SDK}/include $ENV{LEDGER_SECURE_SDK}/lib_cxng/src $ENV{LEDGER_SECURE_SDK}/lib_cxng/include $ENV{LEDGER_SECURE_SDK}/lib_ux/include $ENV{LEDGER_SECURE_SDK}/lib_bagl/include $ENV{LEDGER_SECURE_SDK}/io/include $ENV{LEDGER_SECURE_SDK}/io_legacy/include)
 
 # add src
 set(ExternalProject_Get_property(openssl INSTALL_DIR))
