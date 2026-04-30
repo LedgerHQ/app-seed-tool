@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fix Stax and Flex function tests to work better with generic screen layouts
 - Fix unit tests
+-  Refactor app_main.c
 
 ### Security
 

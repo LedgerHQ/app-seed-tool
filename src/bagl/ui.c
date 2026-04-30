@@ -22,10 +22,6 @@
 
 #include "constants.h"
 
-enum UI_STATE { UI_IDLE, UI_TEXT, UI_APPROVAL };
-
-enum UI_STATE uiState;
-
 //////////////////////////////////////////////////////////////////////
 
 void screen_onboarding_bip39_restore_init(void) {
@@ -149,8 +145,6 @@ UX_FLOW(ux_idle_flow,
         &ux_idle_flow_4_step);
 
 void ui_idle_init(void) {
-    uiState = UI_IDLE;
-
     memzero(G_bolos_ux_context.words_buffer, sizeof(G_bolos_ux_context.words_buffer));
     memzero(G_bolos_ux_context.string_buffer, sizeof(G_bolos_ux_context.string_buffer));
     memzero(G_bolos_ux_context.sskr_words_buffer, G_bolos_ux_context.sskr_words_buffer_length);
