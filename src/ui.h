@@ -25,5 +25,9 @@
 
 #endif  // defined(HAVE_BAGL)
 
+#if defined(TARGET_STAX) || defined(TARGET_FLEX)
+#define ICON_APP_HOME C_icon_seed_64px
+#endif
+
 // All devices
 void ui_idle_init(void);

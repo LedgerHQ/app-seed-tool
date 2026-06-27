@@ -124,11 +124,11 @@ static void display_select_tool_page(void) {
                    (nbgl_touchCallback_t) &select_tool_callback);
 
     screenChildren[SELECT_TOOL_ICON_INDEX] =
-        (nbgl_obj_t *) generic_screen_set_icon(&C_seed_stax_64px);
+        (nbgl_obj_t *) generic_screen_set_icon(&ICON_APP_HOME );
     screenChildren[SELECT_TOOL_TEXT_INDEX] =
         (nbgl_obj_t *) generic_screen_set_title(screenChildren[SELECT_TOOL_ICON_INDEX]);
     ((nbgl_text_area_t *) screenChildren[SELECT_TOOL_TEXT_INDEX])->text =
-        "\n\nSelect the tool\nyou wish to use";
+        "Select the tool\nyou wish to use";
     // create nb words buttons
     nbgl_objPoolGetArray(BUTTON,
                          ARRAYLEN(toolType),
@@ -137,14 +137,14 @@ static void display_select_tool_page(void) {
     generic_screen_configure_buttons((nbgl_button_t **) &screenChildren[SELECT_TOOL_BIP39_INDEX],
                                      ARRAYLEN(toolType));
     ((nbgl_button_t *) screenChildren[SELECT_TOOL_BIP39_INDEX])->text = toolType[0];
-    ((nbgl_button_t *) screenChildren[SELECT_TOOL_BIP39_INDEX])->icon = &C_bip39_stax_32px;
+    ((nbgl_button_t *) screenChildren[SELECT_TOOL_BIP39_INDEX])->icon = &C_icon_bip39_32px;
     ((nbgl_button_t *) screenChildren[SELECT_TOOL_SSKR_INDEX])->text = toolType[1];
-    ((nbgl_button_t *) screenChildren[SELECT_TOOL_SSKR_INDEX])->icon = &C_sskr_stax_32px;
+    ((nbgl_button_t *) screenChildren[SELECT_TOOL_SSKR_INDEX])->icon = &C_icon_sskr_32px;
     ((nbgl_button_t *) screenChildren[SELECT_TOOL_SSKR_INDEX])->borderColor = BLACK;
     ((nbgl_button_t *) screenChildren[SELECT_TOOL_SSKR_INDEX])->innerColor = BLACK;
     ((nbgl_button_t *) screenChildren[SELECT_TOOL_SSKR_INDEX])->foregroundColor = WHITE;
     ((nbgl_button_t *) screenChildren[SELECT_TOOL_BIP85_INDEX])->text = toolType[2];
-    ((nbgl_button_t *) screenChildren[SELECT_TOOL_BIP85_INDEX])->icon = &C_bip85_stax_32px;
+    ((nbgl_button_t *) screenChildren[SELECT_TOOL_BIP85_INDEX])->icon = &C_icon_bip85_32px;
 
     // create back button
     screenChildren[SELECT_TOOL_BACK_BUTTON_INDEX] = (nbgl_obj_t *) generic_screen_set_back_button();
@@ -170,7 +170,7 @@ static void select_recover_bip39_choice(bool bip39_rec) {
 
 void display_select_recover_bip39_page(void) {
     nbgl_useCaseChoice(
-        &C_bip39_stax_64px,
+        &C_icon_bip39_64px,
         "Recover BIP39 Phrase?",
         "Choose if you wish to\nrecover the BIP39 phrase\nfrom your valid\nSSKR shares.",
         "Recover BIP39",
@@ -191,7 +191,7 @@ static void select_generate_sskr_choice(bool sskr_gen) {
 }
 
 void display_select_generate_sskr_page(void) {
-    nbgl_useCaseChoice(&C_sskr_stax_64px,
+    nbgl_useCaseChoice(&C_icon_sskr_64px,
                        "Generate SSKR Phrase?",
                        "Choose if you wish to\ngenerate SSKR shares from\nyour valid BIP39 phrase.",
                        "Generate SSKR",
@@ -253,12 +253,12 @@ static void display_bip39_select_phrase_length_page(void) {
                    (nbgl_touchCallback_t) &select_bip39_phrase_length_callback);
 
     screenChildren[SELECT_BIP39_PHRASE_LENGTH_ICON_INDEX] =
-        (nbgl_obj_t *) generic_screen_set_icon(&C_bip39_stax_64px);
+        (nbgl_obj_t *) generic_screen_set_icon(&C_icon_bip39_64px);
     screenChildren[SELECT_BIP39_PHRASE_LENGTH_TEXT_INDEX] = (nbgl_obj_t *) generic_screen_set_title(
         screenChildren[SELECT_BIP39_PHRASE_LENGTH_ICON_INDEX]);
     ((nbgl_text_area_t *) screenChildren[SELECT_BIP39_PHRASE_LENGTH_TEXT_INDEX])->text =
-        tool_type == TOOL_TYPE_BIP39 ? "\nHow long is your\nBIP39 Recovery\nPhrase?"
-                                     : "\nLength of BIP39\nphrase to\ngenerate?";
+        tool_type == TOOL_TYPE_BIP39 ? "How long is your\nBIP39 Recovery\nPhrase?"
+                                     : "Length of BIP39\nphrase to\ngenerate?";
     // create nb words buttons
     nbgl_objPoolGetArray(
         BUTTON,
@@ -496,7 +496,7 @@ static void display_home_page() {
 
     nbgl_useCaseHomeAndSettings(
         APPNAME,
-        &C_seed_stax_64px,
+        &ICON_APP_HOME ,
         "This Ledger application\nprovides some useful seed\nmanagement utilities.",
         INIT_HOME_PAGE,
         NULL,
@@ -504,12 +504,6 @@ static void display_home_page() {
         &action,
         on_quit);
 }
-
-#if defined(TARGET_STAX)
-#define DEVICE "Ledger Stax"
-#elif defined(TARGET_FLEX)
-#define DEVICE "Ledger Flex"
-#endif
 
 /*
  * Result page
@@ -535,16 +529,16 @@ static void display_check_result_page(const bool result) {
          ""},
         {"Valid Secret\nRecovery Phrase",
          "The BIP39 Recovery Phrase\nyou have entered\ndoesn't match the one present\n"
-         "on this " DEVICE ".",
+         "on this Ledger device.",
          "The BIP39 Recovery Phrase\nyou have entered\nmatches the one present\n"
-         "on this " DEVICE ".",
+         "on this Ledger device.",
          "The SSKR Recovery Phrase\nyou have entered\ndoesn't match the one present\n"
-         "on this " DEVICE ".",
+         "on this Ledger device.",
          "The SSKR Recovery Phrase\nyou have entered\nmatches the one present\n"
-         "on this " DEVICE "."}};
-    static const nbgl_icon_details_t *icons[3] = {&C_Denied_Circle_64px,
-                                                  &C_Important_Circle_64px,
-                                                  &C_Check_Circle_64px};
+         "on this Ledger device."}};
+    static const nbgl_icon_details_t *icons[3] = {&DENIED_CIRCLE_ICON,
+                                                  &IMPORTANT_CIRCLE_ICON,
+                                                  &CHECK_CIRCLE_ICON};
 
     nbgl_pageInfoDescription_t info = {
         .centeredInfo.icon = icons[result + seed_match],
@@ -836,11 +830,11 @@ static void display_bip85_select_app_page(void) {
                    (nbgl_touchCallback_t) &select_bip85_app_callback);
 
     screenChildren[SELECT_BIP85_APP_ICON_INDEX] =
-        (nbgl_obj_t *) generic_screen_set_icon(&C_bip85_stax_64px);
+        (nbgl_obj_t *) generic_screen_set_icon(&C_icon_bip85_64px);
     screenChildren[SELECT_BIP39_PHRASE_LENGTH_TEXT_INDEX] =
         (nbgl_obj_t *) generic_screen_set_title(screenChildren[SELECT_BIP85_APP_ICON_INDEX]);
     ((nbgl_text_area_t *) screenChildren[SELECT_BIP39_PHRASE_LENGTH_TEXT_INDEX])->text =
-        "\nWhich BIP85\napplication do you\nwish to use?";
+        "Which BIP85\napplication do you\nwish to use?";
 
     // create bip85 app buttons
     nbgl_objPoolGetArray(BUTTON,

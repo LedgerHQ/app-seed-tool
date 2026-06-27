@@ -40,11 +40,11 @@ CURVE_APP_LOAD_PARAMS = secp256k1
 PATH_APP_LOAD_PARAMS = ""
 HAVE_APPLICATION_FLAG_DERIVE_MASTER = 1
 
-ICON_NANOS  = glyphs/seed_nanos.gif
-ICON_NANOSP = glyphs/seed_nanox.gif
-ICON_NANOX  = glyphs/seed_nanox.gif
-ICON_STAX   = glyphs/seed_stax_32px.gif
-ICON_FLEX   = glyphs/seed_flex_40px.gif
+ICON_NANOS  = icons/icon_seed_16px.gif
+ICON_NANOSP = icons/icon_seed_14px.png
+ICON_NANOX  = icons/icon_seed_14px.png
+ICON_STAX   = icons/icon_seed_32px.png
+ICON_FLEX   = icons/icon_seed_40px.png
 
 #DEFINES += HAVE_ELECTRUM
 
@@ -52,6 +52,7 @@ ifneq ($(TARGET_NAME), $(filter $(TARGET_NAME), TARGET_STAX TARGET_FLEX))
     $(info Using BAGL)
     ifeq ($(TARGET_NAME),TARGET_NANOS)
         DISABLE_STANDARD_USB = 1
+        CFLAGS += -gdwarf-4 -Wno-unterminated-string-initialization
     endif
 else
     $(info Using NBGL)
@@ -64,3 +65,7 @@ DEBUG = 0
 APP_SOURCE_PATH += src
 
 include $(BOLOS_SDK)/Makefile.standard_app
+
+ifeq ($(TARGET_NAME),TARGET_NANOS)
+    APP_LOAD_PARAMS += --apiLevel 0
+endif

@@ -108,8 +108,8 @@ else()
     ExternalProject_Add(
         openssl
         GIT_REPOSITORY https://github.com/openssl/openssl.git
-        GIT_TAG        openssl-3.4.1
-        CONFIGURE_COMMAND ./Configure "CC=${CMAKE_C_COMPILER}" "CFLAGS=${OPENSSL_CFLAGS}" no-afalgeng no-aria no-asan no-asm no-async no-autoalginit no-autoerrinit no-autoload-config no-bf no-buildtest-c++ no-camellia no-capieng no-cast no-chacha no-cmac no-cms no-comp no-crypto-mdebug no-ct no-deprecated no-des no-devcryptoeng no-dgram no-dh no-dsa no-dso no-dtls no-ec2m no-ecdh no-egd no-engine no-err no-external-tests no-filenames no-fuzz-afl no-fuzz-libfuzzer no-gost no-idea no-makedepend no-md2 no-md4 no-mdc2 no-msan no-multiblock no-nextprotoneg no-ocb no-ocsp no-pinshared no-poly1305 no-posix-io no-psk no-rc2 no-rc4 no-rc5 no-rdrand no-rfc3779 no-scrypt no-sctp no-seed no-shared no-siphash no-sm2 no-sm3 no-sm4 no-sock no-srp no-srtp no-sse2 no-ssl no-ssl3-method no-ssl-trace no-stdio no-tests no-threads no-tls no-ts no-ubsan no-ui-console no-unit-test no-whirlpool no-zlib no-zlib-dynamic linux-armv4 --prefix=${INSTALL_DIR}
+        GIT_TAG        openssl-4.0.1
+        CONFIGURE_COMMAND ./Configure "CC=${CMAKE_C_COMPILER}" "CFLAGS=${OPENSSL_CFLAGS}" no-afalgeng no-aria no-asan no-asm no-async no-autoalginit no-autoerrinit no-autoload-config no-bf no-buildtest-c++ no-camellia no-capieng no-cast no-chacha no-cmac no-cms no-comp no-crypto-mdebug no-ct no-deprecated no-des no-devcryptoeng no-dgram no-dh no-dsa no-dso no-dtls no-ecdh no-egd no-engine no-err no-external-tests no-filenames no-fuzz-afl no-fuzz-libfuzzer no-gost no-idea no-makedepend no-md2 no-md4 no-mdc2 no-msan no-multiblock no-nextprotoneg no-ocb no-ocsp no-pinshared no-poly1305 no-posix-io no-psk no-rc2 no-rc4 no-rc5 no-rdrand no-rfc3779 no-scrypt no-sctp no-seed no-shared no-siphash no-sm2 no-sm3 no-sm4 no-sock no-srp no-srtp no-sse2 no-ssl no-ssl3-method no-ssl-trace no-stdio no-tests no-threads no-tls no-ts no-ubsan no-ui-console no-unit-test no-whirlpool no-zlib no-zlib-dynamic linux-armv4 --prefix=${INSTALL_DIR}
         BUILD_COMMAND make
         INSTALL_COMMAND make install_sw
         BUILD_IN_SOURCE 1
@@ -123,7 +123,7 @@ include(FetchContent)
 FetchContent_Declare(
     cmocka
     GIT_REPOSITORY https://gitlab.com/cmocka/cmocka.git
-    GIT_TAG        cmocka-1.1.7
+    GIT_TAG        cmocka-2.0.2
     GIT_SHALLOW    1
 )
 set(WITH_STATIC_LIB ON CACHE BOOL "CMocka: Build with a static library" FORCE)
@@ -134,7 +134,7 @@ set(PICKY_DEVELOPER OFF CACHE BOOL "CMocka: Build with picky developer flags" FO
 FetchContent_MakeAvailable(cmocka)
 
 add_compile_definitions(TEST DEBUG=0 SKIP_FOR_CMOCKA)
-add_compile_definitions(TARGET_NANOS HAVE_HASH HAVE_HMAC HAVE_SHA224 HAVE_SHA256 HAVE_SHA512 HAVE_PBKDF2 HAVE_ECC HAVE_CRC HAVE_RNG IO_HID_EP_LENGTH=64 OS_IO_SEPH_BUFFER_SIZE=272)
+add_compile_definitions(HAVE_HASH HAVE_HMAC HAVE_SHA224 HAVE_SHA256 HAVE_SHA512 HAVE_PBKDF2 HAVE_ECC HAVE_CRC HAVE_RNG IO_HID_EP_LENGTH=64 OS_IO_SEPH_BUFFER_SIZE=272)
 
 # Set LEDGER_SECURE_SDK only if it's not already set
 if(NOT DEFINED ENV{LEDGER_SECURE_SDK})

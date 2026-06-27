@@ -14,7 +14,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  ********************************************************************************/
-
+#if defined(HAVE_NBGL)
 #include <lcx_hmac.h>
 #include <lcx_sha3.h>
 
@@ -278,3 +278,4 @@ void bolos_ux_bip85_dice(uint32_t* out, uint32_t sides, uint32_t rolls, unsigned
     }
     memzero(buffer_drng, BIP85_DRNG_MAX_DIGEST_SIZE);
 }
+#endif

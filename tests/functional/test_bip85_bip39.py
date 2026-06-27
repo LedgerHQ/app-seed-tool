@@ -32,7 +32,16 @@ def all_eink_bip85_bip39(backend, device):
     keypad.write("0")
     keypad.enter()
     backend.wait_for_text_on_screen("BIP39 Phrase", 5)
-    backend.wait_for_text_on_screen("girl mad pet galaxy egg matter matrix prison refuse sense ordinary nose", 1)
+    if device.type == DeviceType.STAX:
+        backend.wait_for_text_on_screen("girl mad pet galaxy", 1)
+        backend.wait_for_text_on_screen("egg matter matrix", 1)
+        backend.wait_for_text_on_screen("prison refuse sense", 1)
+        backend.wait_for_text_on_screen("ordinary nose", 1)
+    elif device.type == DeviceType.FLEX:
+        backend.wait_for_text_on_screen("girl mad pet galaxy egg", 1)
+        backend.wait_for_text_on_screen("matter matrix prison", 1)
+        backend.wait_for_text_on_screen("refuse sense ordinary", 1)
+        backend.wait_for_text_on_screen("nose", 1)
     review.exit()
     backend.wait_for_text_on_screen("Seed Tool", 5)
     home_page.quit()

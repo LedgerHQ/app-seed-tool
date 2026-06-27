@@ -136,6 +136,8 @@ cx_err_t cx_mpi_mod_pow(cx_mpi_t *r, const cx_mpi_t *a, const cx_mpi_t *e,
                         const cx_mpi_t *n);
 cx_err_t cx_mpi_is_prime(cx_mpi_t *x, bool *prime);
 cx_err_t cx_mpi_next_prime(cx_mpi_t *x);
+cx_err_t cx_mpi_gf2_n_mul(cx_mpi_t *r, const cx_mpi_t *a, const cx_mpi_t *b,
+                          const cx_mpi_t *n, const cx_mpi_t *h);
 void cx_mpi_reverse(cx_mpi_t *x, uint32_t nbytes);
 void cx_mpi_swap(cx_mpi_t *a, cx_mpi_t *b, const int c);
 

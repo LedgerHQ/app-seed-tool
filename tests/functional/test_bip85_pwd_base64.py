@@ -34,7 +34,12 @@ def all_eink_bip85_pwd_base64(backend, device):
     keypad.write("0")
     keypad.enter()
     backend.wait_for_text_on_screen("Base64 Password", 5)
-    backend.wait_for_text_on_screen("dKLoepugzdVJvdL56ogNV", 1)
+    if device.type == DeviceType.STAX:
+        backend.wait_for_text_on_screen("dKLoepugzdVJvdL56o", 1)
+        backend.wait_for_text_on_screen("gNV", 1)
+    elif device.type == DeviceType.FLEX:
+        backend.wait_for_text_on_screen("dKLoepugzdVJvdL56og", 1)
+        backend.wait_for_text_on_screen("NV", 1)
     review.exit()
     backend.wait_for_text_on_screen("Seed Tool", 5)
     home_page.quit()

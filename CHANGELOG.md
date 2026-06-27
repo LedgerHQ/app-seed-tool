@@ -17,12 +17,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add Flex and Stax function tests for BIP39 application of BIP85
 - Add Flex and Stax function tests for base64 password application of BIP85
 - Add Flex and Stax function tests for base85 password application of BIP85
+- Add `cx_bn_gf2_n_mul` to unit test helper functions
 
 ### Fixed
 
 - Fix Stax and Flex function tests to work better with generic screen layouts
 - Fix unit tests
--  Refactor app_main.c
+- Refactor app_main.c
 
 ### Security
 

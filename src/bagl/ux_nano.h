@@ -118,8 +118,8 @@ void recover_bip39(void);
 void clean_exit(bolos_task_status_t exit_code);
 
 #if defined(TARGET_NANOS)
-#define BIP39_ICON                         C_bip39_nanos
-#define SSKR_ICON                          C_sskr_nanos
+#define BIP39_ICON                         C_icon_bip39_16px
+#define SSKR_ICON                          C_icon_sskr_16px
 #define PROCESSING_COMPLETE                0
 #define PROCESSING_COMPARE_RECOVERY_PHRASE 1
 #define PROCESSING_GENERATE_SSKR           2
@@ -129,8 +129,8 @@ void compare_recovery_phrase_and_display_result(void);
 void generate_sskr(void);
 void screen_processing_init(void);
 #else
-#define BIP39_ICON C_bip39_nanox
-#define SSKR_ICON  C_sskr_nanox
+#define BIP39_ICON C_icon_bip39_14px
+#define SSKR_ICON  C_icon_sskr_14px
 
 // to be included into all flow that needs to go back to the dashboard
 extern const ux_flow_step_t ux_ob_goto_dashboard_step;
