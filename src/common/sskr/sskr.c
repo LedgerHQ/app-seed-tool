@@ -459,6 +459,10 @@ static int16_t sskr_combine_shards_internal(sskr_shard_t* shards,
                         return SSKR_ERROR_DUPLICATE_MEMBER_INDEX;
                     }
                 }
+                if (groups[j].count >= SSS_MAX_SHARE_COUNT) {
+                    return SSKR_ERROR_INVALID_SHARD_SET;
+                }
+
                 groups[j].member_index[groups[j].count] = shard->member_index;
                 groups[j].value[groups[j].count] = shard->value;
                 groups[j].count++;
@@ -466,6 +470,10 @@ static int16_t sskr_combine_shards_internal(sskr_shard_t* shards,
         }
 
         if (!group_found) {
+            if (next_group >= SSKR_MAX_GROUP_COUNT) {
+                return SSKR_ERROR_INVALID_SHARD_SET;
+            }
+
             sskr_group_t* g = &groups[next_group];
             g->group_index = shard->group_index;
             g->member_threshold = shard->member_threshold;
