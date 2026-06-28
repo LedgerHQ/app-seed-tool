@@ -1,6 +1,6 @@
 /*******************************************************************************
  *   Ledger Seed Tool application
- *   (c) 2016-2025 Ledger SAS
+ *   (c) 2016-2026 Ledger SAS
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -497,7 +497,7 @@ static void display_check_keyboard_page() {
 static void display_home_page() {
     static const char* const infoTypes[] = {"Version", APPNAME};
     static const char* const infoContents[] = {APPVERSION,
-                                               "(c) 2018-2025 Ledger"};
+                                               "(c) 2018-2026 Ledger"};
     static const nbgl_contentInfoList_t infoList = {
         .nbInfos = 2, .infoTypes = infoTypes, .infoContents = infoContents};
 
