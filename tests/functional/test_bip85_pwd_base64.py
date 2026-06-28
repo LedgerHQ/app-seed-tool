@@ -40,6 +40,9 @@ def all_eink_bip85_pwd_base64(backend, device):
     elif device.type == DeviceType.FLEX:
         backend.wait_for_text_on_screen("dKLoepugzdVJvdL56og", 1)
         backend.wait_for_text_on_screen("NV", 1)
+    elif device.type == DeviceType.APEX_P:
+        backend.wait_for_text_on_screen("dKLoepugzdVJvdL56o", 1)
+        backend.wait_for_text_on_screen("gNV", 1)
     review.exit()
     backend.wait_for_text_on_screen("Seed Tool", 5)
     home_page.quit()
@@ -55,4 +58,6 @@ def test_bip85_pwd_base64(device, backend, set_seed):
     elif device.type == DeviceType.STAX:
         all_eink_bip85_pwd_base64(backend, device)
     elif device.type == DeviceType.FLEX:
+        all_eink_bip85_pwd_base64(backend, device)
+    elif device.type == DeviceType.APEX_P:
         all_eink_bip85_pwd_base64(backend, device)

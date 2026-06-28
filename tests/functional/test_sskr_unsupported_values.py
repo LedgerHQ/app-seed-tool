@@ -120,3 +120,5 @@ def test_sskr_unsupported_values(device, backend, navigator, set_seed):
         all_eink_unsupported_values(backend, device)
     elif device.type == DeviceType.FLEX:
         all_eink_unsupported_values(backend, device)
+    elif device.type == DeviceType.APEX_P:
+        all_eink_unsupported_values(backend, device)

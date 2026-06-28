@@ -34,7 +34,7 @@ nbgl_image_t* generic_screen_set_icon(const nbgl_icon_details_t* icon) {
     image->obj.area.bpp = NBGL_BPP_1;
 #if defined(TARGET_STAX)
     uint8_t divide = 1;
-#elif defined(TARGET_FLEX)
+#elif defined(TARGET_FLEX) || defined(TARGET_APEX_P)
     uint8_t divide = 2;
 #endif
     image->obj.alignmentMarginX = ICON_X / divide;

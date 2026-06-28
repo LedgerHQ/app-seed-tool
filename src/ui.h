@@ -27,6 +27,14 @@
 
 #if defined(TARGET_STAX) || defined(TARGET_FLEX)
 #define ICON_APP_HOME C_icon_seed_64px
+#define BIP39_ICON    C_icon_bip39_64px
+#define SSKR_ICON     C_icon_SSKR_64px
+#define BIP85_ICON    C_icon_bip85_64px
+#elif defined(TARGET_APEX)
+#define ICON_APP_HOME C_icon_seed_48px
+#define BIP39_ICON    C_icon_bip39_32px
+#define SSKR_ICON     C_icon_SSKR_32px
+#define BIP85_ICON    C_icon_bip85_32px
 #endif
 
 // All devices

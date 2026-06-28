@@ -5,7 +5,6 @@
 - [ ] Improve the efficiency of the method used to perform an inverse operation in GF(256)
 - [ ] Update automated function tests to test on nanox and nanosp
 - [ ] There is just enough memory available on Nano S to hold the phrases for 10 shares. Maybe just store SSKR Bytewords as shorter two letter minimal Bytewords rather than a 4 letter Byteword plus space for each share. Convert minimal ByteWords back to four letter Bytewords just prior to display.
-- [ ] Port to Nano Gen5
 
 ### In Progress
 
@@ -14,6 +13,7 @@
 
 ### Done ✓
 
+- [x] Port to Nano Gen5
 - [x] Add BIP85 menus to Stax and Flex
   - [x] Add BIP85 application menus to generate BIP39 children
   - [x] Add BIP85 application menus to generate base64 password children

@@ -51,3 +51,5 @@ def test_bip85_pwd_base85(device, backend, set_seed):
         all_eink_bip85_pwd_base85(backend, device)
     elif device.type == DeviceType.FLEX:
         all_eink_bip85_pwd_base85(backend, device)
+    elif device.type == DeviceType.APEX_P:
+        all_eink_bip85_pwd_base85(backend, device)

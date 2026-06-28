@@ -338,3 +338,5 @@ def test_bip39_12word(device, backend, navigator, set_seed):
         all_eink_bip39_12word(backend, device)
     elif device.type == DeviceType.FLEX:
         all_eink_bip39_12word(backend, device)
+    elif device.type == DeviceType.APEX_P:
+        all_eink_bip39_12word(backend, device)

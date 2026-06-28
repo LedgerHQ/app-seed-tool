@@ -259,7 +259,7 @@ static void display_bip39_select_phrase_length_page(void) {
                    (nbgl_touchCallback_t)&select_bip39_phrase_length_callback);
 
     screenChildren[SELECT_BIP39_PHRASE_LENGTH_ICON_INDEX] =
-        (nbgl_obj_t*)generic_screen_set_icon(&C_icon_bip39_64px);
+        (nbgl_obj_t*)generic_screen_set_icon(&BIP39_ICON);
     screenChildren[SELECT_BIP39_PHRASE_LENGTH_TEXT_INDEX] =
         (nbgl_obj_t*)generic_screen_set_title(
             screenChildren[SELECT_BIP39_PHRASE_LENGTH_ICON_INDEX]);
@@ -839,7 +839,7 @@ static void display_bip85_select_app_page(void) {
                    (nbgl_touchCallback_t)&select_bip85_app_callback);
 
     screenChildren[SELECT_BIP85_APP_ICON_INDEX] =
-        (nbgl_obj_t*)generic_screen_set_icon(&C_icon_bip85_64px);
+        (nbgl_obj_t*)generic_screen_set_icon(&BIP85_ICON);
     screenChildren[SELECT_BIP39_PHRASE_LENGTH_TEXT_INDEX] =
         (nbgl_obj_t*)generic_screen_set_title(
             screenChildren[SELECT_BIP85_APP_ICON_INDEX]);

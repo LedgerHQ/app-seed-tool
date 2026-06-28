@@ -878,7 +878,7 @@ def all_eink_sskr_128bit(backend, device):
     backend.wait_for_text_on_screen("BIP39 Phrase", 5)
     backend.wait_for_text_on_screen("fly mule excess", 1)
     backend.wait_for_text_on_screen("resource treat plunge", 1)
-    backend.wait_for_text_on_screen("nose soda reflect adult",1)
+    backend.wait_for_text_on_screen("nose soda reflect adult", 1)
     backend.wait_for_text_on_screen("ramp planet", 1)
     review.exit()
     backend.wait_for_text_on_screen("Seed Tool", 5)
@@ -895,4 +895,6 @@ def test_sskr_128bit(device, backend, navigator, set_seed):
     elif device.type == DeviceType.STAX:
         all_eink_sskr_128bit(backend, device)
     elif device.type == DeviceType.FLEX:
+        all_eink_sskr_128bit(backend, device)
+    elif device.type == DeviceType.APEX_P:
         all_eink_sskr_128bit(backend, device)

@@ -45,15 +45,16 @@ ICON_NANOSP = icons/icon_seed_14px.png
 ICON_NANOX  = icons/icon_seed_14px.png
 ICON_STAX   = icons/icon_seed_32px.png
 ICON_FLEX   = icons/icon_seed_40px.png
+ICON_APEX_P = icons/icon_seed_32px.png
 
 #DEFINES += HAVE_ELECTRUM
 
-ifneq ($(TARGET_NAME), $(filter $(TARGET_NAME), TARGET_STAX TARGET_FLEX))
+ifeq ($(TARGET_NAME),TARGET_NANOS)
     $(info Using BAGL)
-    ifeq ($(TARGET_NAME),TARGET_NANOS)
-        DISABLE_STANDARD_USB = 1
-        CFLAGS += -gdwarf-4 -Wno-unterminated-string-initialization
-    endif
+    DISABLE_STANDARD_USB = 1
+    CFLAGS += -gdwarf-4 -Wno-unterminated-string-initialization
+else ifeq ($(TARGET_NAME), $(filter $(TARGET_NAME), TARGET_NANOS2 TARGET_NANOX))
+    $(info Using BAGL)
 else
     $(info Using NBGL)
     ENABLE_NBGL_KEYBOARD = 1

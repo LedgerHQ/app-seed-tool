@@ -1274,4 +1274,5 @@ def test_sskr_256bit(device, backend, navigator, set_seed):
         all_eink_sskr_256bit(backend, device)
     elif device.type == DeviceType.FLEX:
         all_eink_sskr_256bit(backend, device)
-
+    elif device.type == DeviceType.APEX_P:
+        all_eink_sskr_256bit(backend, device)

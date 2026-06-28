@@ -1,6 +1,6 @@
 import logging
 from ledgered.devices import DeviceType
-from ragger.firmware.touch.positions import POSITIONS, Position, STAX_X_CENTER, FLEX_X_CENTER
+from ragger.firmware.touch.positions import POSITIONS, Position, STAX_X_CENTER, FLEX_X_CENTER, APEX_P_X_CENTER
 from ragger.firmware.touch.element import Element
 
 GENERIC_LAYOUT_POSITIONS = {
@@ -16,6 +16,12 @@ GENERIC_LAYOUT_POSITIONS = {
             1: Position(FLEX_X_CENTER, 540),
             2: Position(FLEX_X_CENTER, 430),
             3: Position(FLEX_X_CENTER, 320)
+        },
+        DeviceType.APEX_P: {
+            # Up to 3 choices in a list
+            1: Position(APEX_P_X_CENTER, 350),
+            2: Position(APEX_P_X_CENTER, 290),
+            3: Position(APEX_P_X_CENTER, 230)
         }
     }
 }
