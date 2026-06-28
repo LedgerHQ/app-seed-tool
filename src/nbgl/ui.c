@@ -15,34 +15,34 @@
  *  limitations under the License.
  ********************************************************************************/
 
-#include <string.h>
 #include <os.h>
+#include <string.h>
 
 #include "constants.h"
 #include "glyphs.h"
 
 #if defined(HAVE_NBGL)
 
-#include <nbgl_use_case.h>
+#include <nbgl_debug.h>
 #include <nbgl_fonts.h>
 #include <nbgl_front.h>
-#include <nbgl_debug.h>
-#include <nbgl_page.h>
 #include <nbgl_layout.h>
+#include <nbgl_page.h>
+#include <nbgl_use_case.h>
 
 #include "../common/bip39/common_bip39.h"
 #include "../common/sskr/common_sskr.h"
 #include "../ui.h"
 #include "./bip39_mnemonic.h"
-#include "./sskr_shares.h"
 #include "./bip85_app.h"
 #include "./layout_generic_screen.h"
+#include "./sskr_shares.h"
 
 #define HEADER_SIZE 50
 
-static nbgl_page_t *pageContext;
+static nbgl_page_t* pageContext;
 
-static nbgl_layout_t *layout = 0;
+static nbgl_layout_t* layout = 0;
 
 static char headerText[HEADER_SIZE] = {0};
 static char reviewText[(SSKR_SHARES_MAX_LENGTH / 16) + 1] = {0};
@@ -62,7 +62,7 @@ static void display_bip85_select_index_page(void);
 /*
  * Utils
  */
-static const char *buttonTexts[NB_MAX_SUGGESTION_BUTTONS] = {0};
+static const char* buttonTexts[NB_MAX_SUGGESTION_BUTTONS] = {0};
 
 static void reset_globals() {
     bip39_mnemonic_reset();
@@ -73,9 +73,7 @@ static void reset_globals() {
     memzero(reviewText, sizeof(reviewText));
 }
 
-static void on_quit(void) {
-    os_sched_exit(-1);
-}
+static void on_quit(void) { os_sched_exit(-1); }
 
 /*
  * Select tool type, BIP39 or SSKR
@@ -90,9 +88,9 @@ enum __attribute__((packed)) select_tool {
     SELECT_TOOL_NB_CHILDREN
 };
 
-static const char *toolType[] = {"BIP39 Check", "SSKR Check", "BIP85 Generate"};
-static void select_tool_callback(nbgl_obj_t *obj, nbgl_touchType_t eventType) {
-    nbgl_obj_t **screenChildren = nbgl_screenGetElements(0);
+static const char* toolType[] = {"BIP39 Check", "SSKR Check", "BIP85 Generate"};
+static void select_tool_callback(nbgl_obj_t* obj, nbgl_touchType_t eventType) {
+    nbgl_obj_t** screenChildren = nbgl_screenGetElements(0);
     if (eventType != TOUCHED) {
         return;
     }
@@ -114,40 +112,49 @@ static void select_tool_callback(nbgl_obj_t *obj, nbgl_touchType_t eventType) {
 }
 
 static void display_select_tool_page(void) {
-    nbgl_obj_t **screenChildren;
+    nbgl_obj_t** screenChildren;
 
     // From top to bottom:
     // <return back arrow> + <icon> + <text> + <3 buttons>
-    nbgl_screenSet(&screenChildren,
-                   SELECT_TOOL_NB_CHILDREN,
-                   NULL,
-                   (nbgl_touchCallback_t) &select_tool_callback);
+    nbgl_screenSet(&screenChildren, SELECT_TOOL_NB_CHILDREN, NULL,
+                   (nbgl_touchCallback_t)&select_tool_callback);
 
     screenChildren[SELECT_TOOL_ICON_INDEX] =
-        (nbgl_obj_t *) generic_screen_set_icon(&ICON_APP_HOME );
+        (nbgl_obj_t*)generic_screen_set_icon(&ICON_APP_HOME);
     screenChildren[SELECT_TOOL_TEXT_INDEX] =
-        (nbgl_obj_t *) generic_screen_set_title(screenChildren[SELECT_TOOL_ICON_INDEX]);
-    ((nbgl_text_area_t *) screenChildren[SELECT_TOOL_TEXT_INDEX])->text =
+        (nbgl_obj_t*)generic_screen_set_title(
+            screenChildren[SELECT_TOOL_ICON_INDEX]);
+    ((nbgl_text_area_t*)screenChildren[SELECT_TOOL_TEXT_INDEX])->text =
         "Select the tool\nyou wish to use";
     // create nb words buttons
-    nbgl_objPoolGetArray(BUTTON,
-                         ARRAYLEN(toolType),
-                         0,
-                         (nbgl_obj_t **) &screenChildren[SELECT_TOOL_BIP39_INDEX]);
-    generic_screen_configure_buttons((nbgl_button_t **) &screenChildren[SELECT_TOOL_BIP39_INDEX],
-                                     ARRAYLEN(toolType));
-    ((nbgl_button_t *) screenChildren[SELECT_TOOL_BIP39_INDEX])->text = toolType[0];
-    ((nbgl_button_t *) screenChildren[SELECT_TOOL_BIP39_INDEX])->icon = &C_icon_bip39_32px;
-    ((nbgl_button_t *) screenChildren[SELECT_TOOL_SSKR_INDEX])->text = toolType[1];
-    ((nbgl_button_t *) screenChildren[SELECT_TOOL_SSKR_INDEX])->icon = &C_icon_sskr_32px;
-    ((nbgl_button_t *) screenChildren[SELECT_TOOL_SSKR_INDEX])->borderColor = BLACK;
-    ((nbgl_button_t *) screenChildren[SELECT_TOOL_SSKR_INDEX])->innerColor = BLACK;
-    ((nbgl_button_t *) screenChildren[SELECT_TOOL_SSKR_INDEX])->foregroundColor = WHITE;
-    ((nbgl_button_t *) screenChildren[SELECT_TOOL_BIP85_INDEX])->text = toolType[2];
-    ((nbgl_button_t *) screenChildren[SELECT_TOOL_BIP85_INDEX])->icon = &C_icon_bip85_32px;
+    nbgl_objPoolGetArray(
+        BUTTON, ARRAYLEN(toolType), 0,
+        (nbgl_obj_t**)&screenChildren[SELECT_TOOL_BIP39_INDEX]);
+    generic_screen_configure_buttons(
+        (nbgl_button_t**)&screenChildren[SELECT_TOOL_BIP39_INDEX],
+        ARRAYLEN(toolType));
+    ((nbgl_button_t*)screenChildren[SELECT_TOOL_BIP39_INDEX])->text =
+        toolType[0];
+    ((nbgl_button_t*)screenChildren[SELECT_TOOL_BIP39_INDEX])->icon =
+        &C_icon_bip39_32px;
+    ((nbgl_button_t*)screenChildren[SELECT_TOOL_SSKR_INDEX])->text =
+        toolType[1];
+    ((nbgl_button_t*)screenChildren[SELECT_TOOL_SSKR_INDEX])->icon =
+        &C_icon_sskr_32px;
+    ((nbgl_button_t*)screenChildren[SELECT_TOOL_SSKR_INDEX])->borderColor =
+        BLACK;
+    ((nbgl_button_t*)screenChildren[SELECT_TOOL_SSKR_INDEX])->innerColor =
+        BLACK;
+    ((nbgl_button_t*)screenChildren[SELECT_TOOL_SSKR_INDEX])->foregroundColor =
+        WHITE;
+    ((nbgl_button_t*)screenChildren[SELECT_TOOL_BIP85_INDEX])->text =
+        toolType[2];
+    ((nbgl_button_t*)screenChildren[SELECT_TOOL_BIP85_INDEX])->icon =
+        &C_icon_bip85_32px;
 
     // create back button
-    screenChildren[SELECT_TOOL_BACK_BUTTON_INDEX] = (nbgl_obj_t *) generic_screen_set_back_button();
+    screenChildren[SELECT_TOOL_BACK_BUTTON_INDEX] =
+        (nbgl_obj_t*)generic_screen_set_back_button();
 
     nbgl_screenRedraw();
 }
@@ -169,13 +176,10 @@ static void select_recover_bip39_choice(bool bip39_rec) {
 }
 
 void display_select_recover_bip39_page(void) {
-    nbgl_useCaseChoice(
-        &C_icon_bip39_64px,
-        "Recover BIP39 Phrase?",
-        "Choose if you wish to\nrecover the BIP39 phrase\nfrom your valid\nSSKR shares.",
-        "Recover BIP39",
-        "Done",
-        select_recover_bip39_choice);
+    nbgl_useCaseChoice(&C_icon_bip39_64px, "Recover BIP39 Phrase?",
+                       "Choose if you wish to\nrecover the BIP39 phrase\nfrom "
+                       "your valid\nSSKR shares.",
+                       "Recover BIP39", "Done", select_recover_bip39_choice);
 }
 
 /*
@@ -191,12 +195,10 @@ static void select_generate_sskr_choice(bool sskr_gen) {
 }
 
 void display_select_generate_sskr_page(void) {
-    nbgl_useCaseChoice(&C_icon_sskr_64px,
-                       "Generate SSKR Phrase?",
-                       "Choose if you wish to\ngenerate SSKR shares from\nyour valid BIP39 phrase.",
-                       "Generate SSKR",
-                       "Done",
-                       select_generate_sskr_choice);
+    nbgl_useCaseChoice(&C_icon_sskr_64px, "Generate SSKR Phrase?",
+                       "Choose if you wish to\ngenerate SSKR shares from\nyour "
+                       "valid BIP39 phrase.",
+                       "Generate SSKR", "Done", select_generate_sskr_choice);
 }
 
 /*
@@ -213,9 +215,11 @@ enum __attribute__((packed)) select_bip39_phrase_length {
     KBD_TEXT_TOKEN
 };
 
-static const char *bip39_passphraseLength[] = {"12 words", "18 words", "24 words"};
-static void select_bip39_phrase_length_callback(nbgl_obj_t *obj, nbgl_touchType_t eventType) {
-    nbgl_obj_t **screenChildren = nbgl_screenGetElements(0);
+static const char* bip39_passphraseLength[] = {"12 words", "18 words",
+                                               "24 words"};
+static void select_bip39_phrase_length_callback(nbgl_obj_t* obj,
+                                                nbgl_touchType_t eventType) {
+    nbgl_obj_t** screenChildren = nbgl_screenGetElements(0);
     if (eventType != TOUCHED) {
         return;
     }
@@ -223,11 +227,14 @@ static void select_bip39_phrase_length_callback(nbgl_obj_t *obj, nbgl_touchType_
     nbgl_layoutRelease(layout);
     if (obj == screenChildren[SELECT_BIP39_PHRASE_LENGTH_BUTTON_12_INDEX]) {
         bip39_mnemonic_final_size_set(BIP39_MNEMONIC_SIZE_12);
-    } else if (obj == screenChildren[SELECT_BIP39_PHRASE_LENGTH_BUTTON_18_INDEX]) {
+    } else if (obj ==
+               screenChildren[SELECT_BIP39_PHRASE_LENGTH_BUTTON_18_INDEX]) {
         bip39_mnemonic_final_size_set(BIP39_MNEMONIC_SIZE_18);
-    } else if (obj == screenChildren[SELECT_BIP39_PHRASE_LENGTH_BUTTON_24_INDEX]) {
+    } else if (obj ==
+               screenChildren[SELECT_BIP39_PHRASE_LENGTH_BUTTON_24_INDEX]) {
         bip39_mnemonic_final_size_set(BIP39_MNEMONIC_SIZE_24);
-    } else if (obj == screenChildren[SELECT_BIP39_PHRASE_LENGTH_BACK_BUTTON_INDEX]) {
+    } else if (obj ==
+               screenChildren[SELECT_BIP39_PHRASE_LENGTH_BACK_BUTTON_INDEX]) {
         if (tool_type == TOOL_TYPE_BIP85) {
             display_bip85_select_app_page();
         } else {
@@ -243,47 +250,47 @@ static void select_bip39_phrase_length_callback(nbgl_obj_t *obj, nbgl_touchType_
 }
 
 static void display_bip39_select_phrase_length_page(void) {
-    nbgl_obj_t **screenChildren;
+    nbgl_obj_t** screenChildren;
 
     // From top to bottom:
     // <return back arrow> + <icon> + <text> + <3 buttons>
-    nbgl_screenSet(&screenChildren,
-                   SELECT_BIP39_PHRASE_LENGTH_NB_CHILDREN,
+    nbgl_screenSet(&screenChildren, SELECT_BIP39_PHRASE_LENGTH_NB_CHILDREN,
                    NULL,
-                   (nbgl_touchCallback_t) &select_bip39_phrase_length_callback);
+                   (nbgl_touchCallback_t)&select_bip39_phrase_length_callback);
 
     screenChildren[SELECT_BIP39_PHRASE_LENGTH_ICON_INDEX] =
-        (nbgl_obj_t *) generic_screen_set_icon(&C_icon_bip39_64px);
-    screenChildren[SELECT_BIP39_PHRASE_LENGTH_TEXT_INDEX] = (nbgl_obj_t *) generic_screen_set_title(
-        screenChildren[SELECT_BIP39_PHRASE_LENGTH_ICON_INDEX]);
-    ((nbgl_text_area_t *) screenChildren[SELECT_BIP39_PHRASE_LENGTH_TEXT_INDEX])->text =
-        tool_type == TOOL_TYPE_BIP39 ? "How long is your\nBIP39 Recovery\nPhrase?"
-                                     : "Length of BIP39\nphrase to\ngenerate?";
+        (nbgl_obj_t*)generic_screen_set_icon(&C_icon_bip39_64px);
+    screenChildren[SELECT_BIP39_PHRASE_LENGTH_TEXT_INDEX] =
+        (nbgl_obj_t*)generic_screen_set_title(
+            screenChildren[SELECT_BIP39_PHRASE_LENGTH_ICON_INDEX]);
+    ((nbgl_text_area_t*)screenChildren[SELECT_BIP39_PHRASE_LENGTH_TEXT_INDEX])
+        ->text = tool_type == TOOL_TYPE_BIP39
+                     ? "How long is your\nBIP39 Recovery\nPhrase?"
+                     : "Length of BIP39\nphrase to\ngenerate?";
     // create nb words buttons
-    nbgl_objPoolGetArray(
-        BUTTON,
-        ARRAYLEN(bip39_passphraseLength),
-        0,
-        (nbgl_obj_t **) &screenChildren[SELECT_BIP39_PHRASE_LENGTH_BUTTON_12_INDEX]);
+    nbgl_objPoolGetArray(BUTTON, ARRAYLEN(bip39_passphraseLength), 0,
+                         (nbgl_obj_t**)&screenChildren
+                             [SELECT_BIP39_PHRASE_LENGTH_BUTTON_12_INDEX]);
     generic_screen_configure_buttons(
-        (nbgl_button_t **) &screenChildren[SELECT_BIP39_PHRASE_LENGTH_BUTTON_12_INDEX],
+        (nbgl_button_t**)&screenChildren
+            [SELECT_BIP39_PHRASE_LENGTH_BUTTON_12_INDEX],
         ARRAYLEN(bip39_passphraseLength));
-    ((nbgl_button_t *) screenChildren[SELECT_BIP39_PHRASE_LENGTH_BUTTON_12_INDEX])->text =
-        bip39_passphraseLength[0];
-    ((nbgl_button_t *) screenChildren[SELECT_BIP39_PHRASE_LENGTH_BUTTON_18_INDEX])->text =
-        bip39_passphraseLength[1];
-    ((nbgl_button_t *) screenChildren[SELECT_BIP39_PHRASE_LENGTH_BUTTON_24_INDEX])->text =
-        bip39_passphraseLength[2];
-    ((nbgl_button_t *) screenChildren[SELECT_BIP39_PHRASE_LENGTH_BUTTON_24_INDEX])->borderColor =
-        BLACK;
-    ((nbgl_button_t *) screenChildren[SELECT_BIP39_PHRASE_LENGTH_BUTTON_24_INDEX])->innerColor =
-        BLACK;
-    ((nbgl_button_t *) screenChildren[SELECT_BIP39_PHRASE_LENGTH_BUTTON_24_INDEX])
+    ((nbgl_button_t*)screenChildren[SELECT_BIP39_PHRASE_LENGTH_BUTTON_12_INDEX])
+        ->text = bip39_passphraseLength[0];
+    ((nbgl_button_t*)screenChildren[SELECT_BIP39_PHRASE_LENGTH_BUTTON_18_INDEX])
+        ->text = bip39_passphraseLength[1];
+    ((nbgl_button_t*)screenChildren[SELECT_BIP39_PHRASE_LENGTH_BUTTON_24_INDEX])
+        ->text = bip39_passphraseLength[2];
+    ((nbgl_button_t*)screenChildren[SELECT_BIP39_PHRASE_LENGTH_BUTTON_24_INDEX])
+        ->borderColor = BLACK;
+    ((nbgl_button_t*)screenChildren[SELECT_BIP39_PHRASE_LENGTH_BUTTON_24_INDEX])
+        ->innerColor = BLACK;
+    ((nbgl_button_t*)screenChildren[SELECT_BIP39_PHRASE_LENGTH_BUTTON_24_INDEX])
         ->foregroundColor = WHITE;
 
     // create back button
     screenChildren[SELECT_BIP39_PHRASE_LENGTH_BACK_BUTTON_INDEX] =
-        (nbgl_obj_t *) generic_screen_set_back_button();
+        (nbgl_obj_t*)generic_screen_set_back_button();
 
     nbgl_screenRedraw();
 }
@@ -304,7 +311,8 @@ static int keyboardIndex = 0;
 static bool seed_match = false;
 // the biggest word of BIP39 list is 8 char (9 with trailing '\0'), and
 // the max number of showed suggestions is NB_MAX_SUGGESTION_BUTTONS
-static char wordCandidates[(BIP39_MAX_WORD_LENGTH + 1) * NB_MAX_SUGGESTION_BUTTONS] = {0};
+static char wordCandidates[(BIP39_MAX_WORD_LENGTH + 1) *
+                           NB_MAX_SUGGESTION_BUTTONS] = {0};
 
 /*
  * Function called when a key of keyboard is touched
@@ -337,8 +345,9 @@ static void key_press_callback(const char touchedKey) {
         .title = PIC(headerText),
         .text = PIC(textToEnter),
         .numbered = true,
-        .number = tool_type == TOOL_TYPE_BIP39 ? bip39_mnemonic_current_word_number_get() + 1
-                                               : sskr_shares_current_word_number_get() + 1,
+        .number = tool_type == TOOL_TYPE_BIP39
+                      ? bip39_mnemonic_current_word_number_get() + 1
+                      : sskr_shares_current_word_number_get() + 1,
         .grayedOut = false,
         .textToken = KBD_TEXT_TOKEN,
         .suggestionButtons = suggestionButtons,
@@ -352,27 +361,27 @@ static void key_press_callback(const char touchedKey) {
     } else {
         const size_t nbMatchingWords =
             tool_type == TOOL_TYPE_BIP39
-                ? bolos_ux_bip39_fill_with_candidates((unsigned char *) &(textToEnter[0]),
-                                                      strlen(textToEnter),
-                                                      wordCandidates,
-                                                      buttonTexts)
-                : bolos_ux_sskr_fill_with_candidates((unsigned char *) &(textToEnter[0]),
-                                                     strlen(textToEnter),
-                                                     wordCandidates,
-                                                     buttonTexts);
+                ? bolos_ux_bip39_fill_with_candidates(
+                      (unsigned char*)&(textToEnter[0]), strlen(textToEnter),
+                      wordCandidates, buttonTexts)
+                : bolos_ux_sskr_fill_with_candidates(
+                      (unsigned char*)&(textToEnter[0]), strlen(textToEnter),
+                      wordCandidates, buttonTexts);
         keyboardContent.suggestionButtons.nbUsedButtons = nbMatchingWords;
         nbgl_layoutUpdateKeyboardContent(layout, &keyboardContent);
     }
     if (textLen > 0) {
-        mask = tool_type == TOOL_TYPE_BIP39
-                   ? bolos_ux_bip39_get_keyboard_mask((unsigned char *) &(textToEnter[0]),
-                                                      strlen(textToEnter))
-                   : bolos_ux_sskr_get_keyboard_mask((unsigned char *) &(textToEnter[0]),
-                                                     strlen(textToEnter));
+        mask =
+            tool_type == TOOL_TYPE_BIP39
+                ? bolos_ux_bip39_get_keyboard_mask(
+                      (unsigned char*)&(textToEnter[0]), strlen(textToEnter))
+                : bolos_ux_sskr_get_keyboard_mask(
+                      (unsigned char*)&(textToEnter[0]), strlen(textToEnter));
     }
     nbgl_layoutDraw(layout);
     nbgl_layoutUpdateKeyboard(layout, keyboardIndex, mask, false, LOWER_CASE);
-    nbgl_refreshSpecialWithPostRefresh(BLACK_AND_WHITE_REFRESH, POST_REFRESH_FORCE_POWER_ON);
+    nbgl_refreshSpecialWithPostRefresh(BLACK_AND_WHITE_REFRESH,
+                                       POST_REFRESH_FORCE_POWER_ON);
 }
 
 static void bip39_keyboard_dispatcher(const int token, uint8_t index) {
@@ -390,8 +399,9 @@ static void bip39_keyboard_dispatcher(const int token, uint8_t index) {
         PRINTF("Selected word is '%s' (size '%d')\n",
                buttonTexts[token - CHECK_FIRST_SUGGESTION_TOKEN],
                strlen(buttonTexts[token - CHECK_FIRST_SUGGESTION_TOKEN]));
-        bip39_mnemonic_word_add(buttonTexts[token - CHECK_FIRST_SUGGESTION_TOKEN],
-                                strlen(buttonTexts[token - CHECK_FIRST_SUGGESTION_TOKEN]));
+        bip39_mnemonic_word_add(
+            buttonTexts[token - CHECK_FIRST_SUGGESTION_TOKEN],
+            strlen(buttonTexts[token - CHECK_FIRST_SUGGESTION_TOKEN]));
         if (bip39_mnemonic_complete_check()) {
             display_check_result_page(bip39_mnemonic_check(&seed_match));
         } else {
@@ -427,8 +437,9 @@ static void sskr_keyboard_dispatcher(const int token, uint8_t index) {
 static void display_check_keyboard_page() {
     nbgl_layoutDescription_t layoutDescription = {
         .modal = false,
-        .onActionCallback =
-            tool_type == TOOL_TYPE_BIP39 ? &bip39_keyboard_dispatcher : &sskr_keyboard_dispatcher};
+        .onActionCallback = tool_type == TOOL_TYPE_BIP39
+                                ? &bip39_keyboard_dispatcher
+                                : &sskr_keyboard_dispatcher};
     nbgl_layoutKbd_t kbdInfo = {.lettersOnly = true,   // use only letters
                                 .mode = MODE_LETTERS,  // start in letters mode
                                 .keyMask = 0,          // no inactive key
@@ -437,24 +448,23 @@ static void display_check_keyboard_page() {
     memzero(buttonTexts, sizeof(buttonTexts[0]) * NB_MAX_SUGGESTION_BUTTONS);
     layout = nbgl_layoutGet(&layoutDescription);
     if (tool_type == TOOL_TYPE_BIP39) {
-        snprintf(headerText,
-                 HEADER_SIZE,
+        snprintf(headerText, HEADER_SIZE,
                  "Enter word n. %d/%d of your\nBIP39 Recovery Phrase",
                  bip39_mnemonic_current_word_number_get() + 1,
                  bip39_mnemonic_final_size_get());
     } else if (tool_type == TOOL_TYPE_SSKR) {
-        snprintf(headerText,
-                 HEADER_SIZE,
+        snprintf(headerText, HEADER_SIZE,
                  "Enter Share %d Word %d\nof your Recovery Phrase",
                  sskr_shareindex_get() + 1,
                  sskr_shares_current_word_number_get() + 1);
     }
 
-    nbgl_layoutHeader_t headerDesc = {.type = HEADER_BACK_AND_TEXT,
-                                      .separationLine = false,
-                                      .backAndText.token = CHECK_BACK_BUTTON_TOKEN,
-                                      .backAndText.tuneId = TUNE_TAP_CASUAL,
-                                      .backAndText.text = NULL};
+    nbgl_layoutHeader_t headerDesc = {
+        .type = HEADER_BACK_AND_TEXT,
+        .separationLine = false,
+        .backAndText.token = CHECK_BACK_BUTTON_TOKEN,
+        .backAndText.tuneId = TUNE_TAP_CASUAL,
+        .backAndText.text = NULL};
     nbgl_layoutAddHeader(layout, &headerDesc);
 
     keyboardIndex = nbgl_layoutAddKeyboard(layout, &kbdInfo);
@@ -469,8 +479,9 @@ static void display_check_keyboard_page() {
         .title = PIC(headerText),
         .text = PIC(textToEnter),
         .numbered = true,
-        .number = tool_type == TOOL_TYPE_BIP39 ? bip39_mnemonic_current_word_number_get() + 1
-                                               : sskr_shares_current_word_number_get() + 1,
+        .number = tool_type == TOOL_TYPE_BIP39
+                      ? bip39_mnemonic_current_word_number_get() + 1
+                      : sskr_shares_current_word_number_get() + 1,
         .grayedOut = false,
         .textToken = KBD_TEXT_TOKEN,
         .suggestionButtons = suggestionButtons,
@@ -484,25 +495,22 @@ static void display_check_keyboard_page() {
  * Home page, infos & dispatcher
  */
 static void display_home_page() {
-    static const char *const infoTypes[] = {"Version", APPNAME};
-    static const char *const infoContents[] = {APPVERSION, "(c) 2018-2025 Ledger"};
-    static const nbgl_contentInfoList_t infoList = {.nbInfos = 2,
-                                                    .infoTypes = infoTypes,
-                                                    .infoContents = infoContents};
+    static const char* const infoTypes[] = {"Version", APPNAME};
+    static const char* const infoContents[] = {APPVERSION,
+                                               "(c) 2018-2025 Ledger"};
+    static const nbgl_contentInfoList_t infoList = {
+        .nbInfos = 2, .infoTypes = infoTypes, .infoContents = infoContents};
 
     reset_globals();
 
-    nbgl_homeAction_t action = {.text = "Select Tool", .callback = PIC(display_select_tool_page)};
+    nbgl_homeAction_t action = {.text = "Select Tool",
+                                .callback = PIC(display_select_tool_page)};
 
-    nbgl_useCaseHomeAndSettings(
-        APPNAME,
-        &ICON_APP_HOME ,
-        "This Ledger application\nprovides some useful seed\nmanagement utilities.",
-        INIT_HOME_PAGE,
-        NULL,
-        &infoList,
-        &action,
-        on_quit);
+    nbgl_useCaseHomeAndSettings(APPNAME, &ICON_APP_HOME,
+                                "This Ledger application\nprovides some useful "
+                                "seed\nmanagement utilities.",
+                                INIT_HOME_PAGE, NULL, &infoList, &action,
+                                on_quit);
 }
 
 /*
@@ -510,7 +518,8 @@ static void display_home_page() {
  */
 static void check_result_callback(int token __attribute__((unused)),
                                   uint8_t index __attribute__((unused))) {
-    if (tool_type == TOOL_TYPE_BIP39 && bip39_mnemonic_check(&seed_match) && seed_match) {
+    if (tool_type == TOOL_TYPE_BIP39 && bip39_mnemonic_check(&seed_match) &&
+        seed_match) {
         display_select_generate_sskr_page();
     } else if (tool_type == TOOL_TYPE_SSKR && sskr_shares_check(&seed_match)) {
         display_select_recover_bip39_page();
@@ -521,29 +530,30 @@ static void check_result_callback(int token __attribute__((unused)),
 }
 
 static void display_check_result_page(const bool result) {
-    static const char *possible_results[2][5] = {
+    static const char* possible_results[2][5] = {
         {"Invalid Secret\nRecovery Phrase",
-         "The BIP39 Recovery Phrase\nyou have entered is not valid",
-         "",
-         "The SSKR Recovery Phrase\nyou have entered is not valid",
-         ""},
+         "The BIP39 Recovery Phrase\nyou have entered is not valid", "",
+         "The SSKR Recovery Phrase\nyou have entered is not valid", ""},
         {"Valid Secret\nRecovery Phrase",
-         "The BIP39 Recovery Phrase\nyou have entered\ndoesn't match the one present\n"
+         "The BIP39 Recovery Phrase\nyou have entered\ndoesn't match the one "
+         "present\n"
          "on this Ledger device.",
-         "The BIP39 Recovery Phrase\nyou have entered\nmatches the one present\n"
+         "The BIP39 Recovery Phrase\nyou have entered\nmatches the one "
+         "present\n"
          "on this Ledger device.",
-         "The SSKR Recovery Phrase\nyou have entered\ndoesn't match the one present\n"
+         "The SSKR Recovery Phrase\nyou have entered\ndoesn't match the one "
+         "present\n"
          "on this Ledger device.",
          "The SSKR Recovery Phrase\nyou have entered\nmatches the one present\n"
          "on this Ledger device."}};
-    static const nbgl_icon_details_t *icons[3] = {&DENIED_CIRCLE_ICON,
-                                                  &IMPORTANT_CIRCLE_ICON,
-                                                  &CHECK_CIRCLE_ICON};
+    static const nbgl_icon_details_t* icons[3] = {
+        &DENIED_CIRCLE_ICON, &IMPORTANT_CIRCLE_ICON, &CHECK_CIRCLE_ICON};
 
     nbgl_pageInfoDescription_t info = {
         .centeredInfo.icon = icons[result + seed_match],
         .centeredInfo.text1 = possible_results[result][0],
-        .centeredInfo.text2 = possible_results[result][1 + (tool_type * 2) + seed_match],
+        .centeredInfo.text2 =
+            possible_results[result][1 + (tool_type * 2) + seed_match],
         .centeredInfo.text3 = NULL,
         .centeredInfo.style = LARGE_CASE_INFO,
         .centeredInfo.offsetY = -16,
@@ -562,9 +572,12 @@ static void display_check_result_page(const bool result) {
  * Select number of shares page
  */
 
-enum __attribute__((packed)) sskr_gen { SSKR_GEN_BACK_BUTTON_TOKEN = FIRST_USER_TOKEN };
+enum __attribute__((packed)) sskr_gen {
+    SSKR_GEN_BACK_BUTTON_TOKEN = FIRST_USER_TOKEN
+};
 
-static void sskr_sharenum_validate(const uint8_t *sharenumentry, uint8_t length) {
+static void sskr_sharenum_validate(const uint8_t* sharenumentry,
+                                   uint8_t length) {
     // Code to validate the entered shares number
 
     sskr_sharenum_set(0);
@@ -579,18 +592,14 @@ static void sskr_sharenum_validate(const uint8_t *sharenumentry, uint8_t length)
         display_sskr_select_threshold_page();
     } else {
         nbgl_useCaseStatus("Number of SSKR shares must be between 1 and 16",
-                           false,
-                           display_select_generate_sskr_page);
+                           false, display_select_generate_sskr_page);
     }
 }
 
 void display_sskr_select_numshares_page() {
     // Draw the keypad
-    nbgl_useCaseKeypad("Enter number of SSKR shares\nto generate (1 - 16)",
-                       1,
-                       SSKR_MAX_NUMBER_LENGTH,
-                       false,
-                       false,
+    nbgl_useCaseKeypad("Enter number of SSKR shares\nto generate (1 - 16)", 1,
+                       SSKR_MAX_NUMBER_LENGTH, false, false,
                        sskr_sharenum_validate,
                        display_select_generate_sskr_page);
 }
@@ -608,10 +617,9 @@ static void display_generic_review() {
          .content.tagValueList.nbPairs = 1,
          .content.tagValueList.nbMaxLinesForValue = 0,
          .content.tagValueList.wrapping = true,
-         .content.tagValueList.pairs = (nbgl_layoutTagValue_t *) pairs}};
-    static const nbgl_genericContents_t genericContent = {.callbackCallNeeded = false,
-                                                          .contentsList = content,
-                                                          .nbContents = 1};
+         .content.tagValueList.pairs = (nbgl_layoutTagValue_t*)pairs}};
+    static const nbgl_genericContents_t genericContent = {
+        .callbackCallNeeded = false, .contentsList = content, .nbContents = 1};
 
     pairs[0].item = PIC(headerText);
     pairs[0].value = PIC(reviewText);
@@ -619,7 +627,8 @@ static void display_generic_review() {
     nbgl_useCaseGenericReview(&genericContent, "Done", review_done);
 }
 
-static void review_sskr_shares_contentGetter(uint8_t index, nbgl_content_t *genericreview) {
+static void review_sskr_shares_contentGetter(uint8_t index,
+                                             nbgl_content_t* genericreview) {
     static nbgl_layoutTagValue_t pairs[1];
 
     genericreview->type = TAG_VALUE_LIST;
@@ -627,15 +636,17 @@ static void review_sskr_shares_contentGetter(uint8_t index, nbgl_content_t *gene
     genericreview->content.tagValueList.nbPairs = 1;
     genericreview->content.tagValueList.nbMaxLinesForValue = 0;
     genericreview->content.tagValueList.wrapping = true;
-    genericreview->content.tagValueList.pairs = (nbgl_layoutTagValue_t *) pairs;
+    genericreview->content.tagValueList.pairs = (nbgl_layoutTagValue_t*)pairs;
 
     SPRINTF(headerText, "SSKR Share #%d", index + 1);
     // Ensure null termination
-    headerText[sskr_sharecount_get() > 9 ? sizeof(headerText) - 1 : sizeof(headerText) - 2] = '\0';
+    headerText[sskr_sharecount_get() > 9 ? sizeof(headerText) - 1
+                                         : sizeof(headerText) - 2] = '\0';
     pairs[0].item = PIC(headerText);
 
     strncpy(reviewText,
-            sskr_shares_get() + (index * sskr_shares_length_get() / sskr_sharecount_get()),
+            sskr_shares_get() +
+                (index * sskr_shares_length_get() / sskr_sharecount_get()),
             sskr_shares_length_get() / sskr_sharecount_get());
     // Ensure null termination
     reviewText[sskr_shares_length_get() / sskr_sharecount_get()] = '\0';
@@ -653,7 +664,8 @@ static void display_sskr_shares(void) {
     nbgl_useCaseGenericReview(&genericContent, "Done", review_done);
 }
 
-static void sskr_threshold_validate(const uint8_t *thresholdentry, uint8_t length) {
+static void sskr_threshold_validate(const uint8_t* thresholdentry,
+                                    uint8_t length) {
     // Code to validate the entered threshold number
 
     sskr_threshold_set(0);
@@ -665,14 +677,14 @@ static void sskr_threshold_validate(const uint8_t *thresholdentry, uint8_t lengt
     PRINTF("Threshold value entered is '%d'\n", sskr_threshold_get());
 
     if (sskr_threshold_get() < 1) {
-        nbgl_useCaseStatus("Threshold value cannot be 0", false, display_select_generate_sskr_page);
-    } else if (sskr_threshold_get() > sskr_sharenum_get()) {
-        nbgl_useCaseStatus("Threshold value cannot be greater than number of shares",
-                           false,
+        nbgl_useCaseStatus("Threshold value cannot be 0", false,
                            display_select_generate_sskr_page);
+    } else if (sskr_threshold_get() > sskr_sharenum_get()) {
+        nbgl_useCaseStatus(
+            "Threshold value cannot be greater than number of shares", false,
+            display_select_generate_sskr_page);
     } else if (sskr_threshold_get() == 1 && sskr_sharenum_get() > 1) {
-        nbgl_useCaseStatus("1-of-m shares where\nm > 1 is not supported",
-                           false,
+        nbgl_useCaseStatus("1-of-m shares where\nm > 1 is not supported", false,
                            display_select_generate_sskr_page);
     } else {
         display_sskr_shares();
@@ -681,12 +693,8 @@ static void sskr_threshold_validate(const uint8_t *thresholdentry, uint8_t lengt
 
 void display_sskr_select_threshold_page() {
     // Draw the keypad
-    nbgl_useCaseKeypad("Enter threshold value",
-                       1,
-                       SSKR_MAX_NUMBER_LENGTH,
-                       false,
-                       false,
-                       sskr_threshold_validate,
+    nbgl_useCaseKeypad("Enter threshold value", 1, SSKR_MAX_NUMBER_LENGTH,
+                       false, false, sskr_threshold_validate,
                        display_sskr_select_numshares_page);
 }
 
@@ -700,8 +708,9 @@ enum __attribute__((packed)) select_bip85_app {
     SELECT_BIP85_APP_NB_CHILDREN,
 };
 
-static const char *bip85_select_app[] = {"BIP39", "Password (Base64)", "Password (Base85)"};
-static void bip85_index_validate(const uint8_t *indexentry, uint8_t length) {
+static const char* bip85_select_app[] = {"BIP39", "Password (Base64)",
+                                         "Password (Base85)"};
+static void bip85_index_validate(const uint8_t* indexentry, uint8_t length) {
     // Code to validate BIP85 index
 
     bip85_index_set(0);
@@ -715,22 +724,28 @@ static void bip85_index_validate(const uint8_t *indexentry, uint8_t length) {
         switch (bip85_type_get()) {
             case BIP85_APP_BIP39:
                 bip85_app_bip39_gen();
-                SPRINTF(headerText, "BIP39 Phrase (Index #%d)", bip85_index_get());
-                strncpy(reviewText, bip39_mnemonic_get(), bip39_mnemonic_length_get());
+                SPRINTF(headerText, "BIP39 Phrase (Index #%d)",
+                        bip85_index_get());
+                strncpy(reviewText, bip39_mnemonic_get(),
+                        bip39_mnemonic_length_get());
                 // Ensure null termination
                 reviewText[bip39_mnemonic_length_get()] = '\0';
                 display_generic_review();
                 break;
             case BIP85_APP_PWD_BASE64:
-                SPRINTF(headerText, "Base64 Password (Index #%d)", bip85_index_get());
-                strncpy(reviewText, (const char *) bip85_app_pwd_base64_gen(), bip85_length_get());
+                SPRINTF(headerText, "Base64 Password (Index #%d)",
+                        bip85_index_get());
+                strncpy(reviewText, (const char*)bip85_app_pwd_base64_gen(),
+                        bip85_length_get());
                 // Ensure null termination
                 reviewText[bip85_length_get()] = '\0';
                 display_generic_review();
                 break;
             case BIP85_APP_PWD_BASE85:
-                SPRINTF(headerText, "Base85 Password (Index #%d)", bip85_index_get());
-                strncpy(reviewText, (const char *) bip85_app_pwd_base85_gen(), bip85_length_get());
+                SPRINTF(headerText, "Base85 Password (Index #%d)",
+                        bip85_index_get());
+                strncpy(reviewText, (const char*)bip85_app_pwd_base85_gen(),
+                        bip85_length_get());
                 // Ensure null termination
                 reviewText[bip85_length_get()] = '\0';
                 display_generic_review();
@@ -741,23 +756,19 @@ static void bip85_index_validate(const uint8_t *indexentry, uint8_t length) {
         }
     } else {
         nbgl_useCaseStatus("BIP85 index must be between 0 and 2,147,483,647",
-                           false,
-                           display_bip39_select_phrase_length_page);
+                           false, display_bip39_select_phrase_length_page);
     }
 }
 
 void display_bip85_select_index_page() {
     // Draw the keypad
-    nbgl_useCaseKeypad("Enter index",
-                       1,
-                       BIP85_INDEX_MAX_NUMBER_LENGTH,
-                       false,
-                       false,
-                       bip85_index_validate,
+    nbgl_useCaseKeypad("Enter index", 1, BIP85_INDEX_MAX_NUMBER_LENGTH, false,
+                       false, bip85_index_validate,
                        display_bip85_select_app_page);
 }
 
-static void bip85_password_length_validate(const uint8_t *lengthentry, uint8_t length) {
+static void bip85_password_length_validate(const uint8_t* lengthentry,
+                                           uint8_t length) {
     // Code to validate BIP85 index
 
     bip85_length_set(0);
@@ -767,36 +778,34 @@ static void bip85_password_length_validate(const uint8_t *lengthentry, uint8_t l
     }
     PRINTF("BIP85 password length entered is '%d'\n", bip85_length_get());
 
-    uint8_t password_length_min = bip85_type_get() == BIP85_APP_PWD_BASE64 ? 20 : 10;
-    uint8_t password_length_max = bip85_type_get() == BIP85_APP_PWD_BASE64 ? 86 : 80;
+    uint8_t password_length_min =
+        bip85_type_get() == BIP85_APP_PWD_BASE64 ? 20 : 10;
+    uint8_t password_length_max =
+        bip85_type_get() == BIP85_APP_PWD_BASE64 ? 86 : 80;
     char message[50] = {0};
 
     if ((bip85_length_get() >= password_length_min) &&
         (bip85_length_get() <= password_length_max)) {
         display_bip85_select_index_page();
     } else {
-        snprintf(message,
-                 sizeof(message),
+        snprintf(message, sizeof(message),
                  "BIP85 password length must be between %d and %d",
-                 password_length_min,
-                 password_length_max);
-        nbgl_useCaseStatus((const char *) message, false, display_bip85_select_app_page);
+                 password_length_min, password_length_max);
+        nbgl_useCaseStatus((const char*)message, false,
+                           display_bip85_select_app_page);
     }
 }
 
 void display_bip85_select_password_length_page() {
     // Draw the keypad
-    nbgl_useCaseKeypad("Enter password length",
-                       1,
-                       2,
-                       false,
-                       false,
+    nbgl_useCaseKeypad("Enter password length", 1, 2, false, false,
                        bip85_password_length_validate,
                        display_bip85_select_app_page);
 }
 
-static void select_bip85_app_callback(nbgl_obj_t *obj, nbgl_touchType_t eventType) {
-    nbgl_obj_t **screenChildren = nbgl_screenGetElements(0);
+static void select_bip85_app_callback(nbgl_obj_t* obj,
+                                      nbgl_touchType_t eventType) {
+    nbgl_obj_t** screenChildren = nbgl_screenGetElements(0);
     if (eventType != TOUCHED) {
         return;
     }
@@ -805,10 +814,12 @@ static void select_bip85_app_callback(nbgl_obj_t *obj, nbgl_touchType_t eventTyp
     if (obj == screenChildren[SELECT_BIP85_APP_BUTTON_BIP39_INDEX]) {
         bip85_type_set(BIP85_APP_BIP39);
         display_bip39_select_phrase_length_page();
-    } else if (obj == screenChildren[SELECT_BIP85_APP_BUTTON_PWD_BASE64_INDEX]) {
+    } else if (obj ==
+               screenChildren[SELECT_BIP85_APP_BUTTON_PWD_BASE64_INDEX]) {
         bip85_type_set(BIP85_APP_PWD_BASE64);
         display_bip85_select_password_length_page();
-    } else if (obj == screenChildren[SELECT_BIP85_APP_BUTTON_PWD_BASE85_INDEX]) {
+    } else if (obj ==
+               screenChildren[SELECT_BIP85_APP_BUTTON_PWD_BASE85_INDEX]) {
         bip85_type_set(BIP85_APP_PWD_BASE85);
         display_bip85_select_password_length_page();
     } else if (obj == screenChildren[SELECT_BIP85_APP_BACK_BUTTON_INDEX]) {
@@ -820,46 +831,44 @@ static void select_bip85_app_callback(nbgl_obj_t *obj, nbgl_touchType_t eventTyp
 }
 
 static void display_bip85_select_app_page(void) {
-    nbgl_obj_t **screenChildren;
+    nbgl_obj_t** screenChildren;
 
     // From top to bottom:
     // <return back arrow> + <icon> + <text> + <3 buttons>
-    nbgl_screenSet(&screenChildren,
-                   SELECT_BIP85_APP_NB_CHILDREN,
-                   NULL,
-                   (nbgl_touchCallback_t) &select_bip85_app_callback);
+    nbgl_screenSet(&screenChildren, SELECT_BIP85_APP_NB_CHILDREN, NULL,
+                   (nbgl_touchCallback_t)&select_bip85_app_callback);
 
     screenChildren[SELECT_BIP85_APP_ICON_INDEX] =
-        (nbgl_obj_t *) generic_screen_set_icon(&C_icon_bip85_64px);
+        (nbgl_obj_t*)generic_screen_set_icon(&C_icon_bip85_64px);
     screenChildren[SELECT_BIP39_PHRASE_LENGTH_TEXT_INDEX] =
-        (nbgl_obj_t *) generic_screen_set_title(screenChildren[SELECT_BIP85_APP_ICON_INDEX]);
-    ((nbgl_text_area_t *) screenChildren[SELECT_BIP39_PHRASE_LENGTH_TEXT_INDEX])->text =
-        "Which BIP85\napplication do you\nwish to use?";
+        (nbgl_obj_t*)generic_screen_set_title(
+            screenChildren[SELECT_BIP85_APP_ICON_INDEX]);
+    ((nbgl_text_area_t*)screenChildren[SELECT_BIP39_PHRASE_LENGTH_TEXT_INDEX])
+        ->text = "Which BIP85\napplication do you\nwish to use?";
 
     // create bip85 app buttons
-    nbgl_objPoolGetArray(BUTTON,
-                         ARRAYLEN(bip85_select_app),
-                         0,
-                         (nbgl_obj_t **) &screenChildren[SELECT_BIP85_APP_BUTTON_BIP39_INDEX]);
+    nbgl_objPoolGetArray(
+        BUTTON, ARRAYLEN(bip85_select_app), 0,
+        (nbgl_obj_t**)&screenChildren[SELECT_BIP85_APP_BUTTON_BIP39_INDEX]);
     generic_screen_configure_buttons(
-        (nbgl_button_t **) &screenChildren[SELECT_BIP85_APP_BUTTON_BIP39_INDEX],
+        (nbgl_button_t**)&screenChildren[SELECT_BIP85_APP_BUTTON_BIP39_INDEX],
         ARRAYLEN(bip85_select_app));
-    ((nbgl_button_t *) screenChildren[SELECT_BIP85_APP_BUTTON_BIP39_INDEX])->text =
-        bip85_select_app[0];
-    ((nbgl_button_t *) screenChildren[SELECT_BIP85_APP_BUTTON_PWD_BASE64_INDEX])->text =
-        bip85_select_app[1];
-    ((nbgl_button_t *) screenChildren[SELECT_BIP85_APP_BUTTON_PWD_BASE85_INDEX])->text =
-        bip85_select_app[2];
-    ((nbgl_button_t *) screenChildren[SELECT_BIP85_APP_BUTTON_PWD_BASE85_INDEX])->borderColor =
-        BLACK;
-    ((nbgl_button_t *) screenChildren[SELECT_BIP85_APP_BUTTON_PWD_BASE85_INDEX])->innerColor =
-        BLACK;
-    ((nbgl_button_t *) screenChildren[SELECT_BIP85_APP_BUTTON_PWD_BASE85_INDEX])->foregroundColor =
-        WHITE;
+    ((nbgl_button_t*)screenChildren[SELECT_BIP85_APP_BUTTON_BIP39_INDEX])
+        ->text = bip85_select_app[0];
+    ((nbgl_button_t*)screenChildren[SELECT_BIP85_APP_BUTTON_PWD_BASE64_INDEX])
+        ->text = bip85_select_app[1];
+    ((nbgl_button_t*)screenChildren[SELECT_BIP85_APP_BUTTON_PWD_BASE85_INDEX])
+        ->text = bip85_select_app[2];
+    ((nbgl_button_t*)screenChildren[SELECT_BIP85_APP_BUTTON_PWD_BASE85_INDEX])
+        ->borderColor = BLACK;
+    ((nbgl_button_t*)screenChildren[SELECT_BIP85_APP_BUTTON_PWD_BASE85_INDEX])
+        ->innerColor = BLACK;
+    ((nbgl_button_t*)screenChildren[SELECT_BIP85_APP_BUTTON_PWD_BASE85_INDEX])
+        ->foregroundColor = WHITE;
 
     // create back button
     screenChildren[SELECT_BIP85_APP_BACK_BUTTON_INDEX] =
-        (nbgl_obj_t *) generic_screen_set_back_button();
+        (nbgl_obj_t*)generic_screen_set_back_button();
 
     nbgl_screenRedraw();
 }
@@ -867,7 +876,5 @@ static void display_bip85_select_app_page(void) {
 /*
  * Public function
  */
-void ui_idle_init(void) {
-    display_home_page();
-}
+void ui_idle_init(void) { display_home_page(); }
 #endif

@@ -23,7 +23,7 @@
 
 #if defined(HAVE_BAGL)
 
-typedef const bagl_element_t* (*keyboard_callback_t)(unsigned int event, unsigned int value);
+typedef const bagl_element_t *(*keyboard_callback_t)(unsigned int event, unsigned int value);
 
 void bolos_ux_hslider3_init(unsigned int total_count);
 void bolos_ux_hslider3_set_current(unsigned int current);
@@ -69,7 +69,7 @@ typedef struct bolos_ux_context {
 
 #if defined(TARGET_NANOX) || defined(TARGET_NANOS2)
     // label line for common PIN and common keyboard screen (displayed over the entry)
-    const char* common_label;
+    const char *common_label;
 #endif                      // defined(TARGET_NANOX) || defined(TARGET_NANOS2)
     char pin_digit_buffer;  // digit to be displayed
 

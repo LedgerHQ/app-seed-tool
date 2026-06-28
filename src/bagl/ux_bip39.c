@@ -19,19 +19,21 @@
 
 #if defined(HAVE_BAGL)
 
-UX_STEP_NOCB(step_display_bip39,
-             bnnn_paging,
+UX_STEP_NOCB(step_display_bip39, bnnn_paging,
              {
                  .title = "BIP39 Phrase",
                  .text = G_bolos_ux_context.words_buffer,
              });
 
-UX_STEP_CB(step_bip39_clean_exit, pb, clean_exit(0), {&C_icon_dashboard_x, "Quit"});
+UX_STEP_CB(step_bip39_clean_exit, pb, clean_exit(0),
+           {&C_icon_dashboard_x, "Quit"});
 
-UX_FLOW(display_bip39_flow, &step_display_bip39, &step_bip39_clean_exit, FLOW_LOOP);
+UX_FLOW(display_bip39_flow, &step_display_bip39, &step_bip39_clean_exit,
+        FLOW_LOOP);
 
 void recover_bip39(void) {
-    // BIP39 phrase should already be in G_bolos_ux_context.words_buffer so just need to display it
+    // BIP39 phrase should already be in G_bolos_ux_context.words_buffer so just
+    // need to display it
     ux_flow_init(0, display_bip39_flow, NULL);
 }
 

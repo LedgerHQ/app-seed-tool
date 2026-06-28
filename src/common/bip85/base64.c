@@ -27,9 +27,9 @@
  *
  * @return The number of bytes written to the output buffer.
  */
-uint8_t base64_encode_64bytes(const uint8_t *src, char *dst) {
-    const uint8_t *src_end = src + BIP85_ENTROPY_LENGTH;
-    char *dst_start = dst;
+uint8_t base64_encode_64bytes(const uint8_t* src, char* dst) {
+    const uint8_t* src_end = src + BIP85_ENTROPY_LENGTH;
+    char* dst_start = dst;
     uint32_t value;
 
     // Loop through the input in chunks of 3 bytes

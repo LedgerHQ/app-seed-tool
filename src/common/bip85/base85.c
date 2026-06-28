@@ -27,9 +27,11 @@
  *
  * @return The number of bytes written to the output buffer.
  */
-uint8_t base85_encode_64bytes(const uint8_t *src, char *dst) {
-    const uint8_t *src_end = src + BIP85_ENTROPY_LENGTH;  // Mark the end of the source array
-    char *dst_start = dst;  // Save the starting address of the destination array
+uint8_t base85_encode_64bytes(const uint8_t* src, char* dst) {
+    const uint8_t* src_end =
+        src + BIP85_ENTROPY_LENGTH;  // Mark the end of the source array
+    char* dst_start =
+        dst;  // Save the starting address of the destination array
     uint32_t value;
 
     while (src < src_end) {
@@ -38,8 +40,10 @@ uint8_t base85_encode_64bytes(const uint8_t *src, char *dst) {
 
         // Convert the value into 5 base85 characters
         for (int8_t i = 4; i >= 0; i--) {
-            dst[i] = BASE85_TABLE[value % BASE85_TABLE_LENGTH];  // Select character
-            value /= BASE85_TABLE_LENGTH;  // Divide by table length for next digit
+            dst[i] =
+                BASE85_TABLE[value % BASE85_TABLE_LENGTH];  // Select character
+            value /=
+                BASE85_TABLE_LENGTH;  // Divide by table length for next digit
         }
 
         dst += 5;  // Advance destination pointer

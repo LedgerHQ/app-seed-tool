@@ -47,7 +47,7 @@ bool bip39_mnemonic_complete_check(void);
 /*
  * Check if the currently stored mnemonic generates the same seed as the current device's one
  */
-bool bip39_mnemonic_check(bool* match);
+bool bip39_mnemonic_check(bool *match);
 
 /*
  * Erase all information and reset the indexes
@@ -63,21 +63,21 @@ bool bip39_mnemonic_word_remove(void);
 /*
  * Adds a word in the passphrase, returns how many words are stored in the mnemonic
  */
-size_t bip39_mnemonic_word_add(const char* const buffer, const size_t size);
+size_t bip39_mnemonic_word_add(const char *const buffer, const size_t size);
 
 /*
  * Generate BIP39 mnemonic from SSKR shares
  */
-void bip39_mnemonic_from_sskr_shares(unsigned char* seed);
+void bip39_mnemonic_from_sskr_shares(unsigned char *seed);
 
 /*
  * Encode BIP39 mnemonic from hex input
  */
-void bip39_mnemonic_encode(const uint8_t* seed, uint8_t seed_len);
+void bip39_mnemonic_encode(const uint8_t *seed, uint8_t seed_len);
 /*
  * Returns the mnemonic passphrase
  */
-char* bip39_mnemonic_get(void);
+char *bip39_mnemonic_get(void);
 
 /*
  * Returns length of the mnemonic passphrase

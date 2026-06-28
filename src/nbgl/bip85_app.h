@@ -78,10 +78,10 @@ uint8_t bip85_get_get();
 /*
  * Generate base64 password and return pointer to password
  */
-uint8_t* bip85_app_pwd_base64_gen(void);
+uint8_t *bip85_app_pwd_base64_gen(void);
 
 /*
  * Generate base85 password and return pointer to password
  */
-uint8_t* bip85_app_pwd_base85_gen(void);
+uint8_t *bip85_app_pwd_base85_gen(void);
 #endif  // SCREEN_SIZE_WALLET

@@ -39,7 +39,7 @@
  *
  * @return The number of bytes written to the output buffer.
  */
-uint8_t bolos_ux_bip85_bip39(uint8_t* hex_out, uint8_t language, uint8_t words, unsigned int index);
+uint8_t bolos_ux_bip85_bip39(uint8_t *hex_out, uint8_t language, uint8_t words, unsigned int index);
 
 /**
  * @brief Generates BIP85 HEX output using a specified BIP32 path.
@@ -53,7 +53,7 @@ uint8_t bolos_ux_bip85_bip39(uint8_t* hex_out, uint8_t language, uint8_t words, 
  * @param[in]  num_bytes Number of bytes to generate.
  * @param[in]  index     Index to be used in the BIP32 path.
  */
-void bolos_ux_bip85_hex(uint8_t* hex_out, uint8_t num_bytes, unsigned int index);
+void bolos_ux_bip85_hex(uint8_t *hex_out, uint8_t num_bytes, unsigned int index);
 
 /**
  * @brief Generates BIP85 Base64 password using a specified BIP32 path.
@@ -67,7 +67,7 @@ void bolos_ux_bip85_hex(uint8_t* hex_out, uint8_t num_bytes, unsigned int index)
  * @param[in]  pwd_len Length of the password in bytes.
  * @param[in]  index   Index to be used in the BIP32 path.
  */
-uint8_t bolos_ux_bip85_pwd_base64(char* pwd, uint8_t pwd_len, unsigned int index);
+uint8_t bolos_ux_bip85_pwd_base64(char *pwd, uint8_t pwd_len, unsigned int index);
 
 /**
  * @brief Generates BIP85 Base85 password using a specified BIP32 path.
@@ -83,7 +83,7 @@ uint8_t bolos_ux_bip85_pwd_base64(char* pwd, uint8_t pwd_len, unsigned int index
  *
  * @return The number of bytes written to the output buffer.
  */
-uint8_t bolos_ux_bip85_pwd_base85(char* pwd, uint8_t pwd_len, unsigned int index);
+uint8_t bolos_ux_bip85_pwd_base85(char *pwd, uint8_t pwd_len, unsigned int index);
 
 /**
  * @brief Generates a series of random dice rolls using BIP85.
@@ -98,4 +98,4 @@ uint8_t bolos_ux_bip85_pwd_base85(char* pwd, uint8_t pwd_len, unsigned int index
  *
  * @return The number of bytes written to the output buffer.
  */
-void bolos_ux_bip85_dice(uint32_t* out, uint32_t sides, uint32_t rolls, unsigned int index);
+void bolos_ux_bip85_dice(uint32_t *out, uint32_t sides, uint32_t rolls, unsigned int index);

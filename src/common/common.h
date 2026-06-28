@@ -24,7 +24,7 @@
 
 #ifndef SPRINTF
 // avoid typing the size each time
-#define SPRINTF(strbuf, ...) snprintf((char*) (strbuf), sizeof(strbuf), __VA_ARGS__)
+#define SPRINTF(strbuf, ...) snprintf((char *) (strbuf), sizeof(strbuf), __VA_ARGS__)
 #endif
 
 bool compare_recovery_phrase(void);

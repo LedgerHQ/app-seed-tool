@@ -49,7 +49,7 @@ int16_t sss_split_secret(uint8_t threshold,
                          const uint8_t *secret,
                          uint8_t secret_length,
                          uint8_t *result,
-                         unsigned char *(*random_generator)(uint8_t *, size_t));
+                         unsigned char *(*random_generator)(uint8_t *, size_t) );
 
 /**
  * @brief Recovers a secret from Shamir's Secret Sharing (SSS) shares.

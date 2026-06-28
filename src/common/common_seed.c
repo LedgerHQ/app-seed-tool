@@ -17,10 +17,12 @@
 
 #include <lcx_hmac.h>
 
+/* clang-format off */
 #include "constants.h"
 #include "ui.h"
-#include "./common.h"
+/* clang-format on */
 #include "./bip39/common_bip39.h"
+#include "./common.h"
 #if defined(HAVE_NBGL)
 #include "../nbgl/bip39_mnemonic.h"
 extern unsigned int tool_type;
@@ -32,23 +34,24 @@ bool compare_recovery_phrase(void) {
 
 #if defined(HAVE_BAGL)
     if (G_bolos_ux_context.tool_type == TOOL_TYPE_BIP39) {
-        bolos_ux_bip39_mnemonic_to_seed((unsigned char*) G_bolos_ux_context.words_buffer,
-                                        G_bolos_ux_context.words_buffer_length,
-                                        buffer);
+        bolos_ux_bip39_mnemonic_to_seed(
+            (unsigned char*)G_bolos_ux_context.words_buffer,
+            G_bolos_ux_context.words_buffer_length, buffer);
     } else if (G_bolos_ux_context.tool_type == TOOL_TYPE_SSKR) {
-        G_bolos_ux_context.words_buffer_length = sizeof(G_bolos_ux_context.words_buffer);
-        bolos_ux_sskr_to_seed_convert((unsigned char*) G_bolos_ux_context.sskr_words_buffer,
-                                      G_bolos_ux_context.sskr_words_buffer_length,
-                                      G_bolos_ux_context.sskr_share_count,
-                                      (unsigned char*) &G_bolos_ux_context.words_buffer,
-                                      &G_bolos_ux_context.words_buffer_length,
-                                      buffer);
+        G_bolos_ux_context.words_buffer_length =
+            sizeof(G_bolos_ux_context.words_buffer);
+        bolos_ux_sskr_to_seed_convert(
+            (unsigned char*)G_bolos_ux_context.sskr_words_buffer,
+            G_bolos_ux_context.sskr_words_buffer_length,
+            G_bolos_ux_context.sskr_share_count,
+            (unsigned char*)&G_bolos_ux_context.words_buffer,
+            &G_bolos_ux_context.words_buffer_length, buffer);
     }
 #elif defined(HAVE_NBGL)
     if (tool_type == TOOL_TYPE_BIP39) {
-        bolos_ux_bip39_mnemonic_to_seed((const unsigned char *) bip39_mnemonic_get(),
-                                        bip39_mnemonic_length_get(),
-                                        buffer);
+        bolos_ux_bip39_mnemonic_to_seed(
+            (const unsigned char*)bip39_mnemonic_get(),
+            bip39_mnemonic_length_get(), buffer);
     } else if (tool_type == TOOL_TYPE_SSKR) {
         bip39_mnemonic_from_sskr_shares(buffer);
     }
@@ -59,21 +62,21 @@ bool compare_recovery_phrase(void) {
     cx_hmac_sha512_t ctx;
     const char key[] = "Bitcoin seed";
 
-    LEDGER_ASSERT(cx_hmac_sha512_init_no_throw(&ctx, (const uint8_t*) key, strlen(key)) == CX_OK,
+    LEDGER_ASSERT(cx_hmac_sha512_init_no_throw(&ctx, (const uint8_t*)key,
+                                               strlen(key)) == CX_OK,
                   "HMAC init failed");
-    LEDGER_ASSERT(cx_hmac_no_throw((cx_hmac_t*) &ctx, CX_LAST, buffer, 64, buffer, 64) == CX_OK,
+    LEDGER_ASSERT(cx_hmac_no_throw((cx_hmac_t*)&ctx, CX_LAST, buffer, 64,
+                                   buffer, 64) == CX_OK,
                   "HMAC failed");
     PRINTF("Root key from input:\n%.*H\n", 64, buffer);
 
     // get rootkey from device's seed
     uint8_t buffer_device[64];
 
-    // os_derive_bip32* do not accept NULL path, even with a size of 0, so we provide an empty path
+    // os_derive_bip32* do not accept NULL path, even with a size of 0, so we
+    // provide an empty path
     const unsigned int empty_path = 0;
-    if (os_derive_bip32_no_throw(CX_CURVE_256K1,
-                                 &empty_path,
-                                 0,
-                                 buffer_device,
+    if (os_derive_bip32_no_throw(CX_CURVE_256K1, &empty_path, 0, buffer_device,
                                  buffer_device + 32) != CX_OK) {
         PRINTF("An error occurred while comparing the recovery phrase\n");
         return 0;
@@ -81,7 +84,8 @@ bool compare_recovery_phrase(void) {
     PRINTF("Root key from device: \n%.*H\n", 64, buffer_device);
 
     // compare both rootkey
-    const bool result = os_secure_memcmp(buffer, buffer_device, 64) ? false : true;
+    const bool result =
+        os_secure_memcmp(buffer, buffer_device, 64) ? false : true;
     memzero(buffer_device, 64);
     memzero(buffer, 64);
 
