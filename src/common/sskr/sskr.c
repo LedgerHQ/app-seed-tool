@@ -561,6 +561,10 @@ int16_t sskr_combine_shards(const uint8_t** input_shards, uint8_t shard_len,
         return SSKR_ERROR_EMPTY_SHARD_SET;
     }
 
+    if (shards_count > SSS_MAX_SHARE_COUNT * SSKR_MAX_GROUP_COUNT) {
+        return SSKR_ERROR_INVALID_SHARD_SET;
+    }
+
     sskr_shard_t shards[SSS_MAX_SHARE_COUNT * SSKR_MAX_GROUP_COUNT];
 
     for (uint16_t i = 0; !result && i < shards_count; ++i) {

@@ -57,6 +57,15 @@ unsigned int bolos_ux_sskr_combine(unsigned char* sskr_shares_hex,
                                    unsigned int sskr_shares_count,
                                    unsigned char* output) {
     const uint8_t* ptr_sskr_shares[SSKR_MAX_GROUP_COUNT * SSS_MAX_SHARE_COUNT];
+
+    // The count comes from the member-threshold nibble of the entered data, so
+    // it can exceed what this build holds. Reject it before the loop below
+    // fills ptr_sskr_shares[], and before the division by it.
+    if (sskr_shares_count == 0 ||
+        sskr_shares_count > SSKR_MAX_GROUP_COUNT * SSS_MAX_SHARE_COUNT) {
+        memzero(sskr_shares_hex, sskr_shares_hex_length);
+        return 0;
+    }
     uint8_t sskr_share_len = sskr_shares_hex[3] & 0x1F;
     if (sskr_share_len > 23) {
         sskr_share_len = sskr_shares_hex[4];
