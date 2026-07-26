@@ -266,8 +266,8 @@ void bolos_ux_bip85_dice(uint32_t* out, uint32_t sides, uint32_t rolls,
     uint8_t shift_amount = (bytes_per_roll << 3) - bits_per_roll;
 
     for (uint32_t roll_result = 0, roll_index = 0;
-         roll_index < rolls &&
-         buffer_ptr - buffer_drng < BIP85_DRNG_MAX_DIGEST_SIZE;
+         roll_index < rolls && buffer_ptr - buffer_drng + bytes_per_roll <=
+                                   BIP85_DRNG_MAX_DIGEST_SIZE;
          roll_result = 0) {
         // Construct roll result from bytes_per_roll bytes
         uint8_t* end_ptr = buffer_ptr + bytes_per_roll;
