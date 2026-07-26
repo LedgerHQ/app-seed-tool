@@ -170,6 +170,17 @@ target_link_libraries(test_sss PUBLIC cmocka gcov testutils sss)
 add_executable(test_sskr tests/sskr.c)
 target_link_libraries(test_sskr PUBLIC cmocka gcov testutils sskr sss)
 
+add_executable(test_sskr_shard_count tests/sskr_shard_count.c)
+target_link_libraries(test_sskr_shard_count PUBLIC cmocka gcov sskr sss testutils)
+
+# Built with AddressSanitizer: this one is about what the code writes, not
+# what it returns, so the sanitizer is the assertion.
+add_executable(test_sskr_combine_bounds ./tests/sskr_combine_bounds.c ../../src/common/bip39/seed_rom_variables.c ../../src/common/bip39/seed_bip39.c ../../src/common/sskr/seed_rom_variables.c ../../src/common/sskr/seed_sskr.c)
+target_include_directories(test_sskr_combine_bounds PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common/sskr/sss)
+target_compile_options(test_sskr_combine_bounds PRIVATE -fsanitize=address -fno-omit-frame-pointer)
+target_link_options(test_sskr_combine_bounds PRIVATE -fsanitize=address)
+target_link_libraries(test_sskr_combine_bounds PUBLIC cmocka gcov testutils sskr sss)
+
 add_executable(test_bip39 ./tests/bip39.c ../../src/common/bip39/seed_rom_variables.c  ../../src/common/bip39/seed_bip39.c)
 target_include_directories(test_bip39 PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common)
 target_link_libraries(test_bip39 PUBLIC cmocka gcov testutils)
@@ -188,6 +199,6 @@ target_link_libraries(test_base64 PUBLIC cmocka gcov)
 add_executable(test_base85 tests/base85.c ../../src/common/bip85/seed_rom_variables.c ../../src/common/bip85/base85.c)
 target_link_libraries(test_base85 PUBLIC cmocka gcov)
 
-foreach(target test_sss test_sskr test_bip39 test_roundtrip test_words test_base64 test_base85)
+foreach(target test_sss test_sskr test_sskr_shard_count test_sskr_combine_bounds test_bip39 test_roundtrip test_words test_base64 test_base85)
     add_test(NAME ${target} COMMAND ${target})
 endforeach()
