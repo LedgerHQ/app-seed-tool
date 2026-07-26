@@ -36,7 +36,8 @@ uint8_t base85_encode_64bytes(const uint8_t* src, char* dst) {
 
     while (src < src_end) {
         // Load 4 bytes into a 32-bit value
-        value = (src[0] << 24) | (src[1] << 16) | (src[2] << 8) | src[3];
+        value = ((uint32_t)src[0] << 24) | ((uint32_t)src[1] << 16) |
+                ((uint32_t)src[2] << 8) | src[3];
 
         // Convert the value into 5 base85 characters
         for (int8_t i = 4; i >= 0; i--) {
