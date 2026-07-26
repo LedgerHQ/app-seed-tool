@@ -332,7 +332,14 @@ void compare_recovery_phrase_and_display_result(void) {
     G_bolos_ux_context.processing = PROCESSING_COMPLETE;
     io_seproxyhal_general_status();
 
-    if (compare_recovery_phrase()) {
+    bool reconstructed = true;
+    const bool match = compare_recovery_phrase(&reconstructed);
+
+    if (!reconstructed) {
+        // shards were well-formed but could not be combined: report them as
+        // invalid rather than as a seed mismatch
+        ux_flow_init(0, &ux_sskr_invalid_flow, NULL);
+    } else if (match) {
         (G_bolos_ux_context.tool_type == TOOL_TYPE_BIP39)
             ? ux_flow_init(0, &ux_bip39_match_flow, NULL)
             : ux_flow_init(0, &ux_sskr_match_flow, NULL);

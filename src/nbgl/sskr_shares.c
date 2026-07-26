@@ -189,7 +189,15 @@ bool sskr_shares_check(bool* match) {
         return false;
     }
 
-    *match = compare_recovery_phrase();
+    bool reconstructed = true;
+    *match = compare_recovery_phrase(&reconstructed);
+    if (!reconstructed) {
+        // shards were well-formed but could not be combined: report them as
+        // invalid rather than as a seed mismatch
+        sskr_shares_reset();
+        return false;
+    }
+
     // Don't clear the shares just yet as we may need it to generate BIP39
     // mnemonic
     //    sskr_shares_reset();

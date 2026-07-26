@@ -28,9 +28,11 @@
 extern unsigned int tool_type;
 #endif
 
-bool compare_recovery_phrase(void) {
+bool compare_recovery_phrase(bool* reconstructed) {
     // convert mnemonic to hex-seed
     uint8_t buffer[64];
+
+    *reconstructed = true;
 
 #if defined(HAVE_BAGL)
     if (G_bolos_ux_context.tool_type == TOOL_TYPE_BIP39) {
@@ -46,6 +48,11 @@ bool compare_recovery_phrase(void) {
             G_bolos_ux_context.sskr_share_count,
             (unsigned char*)&G_bolos_ux_context.words_buffer,
             &G_bolos_ux_context.words_buffer_length, buffer);
+        if (G_bolos_ux_context.words_buffer_length == 0) {
+            // shards accepted by the CRC check but not combinable
+            *reconstructed = false;
+            return false;
+        }
     }
 #elif defined(HAVE_NBGL)
     if (tool_type == TOOL_TYPE_BIP39) {
@@ -53,7 +60,11 @@ bool compare_recovery_phrase(void) {
             (const unsigned char*)bip39_mnemonic_get(),
             bip39_mnemonic_length_get(), buffer);
     } else if (tool_type == TOOL_TYPE_SSKR) {
-        bip39_mnemonic_from_sskr_shares(buffer);
+        if (!bip39_mnemonic_from_sskr_shares(buffer)) {
+            // shards accepted by the CRC check but not combinable
+            *reconstructed = false;
+            return false;
+        }
     }
 #endif
     PRINTF("Input seed:\n %.*H\n", 64, buffer);
