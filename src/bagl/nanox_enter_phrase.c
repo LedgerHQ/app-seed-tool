@@ -458,7 +458,8 @@ void screen_onboarding_restore_word_validate(void) {
 
                 // Display loading icon to user
                 ux_flow_init(0, ux_load_flow, NULL);
-                if (compare_recovery_phrase()) {
+                bool reconstructed = true;
+                if (compare_recovery_phrase(&reconstructed)) {
                     ux_flow_init(0, &ux_bip39_match_flow, NULL);
                 } else {
                     memzero(G_bolos_ux_context.words_buffer,
@@ -502,7 +503,12 @@ void screen_onboarding_restore_word_validate(void) {
 
                     // Display loading icon to user
                     ux_flow_init(0, ux_load_flow, NULL);
-                    if (compare_recovery_phrase()) {
+                    bool reconstructed = true;
+                    const bool match = compare_recovery_phrase(&reconstructed);
+                    if (!reconstructed) {
+                        // shards were well-formed but could not be combined
+                        ux_flow_init(0, &ux_sskr_invalid_flow, NULL);
+                    } else if (match) {
                         ux_flow_init(0, &ux_sskr_match_flow, NULL);
                     } else {
                         ux_flow_init(0, &ux_sskr_nomatch_flow, NULL);

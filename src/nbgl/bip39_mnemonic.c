@@ -122,7 +122,8 @@ bool bip39_mnemonic_check(bool* match) {
         return false;
     }
 
-    *match = compare_recovery_phrase();
+    bool reconstructed = true;
+    *match = compare_recovery_phrase(&reconstructed);
     // Don't clear the mnemonic just yet as we may need it to generate SSKR
     // shares
     //    bip39_mnemonic_reset();
@@ -130,7 +131,7 @@ bool bip39_mnemonic_check(bool* match) {
     return true;
 }
 
-void bip39_mnemonic_from_sskr_shares(unsigned char* seed) {
+bool bip39_mnemonic_from_sskr_shares(unsigned char* seed) {
     mnemonic.length = BIP39_MNEMONIC_MAX_LENGTH;
 
     bolos_ux_sskr_to_seed_convert(
@@ -141,6 +142,9 @@ void bip39_mnemonic_from_sskr_shares(unsigned char* seed) {
     if (mnemonic.length > 0) {
         PRINTF("BIP39 mnemonic: %.*s\n", mnemonic.length, bip39_mnemonic_get());
     }
+
+    // a zero length means the shards could not be combined
+    return mnemonic.length > 0;
 }
 
 void bip39_mnemonic_encode(const uint8_t* seed, uint8_t seed_len) {
