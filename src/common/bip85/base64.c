@@ -28,26 +28,27 @@
  * @return The number of bytes written to the output buffer.
  */
 uint8_t base64_encode_64bytes(const uint8_t* src, char* dst) {
-    const uint8_t* src_end = src + BIP85_ENTROPY_LENGTH;
     char* dst_start = dst;
     uint32_t value;
+    uint8_t i;
 
-    // Loop through the input in chunks of 3 bytes
-    while (src < src_end) {
+    // Encode the complete 3-byte groups (63 of the 64 input bytes)
+    for (i = 0; i + 3 <= BIP85_ENTROPY_LENGTH; i += 3) {
         // Combine three input bytes into a 24-bit value
-        value = (src[0] << 16) | (src[1] << 8) | src[2];
-
+        value =
+            ((uint32_t)src[i] << 16) | ((uint32_t)src[i + 1] << 8) | src[i + 2];
         // Encode the value into 4 base64 characters
-        for (uint8_t i = 0; i < 4; i++) {
-            *dst++ = BASE64_TABLE[(value >> (18 - i * 6)) & 0x3F];
+        for (uint8_t j = 0; j < 4; j++) {
+            *dst++ = BASE64_TABLE[(value >> (18 - j * 6)) & 0x3F];
         }
-
-        src += 3;  // Advance source pointer by 3 bytes
     }
-
-    // Add the fixed padding (for 64-byte input)
-    *(dst - 1) = '=';
-    *(dst - 2) = '=';
+    // BIP85_ENTROPY_LENGTH is not a multiple of 3: the final group holds a
+    // single byte, zero-padded, followed by two '=' padding characters.
+    value = (uint32_t)src[i] << 16;
+    *dst++ = BASE64_TABLE[(value >> 18) & 0x3F];
+    *dst++ = BASE64_TABLE[(value >> 12) & 0x3F];
+    *dst++ = '=';
+    *dst++ = '=';
 
     return dst - dst_start;  // Return the total number of characters written
 }

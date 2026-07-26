@@ -32,6 +32,28 @@ Not all Ledger devices are equal. The older, less capable devices do not have th
 |[Generate Shamir's secret sharing](#generate-shamirs-secret-sharing)|$${\color{green}✓}$$|$${\color{green}✓}$$|$${\color{green}✓}$$|$${\color{green}✓}$$|$${\color{green}✓}$$|$${\color{green}✓}$$|
 |[Recover BIP-39](#recover-bip-39)|$${\color{green}✓}$$|$${\color{green}✓}$$|$${\color{green}✓}$$|$${\color{green}✓}$$|$${\color{green}✓}$$|$${\color{green}✓}$$|
 |[Generate BIP-85](#generate-bip-85)|$${\color{red}✗}$$|$${\color{orange}✓}$$|$${\color{orange}✓}$$|$${\color{green}✓}$$|$${\color{green}✓}$$|$${\color{green}✓}$$|
+
+<table>
+  <thead>
+    <tr>
+      <th colspan="2" align="center">Key</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td align="center">$${\color{green}✓}$$</td>
+      <td>Supported</td>
+    </tr>
+    <tr>
+      <td align="center">$${\color{orange}✓}$$</td>
+      <td>Work in progress / Planned</td>
+    </tr>
+    <tr>
+      <td align="center">$${\color{red}✗}$$</td>
+      <td>Unsupported and with no plan to support</td>
+    </tr>
+  </tbody>
+</table>
 </div>
 
 ## Application menu flow

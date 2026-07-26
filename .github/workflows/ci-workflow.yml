@@ -19,7 +19,7 @@ jobs:
     uses: LedgerHQ/ledger-app-workflows/.github/workflows/reusable_build.yml@v1
     with:
       upload_app_binaries_artifact: compiled_app_binaries
-      run_for_devices: '["nanox", "nanosp", "stax", "flex", "apex_p"]]'
+      run_for_devices: '["nanox", "nanosp", "stax", "flex", "apex_p"]'
 
   ledger_app_test_function:
     name: Run ragger tests using the reusable workflow
