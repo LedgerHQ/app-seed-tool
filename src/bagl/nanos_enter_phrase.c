@@ -360,6 +360,16 @@ void screen_onboarding_restore_word_validate(void) {
         G_bolos_ux_context.words_buffer_length =
             strlen(G_bolos_ux_context.words_buffer);
     } else if (G_bolos_ux_context.tool_type == TOOL_TYPE_SSKR) {
+        // Both the share length and the share count below are read out of
+        // the entered data, so neither can be trusted to keep these writes
+        // inside the buffer. bolos_ux_sskr_hex_check() only runs once every
+        // share has been entered, so nothing else stands between the keyboard
+        // and it.
+        if (G_bolos_ux_context.sskr_words_buffer_length >=
+            SSKR_WORDS_BUFFER_MAX_SIZE_B) {
+            return;
+        }
+
         G_bolos_ux_context
             .sskr_words_buffer[G_bolos_ux_context.sskr_words_buffer_length] =
             G_bolos_ux_context.onboarding_index +
@@ -378,11 +388,20 @@ void screen_onboarding_restore_word_validate(void) {
                 break;
             case 4:
                 if ((G_bolos_ux_context.sskr_words_buffer[3] & 0x1F) == 24) {
+                    // Read the declared length as the unsigned wire byte it is.
                     G_bolos_ux_context.bip39_type =
                         4 + 1 +
-                        G_bolos_ux_context.sskr_words_buffer
+                        (uint8_t)G_bolos_ux_context.sskr_words_buffer
                             [G_bolos_ux_context.sskr_words_buffer_length] +
                         sizeof(uint32_t);
+                    // A serialized shard is SSKR_METADATA_LENGTH_BYTES plus a
+                    // value of at most SSKR_MAX_STRENGTH_BYTES, so no share
+                    // can be longer than this on the wire.
+                    if (G_bolos_ux_context.bip39_type >
+                        SSKR_SHARE_MAX_WIRE_LENGTH) {
+                        G_bolos_ux_context.bip39_type =
+                            SSKR_SHARE_MAX_WIRE_LENGTH;
+                    }
                 }
                 PRINTF("SSKR number of words: %d\n",
                        G_bolos_ux_context.bip39_type);

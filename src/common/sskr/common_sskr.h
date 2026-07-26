@@ -19,6 +19,13 @@
 
 // SSKR helpers
 #include "./seed_rom_variables.h"
+#include "./sskr-constants.h"
+
+// Largest a serialized share can be on the wire, in bytes: the CBOR long-form
+// byte-string header (3-byte tag + 0x58 + one length byte), the shard itself
+// (SSKR_METADATA_LENGTH_BYTES plus a value of at most SSKR_MAX_STRENGTH_BYTES)
+// and the CRC32. Nothing longer can be a share, whatever its header declares.
+#define SSKR_SHARE_MAX_WIRE_LENGTH (5 + SSKR_METADATA_LENGTH_BYTES + SSKR_MAX_STRENGTH_BYTES + 4)
 
 // Encode SSKR ByteWord as hex
 unsigned int bolos_ux_sskr_byteword_to_hex(unsigned char *byteword);
