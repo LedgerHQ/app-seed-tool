@@ -185,7 +185,13 @@ target_link_libraries(test_words PUBLIC cmocka gcov testutils sskr sss)
 add_executable(test_base64 tests/base64.c ../../src/common/bip85/seed_rom_variables.c ../../src/common/bip85/base64.c)
 target_link_libraries(test_base64 PUBLIC cmocka gcov)
 
+# Built with UndefinedBehaviorSanitizer, in abort mode: base85_encode_64bytes()
+# shifts a promoted uint8_t left by 24, which is undefined once the byte has
+# its top bit set. Nothing about the result is visibly wrong, so a value
+# assertion cannot see it -- the sanitizer is the assertion.
 add_executable(test_base85 tests/base85.c ../../src/common/bip85/seed_rom_variables.c ../../src/common/bip85/base85.c)
+target_compile_options(test_base85 PRIVATE -fsanitize=undefined -fno-sanitize-recover=all)
+target_link_options(test_base85 PRIVATE -fsanitize=undefined)
 target_link_libraries(test_base85 PUBLIC cmocka gcov)
 
 foreach(target test_sss test_sskr test_bip39 test_roundtrip test_words test_base64 test_base85)
