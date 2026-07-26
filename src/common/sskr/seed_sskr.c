@@ -73,7 +73,7 @@ unsigned int bolos_ux_sskr_combine(unsigned char* sskr_shares_hex,
                                               output, SSKR_MAX_STRENGTH_BYTES);
 
     if (output_len < 1) {
-        memzero(sskr_shares_hex, sizeof(sskr_shares_hex));
+        memzero(sskr_shares_hex, sskr_shares_hex_length);
         return 0;
     }
 
@@ -136,7 +136,7 @@ unsigned int bolos_ux_sskr_generate(uint8_t groups_threshold,
 
     if ((share_count < 0) || (share_count != share_count_expected) ||
         (*share_len != share_len_expected)) {
-        memzero(&share_buffer, sizeof(share_buffer));
+        memzero(share_buffer, share_buffer_len);
         return 0;
     }
 
@@ -158,7 +158,7 @@ unsigned int bolos_ux_sskr_share_hex_decode(unsigned char* input,
             memcpy(output + position, SSKR_WORDLIST + offset,
                    SSKR_BYTEWORD_LENGTH);
         } else {
-            memzero(output, sizeof(output));
+            memzero(output, output_len);
             return 0;
         }
         position += SSKR_BYTEWORD_LENGTH;
@@ -194,7 +194,7 @@ unsigned int bolos_ux_bip39_to_sskr_convert(
     if (bolos_ux_bip39_mnemonic_decode(bip39_words_buffer,
                                        bip39_words_buffer_length, seed_buffer,
                                        seed_len + 1) == 1) {
-        memzero(bip39_words_buffer, sizeof(bip39_words_buffer));
+        memzero(bip39_words_buffer, bip39_words_buffer_length);
         uint8_t groups_len = 1;
         uint8_t groups_threshold = 1;
         uint8_t share_len_expected = 0;
@@ -260,9 +260,9 @@ unsigned int bolos_ux_bip39_to_sskr_convert(
                     memzero(share_hex_buffer, sizeof(share_hex_buffer));
                     memzero(cbor_share_crc_buffer,
                             sizeof(cbor_share_crc_buffer));
-                    memzero(share_words_buffer, sizeof(share_words_buffer));
-                    share_words_buffer_length = 0;
-                    memzero(bip39_words_buffer, sizeof(bip39_words_buffer));
+                    memzero(share_words_buffer, *share_words_buffer_length);
+                    *share_words_buffer_length = 0;
+                    memzero(bip39_words_buffer, bip39_words_buffer_length);
                     return 0;
                 }
                 memzero(cbor_share_crc_buffer, sizeof(cbor_share_crc_buffer));
@@ -304,7 +304,7 @@ unsigned int bolos_ux_sskr_hex_check(unsigned char* sskr_shares_hex,
                      ((sskr_shares_hex_length / sskr_shares_count) * (i + 1)) -
                      checksum_len,
                  checksum_len) != 0)) {
-            memzero(sskr_shares_hex, sizeof(sskr_shares_hex));
+            memzero(sskr_shares_hex, sskr_shares_hex_length);
             checksum = 0;
             return 0;
         };
