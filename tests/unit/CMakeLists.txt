@@ -181,6 +181,9 @@ target_link_libraries(test_sskr_memzero PUBLIC cmocka gcov sskr sss testutils)
 add_executable(test_sskr_shard_count tests/sskr_shard_count.c)
 target_link_libraries(test_sskr_shard_count PUBLIC cmocka gcov sskr sss testutils)
 
+add_executable(test_sskr_generate_split_error tests/sskr_generate_split_error.c)
+target_link_libraries(test_sskr_generate_split_error PUBLIC cmocka gcov sskr sss testutils)
+
 # Built with AddressSanitizer: this one is about what the code writes, not
 # what it returns, so the sanitizer is the assertion.
 add_executable(test_sskr_combine_bounds ./tests/sskr_combine_bounds.c ../../src/common/bip39/seed_rom_variables.c ../../src/common/bip39/seed_bip39.c ../../src/common/sskr/seed_rom_variables.c ../../src/common/sskr/seed_sskr.c)
@@ -231,6 +234,6 @@ target_compile_options(test_base85 PRIVATE -fsanitize=undefined -fno-sanitize-re
 target_link_options(test_base85 PRIVATE -fsanitize=undefined)
 target_link_libraries(test_base85 PUBLIC cmocka gcov)
 
-foreach(target test_sss test_sskr test_sskr_share_len test_sskr_memzero test_sskr_shard_count test_sskr_combine_bounds test_sskr_combine_error test_sskr_entry_bounds test_sss_recover_erase_length test_bip39 test_roundtrip test_words test_base64 test_base85)
+foreach(target test_sss test_sskr test_sskr_share_len test_sskr_memzero test_sskr_shard_count test_sskr_generate_split_error test_sskr_combine_bounds test_sskr_combine_error test_sskr_entry_bounds test_sss_recover_erase_length test_bip39 test_roundtrip test_words test_base64 test_base85)
     add_test(NAME ${target} COMMAND ${target})
 endforeach()
