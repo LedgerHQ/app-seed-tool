@@ -170,7 +170,7 @@ int16_t sss_recover_secret(uint8_t threshold, const uint8_t* x,
                     digest) != CX_OK ||
         interpolate(threshold, x, share_length, shares, SSS_SECRET_INDEX,
                     secret) != CX_OK) {
-        memzero(secret, sizeof(digest));
+        memzero(secret, share_length);
         memzero(digest, sizeof(digest));
         memzero(verify, sizeof(verify));
 
