@@ -76,6 +76,14 @@ size_t sskr_shares_current_word_number_get(void) {
 }
 
 size_t sskr_shares_word_add(const char* const byteword) {
+    // Both the share length and the share count below are read out of the
+    // entered data, so neither can be trusted to keep these writes inside the
+    // buffer. bolos_ux_sskr_hex_check() only runs once every share has been
+    // entered, so nothing else stands between the keyboard and this array.
+    if (shares.length >= SSKR_SHARES_MAX_LENGTH) {
+        return sskr_shares_current_word_number_get();
+    }
+
     shares.buffer[shares.length] =
         bolos_ux_sskr_byteword_to_hex((unsigned char*)byteword);
     switch (sskr_shares_current_word_number_get()) {
@@ -87,8 +95,18 @@ size_t sskr_shares_word_add(const char* const byteword) {
             break;
         case 4:
             if ((shares.buffer[3] & 0x1F) == 24) {
-                shares.final_size =
-                    4 + 1 + shares.buffer[shares.length] + sizeof(uint32_t);
+                // Read the declared length as the unsigned wire byte it is:
+                // `char` is signed on the host that builds the unit tests and
+                // unsigned on the device.
+                shares.final_size = 4 + 1 +
+                                    (uint8_t)shares.buffer[shares.length] +
+                                    sizeof(uint32_t);
+                // A serialized shard is SSKR_METADATA_LENGTH_BYTES plus a
+                // value of at most SSKR_MAX_STRENGTH_BYTES, so no share can be
+                // longer than this on the wire.
+                if (shares.final_size > SSKR_SHARE_MAX_WIRE_LENGTH) {
+                    shares.final_size = SSKR_SHARE_MAX_WIRE_LENGTH;
+                }
             }
             PRINTF("SSKR final number of words in this share: %d\n",
                    shares.final_size);
