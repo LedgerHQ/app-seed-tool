@@ -83,7 +83,7 @@ void screen_processing_postinit(unsigned int stack_slot) {
 UX_STEP_NOCB_POSTINIT(processing_step, pb,
                       screen_processing_postinit(stack_slot),
                       {
-                          &C_icon_loader,
+                          &C_icon_loader_16px,
                           "Processing",
                       });
 
@@ -206,17 +206,18 @@ const bagl_element_t* screen_onboarding_restore_word_keyboard_callback(
                 x:57 w:14
                 iconw: 11
                 */
-                G_ux.tmp_element.component.width = C_icon_backspace.width;
+                G_ux.tmp_element.component.width = C_icon_backspace_16px.width;
                 G_ux.tmp_element.component.x +=
                     1 + G_ux.tmp_element.component.width / 2 -
-                    C_icon_backspace.width / 2;
+                    C_icon_backspace_16px.width / 2;
                 G_ux.tmp_element.component.y = 5;
-                G_ux.tmp_element.component.height = C_icon_backspace.height;
+                G_ux.tmp_element.component.height =
+                    C_icon_backspace_16px.height;
                 G_ux.tmp_element.component.type = BAGL_ICON;
                 G_ux.tmp_element.component.icon_id = 0;
                 // if current selected, then display the inversed digit (as in a
                 // pin digit)
-                G_ux.tmp_element.text = (const char*)&C_icon_backspace;
+                G_ux.tmp_element.text = (const char*)&C_icon_backspace_16px;
             } else {
                 // G_ux.string_buffer[0] = G_ux.string_buffer[32+value]-'a'+'A';
                 // // render as uppercase, always

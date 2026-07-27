@@ -64,7 +64,7 @@ const bagl_element_t screen_onboarding_restore_word_select_elements[] = {
 
     {{BAGL_ICON, 0x24, (128 - 14) / 2, 17, 14, 14, 0, 0, 0, 0xFFFFFF, 0x000000,
       0, 0},
-     (const char*)&C_icon_clear},
+     (const char*)&C_icon_clear_14px},
     {{BAGL_LABELINE, 0x24, 0, 43, 128, 32, 0, 0, 0, 0xFFFFFF, 0x000000,
       BAGL_FONT_OPEN_SANS_EXTRABOLD_11px | BAGL_FONT_ALIGNMENT_CENTER, 0},
      "Clear word"},
@@ -76,7 +76,7 @@ const bagl_element_t screen_onboarding_restore_word_select_elements[] = {
      (const char*)&C_icon_right},
 };
 
-UX_STEP_NOCB(ux_load_step, pn, {&C_icon_loader, "Processing"});
+UX_STEP_NOCB(ux_load_step, pn, {&C_icon_loader_14px, "Processing"});
 UX_FLOW(ux_load_flow, &ux_load_step);
 
 extern const ux_flow_step_t* const ux_bip39_match_flow;
@@ -221,19 +221,20 @@ const bagl_element_t* screen_onboarding_restore_word_keyboard_callback(
                 x:57 w:14
                 iconw: 11
                 */
-                G_ux.tmp_element.component.width = C_icon_backspace.width;
+                G_ux.tmp_element.component.width = C_icon_backspace_14px.width;
                 G_ux.tmp_element.component.x +=
                     1 + G_ux.tmp_element.component.width / 2 -
-                    C_icon_backspace.width / 2;
+                    C_icon_backspace_14px.width / 2;
                 G_ux.tmp_element.component.y -= 7;
-                G_ux.tmp_element.component.height = C_icon_backspace.height;
+                G_ux.tmp_element.component.height =
+                    C_icon_backspace_14px.height;
                 G_ux.tmp_element.component.type = BAGL_ICON;
                 G_ux.tmp_element.component.icon_id = 0;
                 if (G_ux.tmp_element.component.userid == 0x02) {
                     G_ux.tmp_element.text =
-                        (const char*)&C_icon_backspace_invert;
+                        (const char*)&C_icon_backspace_invert_14px;
                 } else {
-                    G_ux.tmp_element.text = (const char*)&C_icon_backspace;
+                    G_ux.tmp_element.text = (const char*)&C_icon_backspace_14px;
                 }
             } else {
                 // G_ux.string_buffer[0] = G_ux.string_buffer[32+value]-'a'+'A';

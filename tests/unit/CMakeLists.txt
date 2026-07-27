@@ -167,6 +167,15 @@ target_include_directories(sskr PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/com
 add_executable(test_sss tests/sss.c)
 target_link_libraries(test_sss PUBLIC cmocka gcov testutils sss)
 
+# Built with AddressSanitizer: sss.c/interpolate.c are compiled directly into
+# this target (rather than linked from libsss) so ASan instruments their
+# stack frames, not just this file's.
+add_executable(test_sss_recover_erase_length ./tests/sss_recover_erase_length.c ../../src/common/sskr/sss/sss.c ../../src/common/sskr/sss/interpolate.c)
+target_include_directories(test_sss_recover_erase_length PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common/sskr/sss)
+target_compile_options(test_sss_recover_erase_length PRIVATE -fsanitize=address -fno-omit-frame-pointer)
+target_link_options(test_sss_recover_erase_length PRIVATE -fsanitize=address)
+target_link_libraries(test_sss_recover_erase_length PUBLIC cmocka gcov testutils)
+
 add_executable(test_sskr tests/sskr.c)
 target_link_libraries(test_sskr PUBLIC cmocka gcov testutils sskr sss)
 
@@ -195,15 +204,6 @@ target_link_libraries(test_sskr_combine_bounds PUBLIC cmocka gcov testutils sskr
 add_executable(test_sskr_combine_error ./tests/sskr_combine_error.c ../../src/common/bip39/seed_rom_variables.c ../../src/common/bip39/seed_bip39.c ../../src/common/sskr/seed_rom_variables.c ../../src/common/sskr/seed_sskr.c)
 target_include_directories(test_sskr_combine_error PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common)
 target_link_libraries(test_sskr_combine_error PUBLIC cmocka gcov sskr sss testutils)
-
-# Built with AddressSanitizer: sss.c/interpolate.c are compiled directly into
-# this target (rather than linked from libsss) so ASan instruments their
-# stack frames, not just this file's.
-add_executable(test_sss_recover_erase_length ./tests/sss_recover_erase_length.c ../../src/common/sskr/sss/sss.c ../../src/common/sskr/sss/interpolate.c)
-target_include_directories(test_sss_recover_erase_length PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common/sskr/sss)
-target_compile_options(test_sss_recover_erase_length PRIVATE -fsanitize=address -fno-omit-frame-pointer)
-target_link_options(test_sss_recover_erase_length PRIVATE -fsanitize=address)
-target_link_libraries(test_sss_recover_erase_length PUBLIC cmocka gcov testutils)
 
 add_executable(test_bip39 ./tests/bip39.c ../../src/common/bip39/seed_rom_variables.c  ../../src/common/bip39/seed_bip39.c)
 target_include_directories(test_bip39 PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common)
@@ -240,6 +240,6 @@ target_link_libraries(test_base85 PUBLIC cmocka gcov)
 add_executable(test_bip85_dice_bits_per_roll tests/bip85_dice_bits_per_roll.c ../../src/common/bip85/seed_bip85.c)
 target_link_libraries(test_bip85_dice_bits_per_roll PUBLIC cmocka gcov)
 
-foreach(target test_sss test_sskr test_sskr_share_len test_sskr_memzero test_sskr_shard_count test_sskr_generate_split_error test_sskr_combine_bounds test_sskr_combine_error test_sskr_entry_bounds test_sss_recover_erase_length test_bip39 test_roundtrip test_words test_base64 test_base85 test_bip85_dice_bits_per_roll)
+foreach(target test_sss test_sss_recover_erase_length test_sskr test_sskr_share_len test_sskr_memzero test_sskr_shard_count test_sskr_generate_split_error test_sskr_combine_bounds test_sskr_combine_error test_sskr_entry_bounds test_bip39 test_roundtrip test_words test_base64 test_base85 test_bip85_dice_bits_per_roll)
     add_test(NAME ${target} COMMAND ${target})
 endforeach()
