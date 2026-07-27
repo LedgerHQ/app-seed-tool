@@ -755,8 +755,8 @@ static void bip85_index_validate(const uint8_t* indexentry, uint8_t length) {
                 break;
         }
     } else {
-        nbgl_useCaseStatus("BIP85 index must be between 0 and 2,147,483,647",
-                           false, display_bip39_select_phrase_length_page);
+        nbgl_useCaseStatus("BIP85 index must be between 0 and 9,999,999", false,
+                           display_bip39_select_phrase_length_page);
     }
 }
 
