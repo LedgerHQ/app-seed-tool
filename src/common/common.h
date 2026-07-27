@@ -24,7 +24,7 @@
 
 #ifndef SPRINTF
 // avoid typing the size each time
-#define SPRINTF(strbuf, ...) snprintf((char*) (strbuf), sizeof(strbuf), __VA_ARGS__)
+#define SPRINTF(strbuf, ...) snprintf((char *) (strbuf), sizeof(strbuf), __VA_ARGS__)
 #endif
 
 /*
@@ -35,4 +35,4 @@
  * That is a distinct outcome from a seed mismatch and must not be reported as
  * one. It is always true for the BIP39 tool, which has nothing to reconstruct.
  */
-bool compare_recovery_phrase(bool* reconstructed);
+bool compare_recovery_phrase(bool *reconstructed);
