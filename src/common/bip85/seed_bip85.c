@@ -14,6 +14,25 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  ********************************************************************************/
+#include <stdint.h>
+
+/**
+ * @brief Computes the number of bits needed to represent a DICE roll drawn
+ * uniformly from `[0, sides)`.
+ *
+ * @details Kept outside the `HAVE_NBGL` guard below, and with external
+ * linkage, purely so it can be linked into a unit test: the rest of this
+ * file pulls in NBGL headers the unit test harness does not have.
+ *
+ * @param[in] sides Number of sides on the die. Must be in
+ * `[2, UINT32_MAX >> 1]`; the caller enforces this.
+ *
+ * @return The number of bits per roll.
+ */
+uint8_t bip85_dice_bits_per_roll(uint32_t sides) {
+    return (sizeof(sides) << 3) - __builtin_clz(sides - 1);
+}
+
 #if defined(HAVE_NBGL)
 #include <lcx_hmac.h>
 #include <lcx_sha3.h>
@@ -257,7 +276,7 @@ void bolos_ux_bip85_dice(uint32_t* out, uint32_t sides, uint32_t rolls,
                   "BIP85 SHAKE256 hash failed");
     memzero(buffer_ent, BIP85_ENTROPY_LENGTH);
 
-    uint8_t bits_per_roll = (sizeof(sides) << 3) - __builtin_clz(sides);
+    uint8_t bits_per_roll = bip85_dice_bits_per_roll(sides);
     PRINTF("BIP85 DICE bits per roll : %d\n", bits_per_roll);
 
     uint8_t bytes_per_roll = (bits_per_roll + 7) >> 3;
