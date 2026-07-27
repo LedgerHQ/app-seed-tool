@@ -277,8 +277,13 @@ static int16_t sskr_generate_shards_internal(
 
     uint8_t group_shares[SSS_MAX_SECRET_SIZE * SSKR_MAX_GROUP_COUNT];
 
-    sss_split_secret(group_threshold, groups_len, master_secret,
-                     master_secret_len, group_shares, random_generator);
+    int16_t split_error =
+        sss_split_secret(group_threshold, groups_len, master_secret,
+                         master_secret_len, group_shares, random_generator);
+    if (split_error < 0) {
+        memzero(group_shares, sizeof(group_shares));
+        return split_error;
+    }
 
     uint8_t* group_share = group_shares;
 
@@ -287,8 +292,14 @@ static int16_t sskr_generate_shards_internal(
 
     for (uint8_t i = 0; i < groups_len; ++i, group_share += master_secret_len) {
         uint8_t member_shares[SSS_MAX_SECRET_SIZE * SSS_MAX_SHARE_COUNT];
-        sss_split_secret(groups[i].threshold, groups[i].count, group_share,
-                         master_secret_len, member_shares, random_generator);
+        split_error = sss_split_secret(groups[i].threshold, groups[i].count,
+                                       group_share, master_secret_len,
+                                       member_shares, random_generator);
+        if (split_error < 0) {
+            memzero(member_shares, sizeof(member_shares));
+            memzero(group_shares, sizeof(group_shares));
+            return split_error;
+        }
 
         uint8_t* value = member_shares;
         for (uint8_t j = 0; j < groups[i].count;
