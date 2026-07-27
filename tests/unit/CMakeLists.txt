@@ -234,6 +234,12 @@ target_compile_options(test_base85 PRIVATE -fsanitize=undefined -fno-sanitize-re
 target_link_options(test_base85 PRIVATE -fsanitize=undefined)
 target_link_libraries(test_base85 PUBLIC cmocka gcov)
 
-foreach(target test_sss test_sskr test_sskr_share_len test_sskr_memzero test_sskr_shard_count test_sskr_generate_split_error test_sskr_combine_bounds test_sskr_combine_error test_sskr_entry_bounds test_sss_recover_erase_length test_bip39 test_roundtrip test_words test_base64 test_base85)
+# bip85_dice_bits_per_roll() is defined outside the HAVE_NBGL guard in
+# seed_bip85.c precisely so it can be linked here without the NBGL headers
+# the rest of that file needs.
+add_executable(test_bip85_dice_bits_per_roll tests/bip85_dice_bits_per_roll.c ../../src/common/bip85/seed_bip85.c)
+target_link_libraries(test_bip85_dice_bits_per_roll PUBLIC cmocka gcov)
+
+foreach(target test_sss test_sskr test_sskr_share_len test_sskr_memzero test_sskr_shard_count test_sskr_generate_split_error test_sskr_combine_bounds test_sskr_combine_error test_sskr_entry_bounds test_sss_recover_erase_length test_bip39 test_roundtrip test_words test_base64 test_base85 test_bip85_dice_bits_per_roll)
     add_test(NAME ${target} COMMAND ${target})
 endforeach()
