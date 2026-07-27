@@ -25,16 +25,30 @@
 
 #endif  // defined(HAVE_BAGL)
 
-#if defined(TARGET_STAX) || defined(TARGET_FLEX)
-#define ICON_APP_HOME C_icon_seed_64px
-#define BIP39_ICON    C_icon_bip39_64px
-#define SSKR_ICON     C_icon_SSKR_64px
-#define BIP85_ICON    C_icon_bip85_64px
+#if defined(TARGET_STAX)
+#define ICON_APP_HOME     C_icon_seed_64px
+#define BIP39_ICON        C_icon_bip39_64px
+#define SSKR_ICON         C_icon_sskr_64px
+#define BIP85_ICON        C_icon_bip85_64px
+#define BIP39_ICON_SMALL  C_icon_bip39_32px
+#define SSKR_ICON_SMALL   C_icon_sskr_32px
+#define BIP85_ICON_SMALL  C_icon_bip85_32px
+#elif defined(TARGET_FLEX)
+#define ICON_APP_HOME     C_icon_seed_64px
+#define BIP39_ICON        C_icon_bip39_64px
+#define SSKR_ICON         C_icon_sskr_64px
+#define BIP85_ICON        C_icon_bip85_64px
+#define BIP39_ICON_SMALL  C_icon_bip39_40px
+#define SSKR_ICON_SMALL   C_icon_sskr_40px
+#define BIP85_ICON_SMALL  C_icon_bip85_40px
 #elif defined(TARGET_APEX)
-#define ICON_APP_HOME C_icon_seed_48px
-#define BIP39_ICON    C_icon_bip39_32px
-#define SSKR_ICON     C_icon_SSKR_32px
-#define BIP85_ICON    C_icon_bip85_32px
+#define ICON_APP_HOME     C_icon_seed_48px
+#define BIP39_ICON        C_icon_bip39_32px
+#define SSKR_ICON         C_icon_sskr_32px
+#define BIP85_ICON        C_icon_bip85_32px
+#define BIP39_ICON_SMALL  C_icon_bip39_24px
+#define SSKR_ICON_SMALL   C_icon_sskr_24px
+#define BIP85_ICON_SMALL  C_icon_bip85_24px
 #endif
 
 // All devices

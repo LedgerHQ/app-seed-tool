@@ -136,11 +136,11 @@ static void display_select_tool_page(void) {
     ((nbgl_button_t*)screenChildren[SELECT_TOOL_BIP39_INDEX])->text =
         toolType[0];
     ((nbgl_button_t*)screenChildren[SELECT_TOOL_BIP39_INDEX])->icon =
-        &C_icon_bip39_32px;
+        &BIP39_ICON_SMALL;
     ((nbgl_button_t*)screenChildren[SELECT_TOOL_SSKR_INDEX])->text =
         toolType[1];
     ((nbgl_button_t*)screenChildren[SELECT_TOOL_SSKR_INDEX])->icon =
-        &C_icon_sskr_32px;
+        &SSKR_ICON_SMALL;
     ((nbgl_button_t*)screenChildren[SELECT_TOOL_SSKR_INDEX])->borderColor =
         BLACK;
     ((nbgl_button_t*)screenChildren[SELECT_TOOL_SSKR_INDEX])->innerColor =
@@ -150,7 +150,7 @@ static void display_select_tool_page(void) {
     ((nbgl_button_t*)screenChildren[SELECT_TOOL_BIP85_INDEX])->text =
         toolType[2];
     ((nbgl_button_t*)screenChildren[SELECT_TOOL_BIP85_INDEX])->icon =
-        &C_icon_bip85_32px;
+        &SSKR_ICON_SMALL;
 
     // create back button
     screenChildren[SELECT_TOOL_BACK_BUTTON_INDEX] =
@@ -176,7 +176,7 @@ static void select_recover_bip39_choice(bool bip39_rec) {
 }
 
 void display_select_recover_bip39_page(void) {
-    nbgl_useCaseChoice(&C_icon_bip39_64px, "Recover BIP39 Phrase?",
+    nbgl_useCaseChoice(&BIP39_ICON, "Recover BIP39 Phrase?",
                        "Choose if you wish to\nrecover the BIP39 phrase\nfrom "
                        "your valid\nSSKR shares.",
                        "Recover BIP39", "Done", select_recover_bip39_choice);
@@ -195,7 +195,7 @@ static void select_generate_sskr_choice(bool sskr_gen) {
 }
 
 void display_select_generate_sskr_page(void) {
-    nbgl_useCaseChoice(&C_icon_sskr_64px, "Generate SSKR Phrase?",
+    nbgl_useCaseChoice(&SSKR_ICON, "Generate SSKR Phrase?",
                        "Choose if you wish to\ngenerate SSKR shares from\nyour "
                        "valid BIP39 phrase.",
                        "Generate SSKR", "Done", select_generate_sskr_choice);
