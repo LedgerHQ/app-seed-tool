@@ -30,7 +30,7 @@
  * @return The number of bits per roll.
  */
 uint8_t bip85_dice_bits_per_roll(uint32_t sides) {
-    return (sizeof(sides) << 3) - __builtin_clz(sides);
+    return (sizeof(sides) << 3) - __builtin_clz(sides - 1);
 }
 
 #if defined(HAVE_NBGL)
