@@ -178,6 +178,17 @@ add_executable(test_sskr_memzero ./tests/sskr_memzero.c ../../src/common/bip39/s
 target_include_directories(test_sskr_memzero PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common)
 target_link_libraries(test_sskr_memzero PUBLIC cmocka gcov sskr sss testutils)
 
+add_executable(test_sskr_shard_count tests/sskr_shard_count.c)
+target_link_libraries(test_sskr_shard_count PUBLIC cmocka gcov sskr sss testutils)
+
+# Built with AddressSanitizer: this one is about what the code writes, not
+# what it returns, so the sanitizer is the assertion.
+add_executable(test_sskr_combine_bounds ./tests/sskr_combine_bounds.c ../../src/common/bip39/seed_rom_variables.c ../../src/common/bip39/seed_bip39.c ../../src/common/sskr/seed_rom_variables.c ../../src/common/sskr/seed_sskr.c)
+target_include_directories(test_sskr_combine_bounds PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common/sskr/sss)
+target_compile_options(test_sskr_combine_bounds PRIVATE -fsanitize=address -fno-omit-frame-pointer)
+target_link_options(test_sskr_combine_bounds PRIVATE -fsanitize=address)
+target_link_libraries(test_sskr_combine_bounds PUBLIC cmocka gcov testutils sskr sss)
+
 add_executable(test_sskr_combine_error ./tests/sskr_combine_error.c ../../src/common/bip39/seed_rom_variables.c ../../src/common/bip39/seed_bip39.c ../../src/common/sskr/seed_rom_variables.c ../../src/common/sskr/seed_sskr.c)
 target_include_directories(test_sskr_combine_error PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common)
 target_link_libraries(test_sskr_combine_error PUBLIC cmocka gcov sskr sss testutils)
@@ -206,6 +217,6 @@ target_compile_options(test_base85 PRIVATE -fsanitize=undefined -fno-sanitize-re
 target_link_options(test_base85 PRIVATE -fsanitize=undefined)
 target_link_libraries(test_base85 PUBLIC cmocka gcov)
 
-foreach(target test_sss test_sskr test_sskr_share_len test_sskr_memzero test_sskr_combine_error test_bip39 test_roundtrip test_words test_base64 test_base85)
+foreach(target test_sss test_sskr test_sskr_share_len test_sskr_memzero test_sskr_shard_count test_sskr_combine_bounds test_sskr_combine_error test_bip39 test_roundtrip test_words test_base64 test_base85)
     add_test(NAME ${target} COMMAND ${target})
 endforeach()
