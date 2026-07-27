@@ -84,8 +84,11 @@ size_t sskr_shares_word_add(const char* const byteword) {
         return sskr_shares_current_word_number_get();
     }
 
-    shares.buffer[shares.length] =
-        bolos_ux_sskr_byteword_to_hex((unsigned char*)byteword);
+    uint8_t value;
+    if (!bolos_ux_sskr_byteword_to_hex((const unsigned char*)byteword, &value)) {
+        return sskr_shares_current_word_number_get();
+    }
+    shares.buffer[shares.length] = (char)value;
     switch (sskr_shares_current_word_number_get()) {
         // 4th byte of CBOR header contains number of data bytes to follow
         case 3:

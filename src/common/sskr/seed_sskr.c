@@ -189,16 +189,17 @@ unsigned int bolos_ux_sskr_share_hex_decode(unsigned char* input,
     return position;
 }
 
-unsigned int bolos_ux_sskr_byteword_to_hex(unsigned char* byteword) {
+bool bolos_ux_sskr_byteword_to_hex(const unsigned char* byteword, uint8_t* value) {
     for (unsigned int i = 0; i < SSKR_WORDLIST_LENGTH;
          i += SSKR_BYTEWORD_LENGTH) {
         if (os_secure_memcmp((void*)(SSKR_WORDLIST + i), byteword,
                              SSKR_BYTEWORD_LENGTH) == 0) {
-            return i / SSKR_BYTEWORD_LENGTH;
+            *value = i / SSKR_BYTEWORD_LENGTH;
+            return true;
         }
     }
-    // no match, sry
-    return SSKR_WORDLIST_LENGTH / SSKR_BYTEWORD_LENGTH;
+    // no match
+    return false;
 }
 
 unsigned int bolos_ux_bip39_to_sskr_convert(

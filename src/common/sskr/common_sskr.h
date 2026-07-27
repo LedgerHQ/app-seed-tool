@@ -27,8 +27,9 @@
 // and the CRC32. Nothing longer can be a share, whatever its header declares.
 #define SSKR_SHARE_MAX_WIRE_LENGTH (5 + SSKR_METADATA_LENGTH_BYTES + SSKR_MAX_STRENGTH_BYTES + 4)
 
-// Encode SSKR ByteWord as hex
-unsigned int bolos_ux_sskr_byteword_to_hex(unsigned char *byteword);
+// Encode SSKR ByteWord as hex. Returns false, without writing to *value, if
+// the ByteWord is not in the wordlist.
+bool bolos_ux_sskr_byteword_to_hex(const unsigned char *byteword, uint8_t *value);
 
 // Combine hex value SSKR shares into seed
 void bolos_ux_sskr_to_seed_convert(const unsigned char *sskr_shares_hex,
