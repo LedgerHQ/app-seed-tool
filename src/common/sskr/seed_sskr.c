@@ -62,6 +62,16 @@ unsigned int bolos_ux_sskr_combine(unsigned char* sskr_shares_hex,
         sskr_share_len = sskr_shares_hex[4];
     }
 
+    // The length comes from the entered data. A serialized shard is
+    // SSKR_METADATA_LENGTH_BYTES plus a SSKR_MIN_STRENGTH_BYTES..
+    // SSKR_MAX_STRENGTH_BYTES value, so refuse anything else here, before
+    // sskr_deserialize_shard() copies it into its fixed-size value field.
+    if (sskr_share_len < SSKR_MIN_SERIALIZED_LENGTH_BYTES ||
+        sskr_share_len > SSKR_METADATA_LENGTH_BYTES + SSKR_MAX_STRENGTH_BYTES) {
+        memzero(sskr_shares_hex, sskr_shares_hex_length);
+        return 0;
+    }
+
     for (uint8_t i = 0; i < (uint8_t)sskr_shares_count; i++) {
         ptr_sskr_shares[i] = sskr_shares_hex +
                              (i * sskr_shares_hex_length / sskr_shares_count) +
