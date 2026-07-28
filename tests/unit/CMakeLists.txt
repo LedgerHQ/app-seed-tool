@@ -314,6 +314,13 @@ add_executable(test_bip85_bip39_entropy tests/bip85_bip39_entropy.c ../../src/co
 target_include_directories(test_bip85_bip39_entropy PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common)
 target_link_libraries(test_bip85_bip39_entropy PUBLIC cmocka gcov testutils)
 
-foreach(target test_sss test_sss_recover_erase_length test_sskr test_sskr_share_len test_sskr_memzero test_sskr_shard_count test_sskr_generate_split_error test_sskr_combine_bounds test_sskr_combine_error test_sskr_combine_invariants test_sskr_interop_bc128 test_sskr_interop_bc128_bytewords test_sskr_entry_bounds test_sskr_byteword_sentinel test_sskr_cbor_additional_info test_bip39 test_roundtrip test_words test_base64 test_base85 test_bip85_dice_bits_per_roll test_bip85_dice_roll test_bip85_bip39_entropy)
+# Independent BIP-85 HEX-application vectors (bipsea, determinism); same
+# HAVE_HMAC/HAVE_SHA512-only dependency as test_bip85_bip39_entropy above,
+# nothing extra required.
+add_executable(test_bip85_hex_vector tests/bip85_hex_vector.c ../../src/common/bip85/seed_bip85.c)
+target_include_directories(test_bip85_hex_vector PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src)
+target_link_libraries(test_bip85_hex_vector PUBLIC cmocka gcov testutils)
+
+foreach(target test_sss test_sss_recover_erase_length test_sskr test_sskr_share_len test_sskr_memzero test_sskr_shard_count test_sskr_generate_split_error test_sskr_combine_bounds test_sskr_combine_error test_sskr_combine_invariants test_sskr_interop_bc128 test_sskr_interop_bc128_bytewords test_sskr_entry_bounds test_sskr_byteword_sentinel test_sskr_cbor_additional_info test_bip39 test_roundtrip test_words test_base64 test_base85 test_bip85_dice_bits_per_roll test_bip85_dice_roll test_bip85_bip39_entropy test_bip85_hex_vector)
     add_test(NAME ${target} COMMAND ${target})
 endforeach()
