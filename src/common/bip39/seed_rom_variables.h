@@ -32,6 +32,15 @@
 
 #define BIP39_PBKDF2_ROUNDS 2048
 
+// `WIDE` is normally provided by the SDK's arch.h, pulled in transitively
+// through os.h. Host unit tests that include this header without os.h (or
+// whose own "testutils.h" include happens to come after this one) need it
+// defined too; the fallback keeps it self-contained, with the same empty
+// expansion arch.h uses. Same pattern as bip85/seed_rom_variables.h.
+#ifndef WIDE
+#define WIDE
+#endif
+
 extern unsigned char const WIDE BIP39_WORDLIST[BIP39_WORDLIST_LENGTH];
 extern unsigned short const WIDE BIP39_WORDLIST_OFFSETS[BIP39_WORDLIST_OFFSETS_LENGTH];
 extern unsigned char const WIDE BIP39_MNEMONIC[BIP39_MNEMONIC_LENGTH];
