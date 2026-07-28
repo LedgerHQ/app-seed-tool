@@ -92,9 +92,24 @@ size_t sskr_shares_word_add(const char* const byteword) {
     switch (sskr_shares_current_word_number_get()) {
         // 4th byte of CBOR header contains number of data bytes to follow
         case 3:
-            // SSKR bytes = 4 bytes CBOR + n bytes share + 4 bytes CRC checksum
-            shares.final_size =
-                4 + (shares.buffer[shares.length] & 0x1F) + sizeof(uint32_t);
+            if ((shares.buffer[shares.length] & 0x1F) <= 24) {
+                // SSKR bytes = 4 bytes CBOR + n bytes share + 4 bytes CRC
+                // checksum. This is only a literal length for 0-23; 24 (one
+                // length byte follows) is corrected below once that byte is
+                // read.
+                shares.final_size = 4 + (shares.buffer[shares.length] & 0x1F) +
+                                    sizeof(uint32_t);
+            } else {
+                // 25-31 are reserved CBOR additional-info values (two/four/
+                // eight-byte length, reserved, or indefinite length) with no
+                // literal length of their own -- there is nothing valid to
+                // compute here. Force the same maximum bound used below for
+                // an out-of-range declared length, so entry can still
+                // complete and bolos_ux_sskr_hex_check() rejects it, instead
+                // of treating the reserved value as if it encoded a
+                // 25-to-31-byte payload.
+                shares.final_size = SSKR_SHARE_MAX_WIRE_LENGTH;
+            }
             break;
         case 4:
             if ((shares.buffer[3] & 0x1F) == 24) {
