@@ -14,7 +14,7 @@ extern int32_t bip85_dice_roll(uint32_t* out, size_t out_capacity,
 // d2 (sides = 2) has bits_per_roll = 1, so every byte of the SHAKE256
 // digest yields either 0 or 1 -- always < sides -- and is accepted. That
 // makes the accept rate exactly 100% regardless of the seed's actual
-// content, so a fixed, arbitrary seed is enough to make this test
+// content, so a fixed, arbitrary seed is enough to make these tests
 // deterministic: no dependency on real BIP85 entropy or on the rejection
 // step ever discarding a byte.
 static const uint8_t seed[BIP85_ENTROPY_LENGTH] = {
@@ -29,26 +29,25 @@ static const uint8_t seed[BIP85_ENTROPY_LENGTH] = {
 // byte digest, no more than 256 rolls can ever come out of a single,
 // non-extended digest -- even at the 100% acceptance rate d2 gives here,
 // which is the best case any (sides, rolls) pair can have. Asking for 257
-// therefore always demonstrates the silent-truncation bug: it does not
-// depend on the rejection step ever discarding a byte, so it does not
-// depend on chance.
-static void test_dice_roll_truncates_past_256_bytes(void** state) {
+// therefore always exercises the re-extension path: it does not depend on
+// the rejection step ever discarding a byte, so it does not depend on
+// chance.
+static void test_dice_roll_extends_past_256_bytes(void** state) {
     (void)state;
 
     uint32_t out[300];
     int32_t produced =
         bip85_dice_roll(out, sizeof(out) / sizeof(out[0]), 2, 257, seed);
 
-    // Bug: fewer rolls than requested come back, and the caller has no
-    // signal beyond comparing the return value to what it asked for --
-    // which today's `bolos_ux_bip85_dice()` cannot do at all, since it
-    // returns void.
-    assert_int_equal(produced, 256);
+    // Fixed: the digest is re-derived at double the length and the request
+    // is satisfied in full, rather than silently truncated at 256 -- which
+    // is what `bolos_ux_bip85_dice()` could not even report before, since
+    // it returned void.
+    assert_int_equal(produced, 257);
 }
 
 // A request that fits comfortably inside a single digest must not be
-// affected by the bug above -- this is the baseline the fix must not
-// regress.
+// affected by the extension path above.
 static void test_dice_roll_exact_when_well_under_capacity(void** state) {
     (void)state;
 
@@ -59,10 +58,37 @@ static void test_dice_roll_exact_when_well_under_capacity(void** state) {
     assert_int_equal(produced, 10);
 }
 
+// SHAKE256 is a genuine XOF: a longer digest from the same seed must
+// reproduce the same leading bytes as a shorter one. This is the property
+// the fix's re-derive-from-scratch strategy depends on for correctness --
+// verified here end to end through the real cx_shake256_hash(), not just
+// assumed. rolls=256 stays within the initial digest (no extension);
+// rolls=257 forces exactly one re-extension (512-byte digest). The first
+// 256 results of the second call must be pixel-for-pixel identical to the
+// first call's, proving the extension does not alter rolls already found.
+static void test_dice_roll_extension_preserves_prior_rolls(void** state) {
+    (void)state;
+
+    uint32_t out_no_extension[256];
+    int32_t produced_no_extension = bip85_dice_roll(
+        out_no_extension, sizeof(out_no_extension) / sizeof(uint32_t), 2, 256,
+        seed);
+    assert_int_equal(produced_no_extension, 256);
+
+    uint32_t out_extended[257];
+    int32_t produced_extended = bip85_dice_roll(
+        out_extended, sizeof(out_extended) / sizeof(uint32_t), 2, 257, seed);
+    assert_int_equal(produced_extended, 257);
+
+    assert_memory_equal(out_no_extension, out_extended,
+                        sizeof(out_no_extension));
+}
+
 int main(void) {
     const struct CMUnitTest tests[] = {
-        cmocka_unit_test(test_dice_roll_truncates_past_256_bytes),
+        cmocka_unit_test(test_dice_roll_extends_past_256_bytes),
         cmocka_unit_test(test_dice_roll_exact_when_well_under_capacity),
+        cmocka_unit_test(test_dice_roll_extension_preserves_prior_rolls),
     };
     return cmocka_run_group_tests(tests, NULL, NULL);
 }

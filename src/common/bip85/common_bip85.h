@@ -91,11 +91,25 @@ uint8_t bolos_ux_bip85_pwd_base85(char *pwd, uint8_t pwd_len, unsigned int index
  * @details This function simulates the rolling of dice with the specified number of sides and
  *          rolls. It utilizes the BIP85 standard to ensure cryptographic security and randomness.
  *
- * @param[out] out    Pointer to an array of `uint32_t` to store the generated dice rolls.
- * @param[in]  sides  Number of sides on each die (must be between 2 and UINT32_MAX >> 1).
- * @param[in]  rolls  Number of dice rolls to generate (must be between 1 and UINT32_MAX >> 1).
- * @param[in]  index  Index to be used in the BIP32 path.
+ *          The DRNG output is a finite SHAKE256 digest: rejection sampling on it is not
+ *          guaranteed to produce `rolls` valid values from a single digest, so this function
+ *          re-extends the digest (re-deriving a longer one from the same seed, not resuming
+ *          mid-stream) a bounded number of times before giving up. It always reports how many
+ *          rolls it actually produced rather than silently returning fewer than requested.
  *
- * @return The number of bytes written to the output buffer.
+ * @param[out] out          Pointer to an array of `uint32_t` to store the generated dice rolls.
+ * @param[in]  out_capacity Capacity of `out`, in elements.
+ * @param[in]  sides        Number of sides on each die (must be between 2 and UINT32_MAX >> 1).
+ * @param[in]  rolls        Number of dice rolls to generate (must be between 1 and UINT32_MAX >>
+ * 1).
+ * @param[in]  index        Index to be used in the BIP32 path.
+ *
+ * @return `rolls` on success. A negative value if `out_capacity < rolls`, if entropy derivation
+ *         or the SHAKE256 call failed, or if the DRNG stream could not be extended far enough to
+ *         produce `rolls` valid results.
  */
-void bolos_ux_bip85_dice(uint32_t *out, uint32_t sides, uint32_t rolls, unsigned int index);
+int32_t bolos_ux_bip85_dice(uint32_t *out,
+                            size_t out_capacity,
+                            uint32_t sides,
+                            uint32_t rolls,
+                            uint32_t index);
