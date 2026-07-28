@@ -14,7 +14,16 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  ********************************************************************************/
+#include <stddef.h>
 #include <stdint.h>
+#include <string.h>
+
+#include "./seed_rom_variables.h"
+#include "constants.h"
+
+#ifdef HAVE_SHA3
+#include <lcx_sha3.h>
+#endif
 
 /**
  * @brief Computes the number of bits needed to represent a DICE roll drawn
@@ -32,6 +41,114 @@
 uint8_t bip85_dice_bits_per_roll(uint32_t sides) {
     return (sizeof(sides) << 3) - __builtin_clz(sides - 1);
 }
+
+#ifdef HAVE_SHA3
+
+// How many times the DRNG digest is allowed to double in size (from
+// BIP85_DRNG_MAX_DIGEST_SIZE) before bip85_dice_roll() gives up and reports
+// an error instead of producing a truncated result.
+#define BIP85_DICE_MAX_DRNG_DOUBLINGS 3
+
+/**
+ * @brief Draws `rolls` values uniformly distributed in `[0, sides)` from a
+ * BIP85-derived seed, re-extending the SHAKE256 output stream if the
+ * initial digest runs out before enough values have been drawn.
+ *
+ * @details Kept outside the `HAVE_NBGL` guard below, and with external
+ * linkage, purely so it can be linked into a unit test against the real
+ * `cx_shake256_hash()` -- pure software, no BOLOS syscall -- without the
+ * NBGL headers the rest of this file needs.
+ *
+ * Rejection sampling with `bits_per_roll = ceil(log2(sides))`
+ * (`bip85_dice_bits_per_roll()` above) never accepts fewer than half of the
+ * candidates it draws: the worst case is `sides` one more than a power of
+ * two (e.g. `sides = 129`, `bits_per_roll = 8`, acceptance 129/256 =~
+ * 50.4%). A `BIP85_DRNG_MAX_DIGEST_SIZE`-byte digest therefore runs out
+ * only when `rolls` is in the hundreds or more for single-byte rolls, and
+ * higher still for wider ones. When it does, this function re-derives the
+ * digest from scratch at double the previous length rather than resuming
+ * mid-stream: SHAKE256 is a genuine XOF, so a longer digest from the same
+ * seed reproduces the same leading bytes -- already-accepted rolls are
+ * identical across a retry -- and the computation is cheap enough that
+ * redoing it from scratch costs nothing worth optimizing away.
+ * `BIP85_DICE_MAX_DRNG_DOUBLINGS` bounds the number of retries: given the
+ * better-than-50% acceptance rate above, exhausting them without producing
+ * `rolls` values is not expected for any realistic request, but it is
+ * still reported as an error rather than looped on indefinitely.
+ *
+ * @param[out] out           Buffer to receive the `rolls` dice results.
+ * @param[in]  out_capacity  Capacity of `out`, in elements.
+ * @param[in]  sides         Number of sides on the die.
+ * @param[in]  rolls         Number of rolls requested.
+ * @param[in]  seed          BIP85 entropy seed, `BIP85_ENTROPY_LENGTH`
+ * bytes.
+ *
+ * @return `rolls` on success (`out[0..rolls)` is fully populated). A
+ * negative value on error:
+ * - `-1` if `out_capacity < rolls`;
+ * - `-2` if the SHAKE256 call failed;
+ * - `-3` if the DRNG stream was exhausted after
+ *   `BIP85_DICE_MAX_DRNG_DOUBLINGS` doublings without producing `rolls`
+ *   valid results.
+ */
+int32_t bip85_dice_roll(uint32_t* out, size_t out_capacity, uint32_t sides,
+                        uint32_t rolls,
+                        const uint8_t seed[BIP85_ENTROPY_LENGTH]) {
+    if (out_capacity < rolls) {
+        return -1;
+    }
+
+    uint8_t bits_per_roll = bip85_dice_bits_per_roll(sides);
+    uint8_t bytes_per_roll = (bits_per_roll + 7) >> 3;
+    uint8_t shift_amount = (bytes_per_roll << 3) - bits_per_roll;
+
+    // Sized for the largest digest a retry can request; only the leading
+    // `digest_length` bytes are meaningful on any given attempt.
+    uint8_t digest[BIP85_DRNG_MAX_DIGEST_SIZE << BIP85_DICE_MAX_DRNG_DOUBLINGS];
+    int32_t result = -3;
+
+    for (uint8_t attempt = 0; attempt <= BIP85_DICE_MAX_DRNG_DOUBLINGS;
+         attempt++) {
+        size_t digest_length = (size_t)BIP85_DRNG_MAX_DIGEST_SIZE << attempt;
+
+        if (cx_shake256_hash(seed, BIP85_ENTROPY_LENGTH, digest,
+                             digest_length) != CX_OK) {
+            result = -2;
+            break;
+        }
+
+        uint8_t* digest_ptr = digest;
+        uint32_t roll_index = 0;
+
+        while (roll_index < rolls &&
+               (size_t)(digest_ptr - digest) + bytes_per_roll <=
+                   digest_length) {
+            // Construct roll result from bytes_per_roll bytes
+            uint32_t roll_result = 0;
+            uint8_t* end_ptr = digest_ptr + bytes_per_roll;
+            while (digest_ptr < end_ptr) {
+                roll_result = roll_result << 8 | (uint32_t)*digest_ptr++;
+            }
+            // Adjust roll result to keep only bits_per_roll
+            roll_result >>= shift_amount;
+
+            // Check if roll result is within valid range
+            if (roll_result < sides) {
+                out[roll_index++] = roll_result;
+            }
+        }
+
+        if (roll_index == rolls) {
+            result = (int32_t)rolls;
+            break;
+        }
+    }
+
+    explicit_bzero(digest, sizeof(digest));
+    return result;
+}
+
+#endif  // HAVE_SHA3
 
 #if defined(HAVE_NBGL)
 #include <lcx_hmac.h>
@@ -254,8 +371,8 @@ uint8_t bolos_ux_bip85_pwd_base85(char* pwd, uint8_t pwd_len,
     return pwd_len;
 }
 
-void bolos_ux_bip85_dice(uint32_t* out, uint32_t sides, uint32_t rolls,
-                         unsigned int index) {
+int32_t bolos_ux_bip85_dice(uint32_t* out, size_t out_capacity, uint32_t sides,
+                            uint32_t rolls, uint32_t index) {
     LEDGER_ASSERT((sides >= 2) && (sides <= (UINT32_MAX >> 1)),
                   "Invalid value for BIP85 DICE sides");
     LEDGER_ASSERT((rolls >= 1) && (rolls <= (UINT32_MAX >> 1)),
@@ -267,42 +384,15 @@ void bolos_ux_bip85_dice(uint32_t* out, uint32_t sides, uint32_t rolls,
                                  0x80000000 | rolls, 0x80000000 | index};
 
     uint8_t buffer_ent[BIP85_ENTROPY_LENGTH];
-    uint8_t buffer_drng[BIP85_DRNG_MAX_DIGEST_SIZE], *buffer_ptr = buffer_drng;
 
     LEDGER_ASSERT(bolos_ux_bip85_entropy(buffer_ent, path, ARRAYLEN(path)) == 1,
                   "BIP85 entropy failed");
-    LEDGER_ASSERT(bolos_ux_bip85_drng_with_seed(
-                      buffer_ent, BIP85_ENTROPY_LENGTH, buffer_drng,
-                      BIP85_DRNG_MAX_DIGEST_SIZE) == 1,
-                  "BIP85 SHAKE256 hash failed");
+
+    int32_t produced =
+        bip85_dice_roll(out, out_capacity, sides, rolls, buffer_ent);
+
     memzero(buffer_ent, BIP85_ENTROPY_LENGTH);
 
-    uint8_t bits_per_roll = bip85_dice_bits_per_roll(sides);
-    PRINTF("BIP85 DICE bits per roll : %d\n", bits_per_roll);
-
-    uint8_t bytes_per_roll = (bits_per_roll + 7) >> 3;
-    PRINTF("BIP85 DICE bytes per roll : %d\n", bytes_per_roll);
-
-    uint8_t shift_amount = (bytes_per_roll << 3) - bits_per_roll;
-
-    for (uint32_t roll_result = 0, roll_index = 0;
-         roll_index < rolls && buffer_ptr - buffer_drng + bytes_per_roll <=
-                                   BIP85_DRNG_MAX_DIGEST_SIZE;
-         roll_result = 0) {
-        // Construct roll result from bytes_per_roll bytes
-        uint8_t* end_ptr = buffer_ptr + bytes_per_roll;
-        while (buffer_ptr < end_ptr) {
-            roll_result = roll_result << 8 | (uint32_t)*buffer_ptr++;
-        }
-        // Adjust roll result to keep only bits_per_roll
-        roll_result >>= shift_amount;
-
-        // Check if roll result is within valid range
-        if (roll_result < sides) {
-            out[roll_index++] = roll_result;
-            PRINTF("BIP85 DICE roll %d : %d\n", roll_index, roll_result);
-        }
-    }
-    memzero(buffer_drng, BIP85_DRNG_MAX_DIGEST_SIZE);
+    return produced;
 }
 #endif

@@ -149,12 +149,17 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/lib $ENV{LEDGER_SECURE_SDK}/incl
 # add src
 set(ExternalProject_Get_property(openssl INSTALL_DIR))
 set(BOLOS_SOURCES ./lib/bolos/cx_bn.c ./lib/bolos/cx_crc.c ./lib/bolos/cx_mpi.c)
-set(LIBCXNG_SOURCES $ENV{LEDGER_SECURE_SDK}/lib_cxng/src/cx_ram.c $ENV{LEDGER_SECURE_SDK}/lib_cxng/src/cx_hash.c $ENV{LEDGER_SECURE_SDK}/lib_cxng/src/cx_sha256.c $ENV{LEDGER_SECURE_SDK}/lib_cxng/src/cx_sha512.c $ENV{LEDGER_SECURE_SDK}/lib_cxng/src/cx_pbkdf2.c $ENV{LEDGER_SECURE_SDK}/lib_cxng/src/cx_hmac.c $ENV{LEDGER_SECURE_SDK}/lib_cxng/src/cx_utils.c)
+set(LIBCXNG_SOURCES $ENV{LEDGER_SECURE_SDK}/lib_cxng/src/cx_ram.c $ENV{LEDGER_SECURE_SDK}/lib_cxng/src/cx_hash.c $ENV{LEDGER_SECURE_SDK}/lib_cxng/src/cx_sha256.c $ENV{LEDGER_SECURE_SDK}/lib_cxng/src/cx_sha512.c $ENV{LEDGER_SECURE_SDK}/lib_cxng/src/cx_pbkdf2.c $ENV{LEDGER_SECURE_SDK}/lib_cxng/src/cx_hmac.c $ENV{LEDGER_SECURE_SDK}/lib_cxng/src/cx_utils.c $ENV{LEDGER_SECURE_SDK}/lib_cxng/src/cx_sha3.c)
 set(TESTLIB_SOURCES ./lib/testutils.c)
 add_library(testutils SHARED ${TESTLIB_SOURCES} ${LIBCXNG_SOURCES} ${BOLOS_SOURCES})
 target_include_directories(testutils PUBLIC ${INSTALL_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common/sskr/sss ${CMAKE_CURRENT_SOURCE_DIR}/../../src/commonsskr)
 target_link_directories(testutils PUBLIC ${INSTALL_DIR}/lib)
 target_link_libraries(testutils PUBLIC ssl crypto)
+# HAVE_SHA3 only affects this library's own SHA3 dispatch-table entry
+# (cx_hash.c gates it behind `#ifdef HAVE_SHA3`) and the newly-added
+# cx_sha3.c above; it does not change compile definitions for any other
+# test executable, which is what actually links against testutils.
+target_compile_definitions(testutils PRIVATE HAVE_SHA3)
 add_dependencies(testutils openssl)
 
 add_library(sss SHARED ../../src/common/sskr/sss/sss.c ../../src/common/sskr/sss/interpolate.c)
@@ -243,8 +248,29 @@ target_link_libraries(test_base85 PUBLIC cmocka gcov)
 # seed_bip85.c precisely so it can be linked here without the NBGL headers
 # the rest of that file needs.
 add_executable(test_bip85_dice_bits_per_roll tests/bip85_dice_bits_per_roll.c ../../src/common/bip85/seed_bip85.c)
+target_include_directories(test_bip85_dice_bits_per_roll PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src)
 target_link_libraries(test_bip85_dice_bits_per_roll PUBLIC cmocka gcov)
 
-foreach(target test_sss test_sss_recover_erase_length test_sskr test_sskr_share_len test_sskr_memzero test_sskr_shard_count test_sskr_generate_split_error test_sskr_combine_bounds test_sskr_combine_error test_sskr_entry_bounds test_sskr_byteword_sentinel test_bip39 test_roundtrip test_words test_base64 test_base85 test_bip85_dice_bits_per_roll)
+# bip85_dice_roll() (also outside the HAVE_NBGL guard) calls
+# cx_shake256_hash() -- pure software, no BOLOS syscall, unlike
+# bolos_ux_bip85_entropy() which the rest of seed_bip85.c depends on and
+# which cannot be tested on host. cx_sha3.c and cx_hash_iovec.c are
+# compiled directly into this target rather than added to the shared
+# `testutils` library, the same way sss.c/interpolate.c are for
+# test_sss_recover_erase_length; HAVE_SHA3 is defined for this target only,
+# matching the real app build (Makefile.conf.cx enables it unconditionally)
+# without turning it on for any other unit test.
+add_executable(test_bip85_dice_roll tests/bip85_dice_roll.c ../../src/common/bip85/seed_bip85.c $ENV{LEDGER_SECURE_SDK}/src/cx_hash_iovec.c)
+# cx_shake256_hash_iovec() (which cx_shake256_hash() wraps) is behind
+# `#ifdef HAVE_SHA3` in cx_hash_iovec.c, same as the SHA3 dispatch-table
+# entry testutils now also compiles in (see `target_compile_definitions
+# (testutils ...)` above) -- both need it for this target to link.
+target_compile_definitions(test_bip85_dice_roll PRIVATE HAVE_SHA3)
+# cx_hash_iovec.c does `#include "lib_cxng/src/cx_ram.h"`, resolved relative
+# to the SDK root rather than to lib_cxng/src itself.
+target_include_directories(test_bip85_dice_roll PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src $ENV{LEDGER_SECURE_SDK})
+target_link_libraries(test_bip85_dice_roll PUBLIC cmocka gcov testutils)
+
+foreach(target test_sss test_sss_recover_erase_length test_sskr test_sskr_share_len test_sskr_memzero test_sskr_shard_count test_sskr_generate_split_error test_sskr_combine_bounds test_sskr_combine_error test_sskr_entry_bounds test_sskr_byteword_sentinel test_bip39 test_roundtrip test_words test_base64 test_base85 test_bip85_dice_bits_per_roll test_bip85_dice_roll)
     add_test(NAME ${target} COMMAND ${target})
 endforeach()
