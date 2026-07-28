@@ -213,6 +213,7 @@ uint8_t bolos_ux_bip85_pwd_base64(char* pwd, uint8_t pwd_len,
         "Base64 encoding failed");
 
     memcpy(pwd, buffer_pwd, pwd_len);
+    pwd[pwd_len] = '\0';  // Add string termination character
 
     memzero(buffer_ent, BIP85_ENTROPY_LENGTH);
     memzero(buffer_pwd, BASE64_ENCODE_LENGTH);
