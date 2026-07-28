@@ -31,6 +31,14 @@ extern unsigned int tool_type;
 bool compare_recovery_phrase(bool* reconstructed) {
     // convert mnemonic to hex-seed
     uint8_t buffer[64];
+    bool result = false;
+
+    // declared up front so goto cleanup can reach it from every early exit
+    uint8_t buffer_device[64];
+
+    // os_derive_bip32* do not accept NULL path, even with a size of 0, so we
+    // provide an empty path
+    const unsigned int empty_path = 0;
 
     *reconstructed = true;
 
@@ -51,7 +59,7 @@ bool compare_recovery_phrase(bool* reconstructed) {
         if (G_bolos_ux_context.words_buffer_length == 0) {
             // shards accepted by the CRC check but not combinable
             *reconstructed = false;
-            return false;
+            goto cleanup;
         }
     }
 #elif defined(HAVE_NBGL)
@@ -63,7 +71,7 @@ bool compare_recovery_phrase(bool* reconstructed) {
         if (!bip39_mnemonic_from_sskr_shares(buffer)) {
             // shards accepted by the CRC check but not combinable
             *reconstructed = false;
-            return false;
+            goto cleanup;
         }
     }
 #endif
@@ -82,21 +90,17 @@ bool compare_recovery_phrase(bool* reconstructed) {
     PRINTF("Root key from input:\n%.*H\n", 64, buffer);
 
     // get rootkey from device's seed
-    uint8_t buffer_device[64];
-
-    // os_derive_bip32* do not accept NULL path, even with a size of 0, so we
-    // provide an empty path
-    const unsigned int empty_path = 0;
     if (os_derive_bip32_no_throw(CX_CURVE_256K1, &empty_path, 0, buffer_device,
                                  buffer_device + 32) != CX_OK) {
         PRINTF("An error occurred while comparing the recovery phrase\n");
-        return 0;
+        goto cleanup;
     }
     PRINTF("Root key from device: \n%.*H\n", 64, buffer_device);
 
     // compare both rootkey
-    const bool result =
-        os_secure_memcmp(buffer, buffer_device, 64) ? false : true;
+    result = os_secure_memcmp(buffer, buffer_device, 64) ? false : true;
+
+cleanup:
     memzero(buffer_device, 64);
     memzero(buffer, 64);
 
