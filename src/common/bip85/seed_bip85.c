@@ -150,6 +150,49 @@ int32_t bip85_dice_roll(uint32_t* out, size_t out_capacity, uint32_t sides,
 
 #endif  // HAVE_SHA3
 
+#ifdef HAVE_HMAC
+#include <lcx_hmac.h>
+
+/**
+ * @brief Computes BIP85 entropy from an already BIP32-derived 32-byte root
+ * key, via HMAC-SHA512("bip-entropy-from-k", key) as specified by BIP-85.
+ *
+ * @details Kept outside the `HAVE_NBGL` guard below, and with external
+ * linkage, purely so it can be linked into a unit test against the real
+ * `cx_hmac_no_throw()` -- pure software, no BOLOS syscall, unlike the BIP32
+ * derivation in `bolos_ux_bip85_entropy()` below, which depends on
+ * `os_derive_bip32_no_throw()` and cannot be tested on host. Same pattern as
+ * `bip85_dice_roll()` above.
+ *
+ * `bolos_ux_bip85_entropy()` calls this with `key` and `out` pointing at the
+ * same buffer -- safe only because a single `CX_LAST` call consumes the
+ * whole 32-byte input before any output byte is written; preserve that
+ * property if this function is ever changed.
+ *
+ * @param[in]  key      32-byte root key.
+ * @param[out] out      Buffer to receive the HMAC-SHA512 output; may alias
+ * `key`.
+ * @param[in]  out_len  Number of bytes of `out` to write.
+ *
+ * @return `true` on success, `false` if the HMAC computation failed.
+ */
+bool bip85_entropy_from_key(const uint8_t key[32], uint8_t* out,
+                            size_t out_len) {
+    cx_hmac_sha512_t ctx;
+    const char hmac_key[] = "bip-entropy-from-k";
+
+    if (cx_hmac_sha512_init_no_throw(&ctx, (const uint8_t*)hmac_key,
+                                     strlen(hmac_key)) != CX_OK) {
+        return false;
+    }
+    if (cx_hmac_no_throw((cx_hmac_t*)&ctx, CX_LAST, key, 32, out, out_len) !=
+        CX_OK) {
+        return false;
+    }
+    return true;
+}
+#endif  // HAVE_HMAC
+
 #if defined(HAVE_NBGL)
 #include <lcx_hmac.h>
 #include <lcx_sha3.h>
@@ -190,15 +233,9 @@ bool bolos_ux_bip85_entropy(uint8_t* entropy, const unsigned int* path,
     PRINTF("Root key from device: \n%.*H\n", 32, entropy);
 
     // Generate BIP85 entropy from root key
-    cx_hmac_sha512_t ctx;
-    const char key[] = "bip-entropy-from-k";
-
-    LEDGER_ASSERT(cx_hmac_sha512_init_no_throw(&ctx, (const uint8_t*)key,
-                                               strlen(key)) == CX_OK,
-                  "HMAC init failed");
-    LEDGER_ASSERT(cx_hmac_no_throw((cx_hmac_t*)&ctx, CX_LAST, entropy, 32,
-                                   entropy, BIP85_ENTROPY_LENGTH) == CX_OK,
-                  "HMAC failed");
+    LEDGER_ASSERT(
+        bip85_entropy_from_key(entropy, entropy, BIP85_ENTROPY_LENGTH),
+        "HMAC failed");
     PRINTF("BIP85 entropy from root key:\n%.*H\n", BIP85_ENTROPY_LENGTH,
            entropy);
 
