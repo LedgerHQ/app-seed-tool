@@ -251,10 +251,15 @@ target_link_libraries(test_base85 PUBLIC cmocka gcov)
 
 # bip85_dice_bits_per_roll() is defined outside the HAVE_NBGL guard in
 # seed_bip85.c precisely so it can be linked here without the NBGL headers
-# the rest of that file needs.
+# the rest of that file needs. Since HAVE_HMAC is defined globally above
+# (unlike the per-target HAVE_SHA3 below), compiling seed_bip85.c as a whole
+# now always pulls in bip85_entropy_from_key()'s reference to
+# cx_hmac_sha512_init_no_throw()/cx_hmac_no_throw() too, even though this
+# target itself never calls it -- testutils is where those symbols actually
+# live.
 add_executable(test_bip85_dice_bits_per_roll tests/bip85_dice_bits_per_roll.c ../../src/common/bip85/seed_bip85.c)
 target_include_directories(test_bip85_dice_bits_per_roll PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src)
-target_link_libraries(test_bip85_dice_bits_per_roll PUBLIC cmocka gcov)
+target_link_libraries(test_bip85_dice_bits_per_roll PUBLIC cmocka gcov testutils)
 
 # bip85_dice_roll() (also outside the HAVE_NBGL guard) calls
 # cx_shake256_hash() -- pure software, no BOLOS syscall, unlike
@@ -276,6 +281,20 @@ target_compile_definitions(test_bip85_dice_roll PRIVATE HAVE_SHA3)
 target_include_directories(test_bip85_dice_roll PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src $ENV{LEDGER_SECURE_SDK})
 target_link_libraries(test_bip85_dice_roll PUBLIC cmocka gcov testutils)
 
-foreach(target test_sss test_sss_recover_erase_length test_sskr test_sskr_share_len test_sskr_memzero test_sskr_shard_count test_sskr_generate_split_error test_sskr_combine_bounds test_sskr_combine_error test_sskr_entry_bounds test_sskr_byteword_sentinel test_sskr_cbor_additional_info test_bip39 test_roundtrip test_words test_base64 test_base85 test_bip85_dice_bits_per_roll test_bip85_dice_roll)
+# bip85_entropy_from_key() (also outside the HAVE_NBGL guard) is the
+# HMAC-SHA512("bip-entropy-from-k", key) half of bolos_ux_bip85_entropy();
+# the BIP32 derivation that produces `key` is a BOLOS syscall
+# (os_derive_bip32_no_throw()) with no host equivalent and is not exercised
+# here. Chained with bolos_ux_bip39_mnemonic_encode() (seed_bip39.c, also
+# outside HAVE_NBGL) and checked word-for-word against the official BIP-85
+# test vectors. HAVE_HMAC and HAVE_SHA512 are already defined globally
+# above (needed for BIP39's own PBKDF2-HMAC-SHA512 seed derivation), so
+# nothing extra is required here, unlike HAVE_SHA3 for test_bip85_dice_roll
+# above.
+add_executable(test_bip85_bip39_entropy tests/bip85_bip39_entropy.c ../../src/common/bip85/seed_bip85.c ../../src/common/bip39/seed_rom_variables.c ../../src/common/bip39/seed_bip39.c)
+target_include_directories(test_bip85_bip39_entropy PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common)
+target_link_libraries(test_bip85_bip39_entropy PUBLIC cmocka gcov testutils)
+
+foreach(target test_sss test_sss_recover_erase_length test_sskr test_sskr_share_len test_sskr_memzero test_sskr_shard_count test_sskr_generate_split_error test_sskr_combine_bounds test_sskr_combine_error test_sskr_entry_bounds test_sskr_byteword_sentinel test_sskr_cbor_additional_info test_bip39 test_roundtrip test_words test_base64 test_base85 test_bip85_dice_bits_per_roll test_bip85_dice_roll test_bip85_bip39_entropy)
     add_test(NAME ${target} COMMAND ${target})
 endforeach()
