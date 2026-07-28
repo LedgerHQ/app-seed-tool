@@ -210,6 +210,10 @@ add_executable(test_sskr_combine_error ./tests/sskr_combine_error.c ../../src/co
 target_include_directories(test_sskr_combine_error PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common)
 target_link_libraries(test_sskr_combine_error PUBLIC cmocka gcov sskr sss testutils)
 
+add_executable(test_sskr_combine_invariants ./tests/sskr_combine_invariants.c ../../src/common/bip39/seed_rom_variables.c ../../src/common/bip39/seed_bip39.c ../../src/common/sskr/seed_rom_variables.c ../../src/common/sskr/seed_sskr.c)
+target_include_directories(test_sskr_combine_invariants PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common)
+target_link_libraries(test_sskr_combine_invariants PUBLIC cmocka gcov sskr sss testutils)
+
 add_executable(test_bip39 ./tests/bip39.c ../../src/common/bip39/seed_rom_variables.c  ../../src/common/bip39/seed_bip39.c)
 target_include_directories(test_bip39 PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common)
 target_link_libraries(test_bip39 PUBLIC cmocka gcov testutils)
@@ -295,6 +299,6 @@ add_executable(test_bip85_bip39_entropy tests/bip85_bip39_entropy.c ../../src/co
 target_include_directories(test_bip85_bip39_entropy PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common)
 target_link_libraries(test_bip85_bip39_entropy PUBLIC cmocka gcov testutils)
 
-foreach(target test_sss test_sss_recover_erase_length test_sskr test_sskr_share_len test_sskr_memzero test_sskr_shard_count test_sskr_generate_split_error test_sskr_combine_bounds test_sskr_combine_error test_sskr_entry_bounds test_sskr_byteword_sentinel test_sskr_cbor_additional_info test_bip39 test_roundtrip test_words test_base64 test_base85 test_bip85_dice_bits_per_roll test_bip85_dice_roll test_bip85_bip39_entropy)
+foreach(target test_sss test_sss_recover_erase_length test_sskr test_sskr_share_len test_sskr_memzero test_sskr_shard_count test_sskr_generate_split_error test_sskr_combine_bounds test_sskr_combine_error test_sskr_combine_invariants test_sskr_entry_bounds test_sskr_byteword_sentinel test_sskr_cbor_additional_info test_bip39 test_roundtrip test_words test_base64 test_base85 test_bip85_dice_bits_per_roll test_bip85_dice_roll test_bip85_bip39_entropy)
     add_test(NAME ${target} COMMAND ${target})
 endforeach()
