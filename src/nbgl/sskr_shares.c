@@ -146,7 +146,7 @@ size_t sskr_shares_word_add(const char* const byteword) {
 
     PRINTF("Current number of words in the share: '%d'\n",
            sskr_shares_current_word_number_get());
-    PRINTF("Current shares buffer: '%.*H'\n", shares.length, &shares.buffer[0]);
+    PRINTF("Current shares buffer length: %zu bytes\n", shares.length);
 
     return sskr_shares_current_word_number_get();
 }
@@ -186,8 +186,7 @@ void sskr_shares_from_bip39_mnemonic(void) {
         PRINTF("SSKR share buffer length is %d\n", shares.length);
         for (uint8_t share = 0; share < shares.count; share++) {
             PRINTF("SSKR share %d:\n", share + 1);
-            PRINTF("%.*s\n", shares.length / shares.count,
-                   shares.buffer + share * shares.length / shares.count);
+            PRINTF("(%zu bytes)\n", shares.length / shares.count);
         }
     }
 }
@@ -215,8 +214,7 @@ bool sskr_shares_check(bool* match) {
         return false;
     }
 
-    PRINTF("Checking the following shares: '%.*H' (size %d)\n", shares.length,
-           &shares.buffer[0], shares.length);
+    PRINTF("Checking the shares buffer: %zu bytes\n", shares.length);
 
     if (bolos_ux_sskr_hex_check((unsigned char*)sskr_shares_get(),
                                 sskr_shares_length_get(),

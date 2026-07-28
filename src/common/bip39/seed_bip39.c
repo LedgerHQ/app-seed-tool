@@ -46,7 +46,7 @@ void bolos_ux_bip39_mnemonic_to_seed(unsigned char* mnemonic,
     cx_pbkdf2_sha512(mnemonic_hash, mnemonic_length, passphrase,
                      BIP39_MNEMONIC_LENGTH, BIP39_PBKDF2_ROUNDS, seed, 64);
     memzero(mnemonic_hash, sizeof(mnemonic_hash));
-    PRINTF("BIP39 seed:\n %.*H\n", 64, seed);
+    PRINTF("BIP39 seed computed: 64 bytes\n");
 }
 
 unsigned int bolos_ux_bip39_mnemonic_decode(unsigned char* mnemonic,
@@ -58,7 +58,7 @@ unsigned int bolos_ux_bip39_mnemonic_decode(unsigned char* mnemonic,
     unsigned char buffer[32];
     unsigned char mask;
 
-    PRINTF("BIP39 mnemonic phrase:\n %.*s\n", mnemonic_length, mnemonic);
+    PRINTF("BIP39 mnemonic phrase: %u characters\n", mnemonic_length);
 
     for (i = 0; i < mnemonic_length; i++) {
         if (mnemonic[i] == ' ') {
@@ -136,7 +136,7 @@ unsigned int bolos_ux_bip39_mnemonic_decode(unsigned char* mnemonic,
     }
 
     // alright mnemonic is ok
-    PRINTF("BIP39 mnemonic decoded in hex:\n %.*H\n", bitslength, bits);
+    PRINTF("BIP39 mnemonic decoded: %u bytes\n", bitslength);
     return 1;
 }
 
@@ -183,7 +183,7 @@ unsigned int bolos_ux_bip39_mnemonic_encode(const uint8_t* seed,
     }
     memzero(bits, sizeof(bits));
 
-    PRINTF("BIP39 encoded mnemonic:\n %.*s\n", offset, out);
+    PRINTF("BIP39 mnemonic encoded: %u characters\n", offset);
     return offset;
 }
 
@@ -311,13 +311,13 @@ size_t bolos_ux_bip39_fill_with_candidates(const unsigned char* startingChars,
                                            const size_t startingCharsLength,
                                            char wordCandidatesBuffer[],
                                            const char* wordIndexorBuffer[]) {
-    PRINTF("Calculating nb of words starting with '%s' (size is '%d')\n",
-           startingChars, startingCharsLength);
+    PRINTF("Calculating nb of words starting with a %u-character prefix\n",
+           startingCharsLength);
     const size_t nbMatchingWords =
         MIN(bolos_ux_bip39_get_word_count_starting_with(startingChars,
                                                         startingCharsLength),
             NB_MAX_SUGGESTION_BUTTONS);
-    PRINTF("'%d' words start with '%s'\n", nbMatchingWords, startingChars);
+    PRINTF("'%d' words start with the given prefix\n", nbMatchingWords);
     if (nbMatchingWords == 0) {
         return 0;
     }
@@ -342,12 +342,13 @@ uint32_t bolos_ux_bip39_get_keyboard_mask(const unsigned char* prefix,
     uint32_t existing_mask =
         1 << 28;  // Starting with the 'return' keypad activated
     unsigned char next_letters[ALPHABET_LENGTH] = {0};
-    PRINTF("Looking for letter candidates following '%s'\n", prefix);
+    PRINTF("Looking for letter candidates following a %u-character prefix\n",
+           prefixLength);
     const size_t nb_letters =
         bolos_ux_bip39_get_word_next_letters_starting_with(prefix, prefixLength,
                                                            next_letters);
     next_letters[nb_letters] = '\0';
-    PRINTF("Next letters are in: %s\n", next_letters);
+    PRINTF("Found %u next-letter candidates\n", nb_letters);
     for (int i = 0; i < ALPHABET_LENGTH; i++) {
         for (size_t j = 0; j < nb_letters; j++) {
             if (KBD_LETTERS[i] == next_letters[j]) {
