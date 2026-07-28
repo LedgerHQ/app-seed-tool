@@ -1,0 +1,84 @@
+name: Unit test configuration matrix
+
+# Sweeps the cmocka unit test suite (tests/unit) across build configurations
+# that unit_tests.yml does not cover: ASan, UBSan, -O2, -Os, -fsigned-char
+# and -funsigned-char. The default configuration (Debug, -O0) is already
+# exercised by unit_tests.yml on every pull request, so it is intentionally
+# not repeated here.
+#
+# Each matrix entry builds OpenSSL (a unit test dependency, fetched and
+# compiled from source by tests/unit/CMakeLists.txt) once with no special
+# flags, then reconfigures using -DPRECOMPILED_DEPENDENCIES_DIR to reuse
+# that build unchanged and apply the job-specific flags only to the actual
+# test suite. Without this, CMAKE_C_FLAGS/CMAKE_EXE_LINKER_FLAGS passed to
+# the top-level cmake invocation would also apply to OpenSSL's build,
+# needlessly recompiling a third-party dependency with flags it was never
+# meant to receive.
+#
+# This sweep is heavier than unit_tests.yml (6 OpenSSL builds + 6 full test
+# builds), so it does not run on every pull request; it runs on push to the
+# integration branches and on demand.
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - bip85
+      - develop
+
+jobs:
+  unit_tests_matrix:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/ledgerhq/ledger-app-builder/ledger-app-dev-tools:latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: ASan
+            cflags: "-fsanitize=address -fno-omit-frame-pointer"
+            ldflags: "-fsanitize=address"
+          - name: UBSan
+            cflags: "-fsanitize=undefined -fno-sanitize-recover=all"
+            ldflags: "-fsanitize=undefined"
+          - name: "-O2"
+            cflags: "-O2"
+            ldflags: ""
+          - name: "-Os"
+            cflags: "-Os"
+            ldflags: ""
+          - name: "-fsigned-char"
+            cflags: "-fsigned-char"
+            ldflags: ""
+          - name: "-funsigned-char"
+            cflags: "-funsigned-char"
+            ldflags: ""
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Build OpenSSL dependency (no matrix flags)
+        working-directory: tests/unit
+        run: |
+          cmake -Bbuild-deps -H.
+          make -C build-deps openssl -j"$(nproc)"
+
+      - name: Configure unit tests with matrix flags
+        working-directory: tests/unit
+        run: |
+          cmake -Bbuild -H. \
+            -DPRECOMPILED_DEPENDENCIES_DIR="$(pwd)/build-deps/install" \
+            -DCMAKE_C_FLAGS="${{ matrix.cflags }}" \
+            -DCMAKE_EXE_LINKER_FLAGS="${{ matrix.ldflags }}"
+
+      - name: Build unit tests
+        working-directory: tests/unit
+        run: make -C build -j"$(nproc)"
+
+      - name: Run unit tests
+        working-directory: tests/unit
+        env:
+          CTEST_OUTPUT_ON_FAILURE: 1
+        run: ctest --test-dir build
