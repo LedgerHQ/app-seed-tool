@@ -85,7 +85,8 @@ size_t sskr_shares_word_add(const char* const byteword) {
     }
 
     uint8_t value;
-    if (!bolos_ux_sskr_byteword_to_hex((const unsigned char*)byteword, &value)) {
+    if (!bolos_ux_sskr_byteword_to_hex((const unsigned char*)byteword,
+                                       &value)) {
         return sskr_shares_current_word_number_get();
     }
     shares.buffer[shares.length] = (char)value;
