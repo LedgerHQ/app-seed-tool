@@ -98,7 +98,7 @@ size_t bip39_mnemonic_word_add(const char* const buffer, const size_t size) {
     mnemonic.word_lengths[mnemonic.current_word_index] = size;
     PRINTF("Number of words in the mnemonic: '%d'\n",
            bip39_mnemonic_current_word_number_get());
-    PRINTF("Current mnemonic: '%s'\n", &mnemonic.buffer[0]);
+    PRINTF("Current mnemonic length: %zu characters\n", mnemonic.length);
     return bip39_mnemonic_current_word_number_get();
 }
 
@@ -113,8 +113,7 @@ bool bip39_mnemonic_check(bool* match) {
     if (!bip39_mnemonic_complete_check()) {
         return false;
     }
-    PRINTF("Checking the following mnemonic: '%s' (size %d)\n",
-           &mnemonic.buffer[0], mnemonic.length);
+    PRINTF("Checking the mnemonic: %zu characters\n", mnemonic.length);
 
     if (bolos_ux_bip39_mnemonic_check((unsigned char*)&mnemonic.buffer[0],
                                       mnemonic.length) == false) {
@@ -140,7 +139,7 @@ bool bip39_mnemonic_from_sskr_shares(unsigned char* seed) {
         &mnemonic.length, seed);
 
     if (mnemonic.length > 0) {
-        PRINTF("BIP39 mnemonic: %.*s\n", mnemonic.length, bip39_mnemonic_get());
+        PRINTF("BIP39 mnemonic: %zu characters\n", mnemonic.length);
     }
 
     // a zero length means the shards could not be combined
@@ -154,7 +153,7 @@ void bip39_mnemonic_encode(const uint8_t* seed, uint8_t seed_len) {
         BIP39_MNEMONIC_MAX_LENGTH);
 
     if (mnemonic.length > 0) {
-        PRINTF("BIP39 mnemonic: %.*s\n", mnemonic.length, bip39_mnemonic_get());
+        PRINTF("BIP39 mnemonic: %zu characters\n", mnemonic.length);
     }
 }
 

@@ -230,15 +230,14 @@ bool bolos_ux_bip85_entropy(uint8_t* entropy, const unsigned int* path,
         PRINTF("An error occurred while generating BIP85 entropy\n");
         return 0;
     }
-    PRINTF("Root key from device: \n%.*H\n", 32, entropy);
+    PRINTF("Root key from device: 32 bytes\n");
 
     // Generate BIP85 entropy from root key
     if (!bip85_entropy_from_key(entropy, entropy, BIP85_ENTROPY_LENGTH)) {
         memzero(entropy, BIP85_ENTROPY_LENGTH);
         LEDGER_ASSERT(false, "HMAC failed");
     }
-    PRINTF("BIP85 entropy from root key:\n%.*H\n", BIP85_ENTROPY_LENGTH,
-           entropy);
+    PRINTF("BIP85 entropy from root key: %u bytes\n", BIP85_ENTROPY_LENGTH);
 
     return 1;
 }
@@ -265,7 +264,7 @@ bool bolos_ux_bip85_drng_with_seed(uint8_t* seed, size_t seed_length,
         PRINTF("SHAKE256 hash error\n");
         return 0;
     }
-    PRINTF("BIP85 DRNG output:\n%.*H\n", digest_length, digest);
+    PRINTF("BIP85 DRNG output: %u bytes\n", digest_length);
 
     return 1;
 }
@@ -328,7 +327,7 @@ uint8_t bolos_ux_bip85_bip39(uint8_t* hex_out, uint8_t language, uint8_t words,
     memcpy(hex_out, buffer, words * 4 / 3);
     memzero(buffer, BIP85_ENTROPY_LENGTH);
 
-    PRINTF("BIP85 BIP39 hex output:\n%.*H\n", words * 4 / 3, hex_out);
+    PRINTF("BIP85 BIP39 hex output: %u bytes\n", words * 4 / 3);
     return words * 4 / 3;
 }
 
@@ -352,7 +351,7 @@ void bolos_ux_bip85_hex(uint8_t* hex_out, uint8_t num_bytes,
     memcpy(hex_out, buffer, num_bytes);
     memzero(buffer, BIP85_ENTROPY_LENGTH);
 
-    PRINTF("BIP85 HEX output:\n%.*H\n", num_bytes, hex_out);
+    PRINTF("BIP85 HEX output: %u bytes\n", num_bytes);
 }
 
 uint8_t bolos_ux_bip85_pwd_base64(char* pwd, uint8_t pwd_len,
@@ -384,7 +383,7 @@ uint8_t bolos_ux_bip85_pwd_base64(char* pwd, uint8_t pwd_len,
     memzero(buffer_ent, BIP85_ENTROPY_LENGTH);
     memzero(buffer_pwd, BASE64_ENCODE_LENGTH);
 
-    PRINTF("BIP85 PWD BASE64 output: %s\n", pwd);
+    PRINTF("BIP85 PWD BASE64 output: %u characters\n", pwd_len);
 
     return pwd_len;
 }
@@ -418,7 +417,7 @@ uint8_t bolos_ux_bip85_pwd_base85(char* pwd, uint8_t pwd_len,
     memzero(buffer_ent, BIP85_ENTROPY_LENGTH);
     memzero(buffer_pwd, BASE85_ENCODE_LENGTH);
 
-    PRINTF("BIP85 PWD BASE85 output: %s\n", pwd);
+    PRINTF("BIP85 PWD BASE85 output: %u characters\n", pwd_len);
 
     return pwd_len;
 }

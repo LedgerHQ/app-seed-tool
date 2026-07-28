@@ -75,7 +75,7 @@ bool compare_recovery_phrase(bool* reconstructed) {
         }
     }
 #endif
-    PRINTF("Input seed:\n %.*H\n", 64, buffer);
+    PRINTF("Input seed: 64 bytes\n");
 
     // get rootkey from hex-seed
     cx_hmac_sha512_t ctx;
@@ -87,7 +87,7 @@ bool compare_recovery_phrase(bool* reconstructed) {
     LEDGER_ASSERT(cx_hmac_no_throw((cx_hmac_t*)&ctx, CX_LAST, buffer, 64,
                                    buffer, 64) == CX_OK,
                   "HMAC failed");
-    PRINTF("Root key from input:\n%.*H\n", 64, buffer);
+    PRINTF("Root key from input: 64 bytes\n");
 
     // get rootkey from device's seed
     if (os_derive_bip32_no_throw(CX_CURVE_256K1, &empty_path, 0, buffer_device,
@@ -95,7 +95,7 @@ bool compare_recovery_phrase(bool* reconstructed) {
         PRINTF("An error occurred while comparing the recovery phrase\n");
         goto cleanup;
     }
-    PRINTF("Root key from device: \n%.*H\n", 64, buffer_device);
+    PRINTF("Root key from device: 64 bytes\n");
 
     // compare both rootkey
     result = os_secure_memcmp(buffer, buffer_device, 64) ? false : true;

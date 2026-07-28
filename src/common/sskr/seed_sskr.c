@@ -96,7 +96,7 @@ unsigned int bolos_ux_sskr_combine(unsigned char* sskr_shares_hex,
         return 0;
     }
 
-    PRINTF("SSKR decoded shares:\n %.*H\n", output_len, output);
+    PRINTF("SSKR decoded shares: %d bytes\n", output_len);
     return (unsigned int)output_len;
 }
 
@@ -106,8 +106,7 @@ void bolos_ux_sskr_to_seed_convert(unsigned char* sskr_shares_hex,
                                    unsigned char* words_buffer,
                                    unsigned int* words_buffer_length,
                                    unsigned char* seed) {
-    PRINTF("SSKR share in hex:\n %.*H\n", sskr_shares_hex_length,
-           sskr_shares_hex);
+    PRINTF("SSKR share in hex: %u bytes\n", sskr_shares_hex_length);
 
     uint8_t seed_buffer[SSKR_MAX_STRENGTH_BYTES] = {0};
     uint8_t seed_buffer_len =
@@ -142,7 +141,7 @@ unsigned int bolos_ux_sskr_generate(uint8_t groups_threshold,
         return 0;
     }
 
-    PRINTF("SSKR generate input:\n %.*H\n", seed_len, seed);
+    PRINTF("SSKR generate input: %u bytes\n", seed_len);
     // convert seed to SSKR shares
     int16_t share_count = sskr_generate_shards(
         groups_threshold, groups, groups_len, seed, seed_len, share_len,
@@ -159,7 +158,7 @@ unsigned int bolos_ux_sskr_generate(uint8_t groups_threshold,
         return 0;
     }
 
-    PRINTF("SSKR generate output:\n %.*H\n", share_buffer_len, share_buffer);
+    PRINTF("SSKR generate output: %u bytes\n", share_buffer_len);
 
     return share_count;
 }
@@ -185,7 +184,7 @@ unsigned int bolos_ux_sskr_share_hex_decode(unsigned char* input,
             output[position++] = ' ';
         }
     }
-    PRINTF("SSKR share:\n %.*s\n", output_len, output);
+    PRINTF("SSKR share: %u bytes\n", output_len);
     return position;
 }
 
@@ -434,13 +433,13 @@ size_t bolos_ux_sskr_fill_with_candidates(const unsigned char* startingChars,
                                           const size_t startingCharsLength,
                                           char wordCandidatesBuffer[],
                                           const char* wordIndexorBuffer[]) {
-    PRINTF("Calculating nb of words starting with '%s' (size is '%d')\n",
-           startingChars, startingCharsLength);
+    PRINTF("Calculating nb of words starting with a %u-character prefix\n",
+           startingCharsLength);
     const size_t nbMatchingWords =
         MIN(bolos_ux_sskr_get_word_count_starting_with(startingChars,
                                                        startingCharsLength),
             NB_MAX_SUGGESTION_BUTTONS);
-    PRINTF("'%d' words start with '%s'\n", nbMatchingWords, startingChars);
+    PRINTF("'%d' words start with the given prefix\n", nbMatchingWords);
     if (nbMatchingWords == 0) {
         return 0;
     }
@@ -465,11 +464,12 @@ uint32_t bolos_ux_sskr_get_keyboard_mask(const unsigned char* prefix,
     uint32_t existing_mask =
         1 << 28;  // Starting with the 'return' keypad activated
     unsigned char next_letters[ALPHABET_LENGTH] = {0};
-    PRINTF("Looking for letter candidates following '%s'\n", prefix);
+    PRINTF("Looking for letter candidates following a %u-character prefix\n",
+           prefixLength);
     const size_t nb_letters = bolos_ux_sskr_get_word_next_letters_starting_with(
         prefix, prefixLength, next_letters);
     next_letters[nb_letters] = '\0';
-    PRINTF("Next letters are in: %s\n", next_letters);
+    PRINTF("Found %u next-letter candidates\n", nb_letters);
     for (int i = 0; i < ALPHABET_LENGTH; i++) {
         for (size_t j = 0; j < nb_letters; j++) {
             if (KBD_LETTERS[i] == next_letters[j]) {
