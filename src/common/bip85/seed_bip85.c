@@ -233,9 +233,10 @@ bool bolos_ux_bip85_entropy(uint8_t* entropy, const unsigned int* path,
     PRINTF("Root key from device: \n%.*H\n", 32, entropy);
 
     // Generate BIP85 entropy from root key
-    LEDGER_ASSERT(
-        bip85_entropy_from_key(entropy, entropy, BIP85_ENTROPY_LENGTH),
-        "HMAC failed");
+    if (!bip85_entropy_from_key(entropy, entropy, BIP85_ENTROPY_LENGTH)) {
+        memzero(entropy, BIP85_ENTROPY_LENGTH);
+        LEDGER_ASSERT(false, "HMAC failed");
+    }
     PRINTF("BIP85 entropy from root key:\n%.*H\n", BIP85_ENTROPY_LENGTH,
            entropy);
 
@@ -292,12 +293,16 @@ void bolos_ux_bip85_drng_test(uint8_t* digest, size_t digest_length,
 
     uint8_t buffer[BIP85_ENTROPY_LENGTH];
 
-    LEDGER_ASSERT(bolos_ux_bip85_entropy(buffer, path, ARRAYLEN(path)) == 1,
-                  "BIP85 entropy failed");
+    if (bolos_ux_bip85_entropy(buffer, path, ARRAYLEN(path)) != 1) {
+        memzero(buffer, BIP85_ENTROPY_LENGTH);
+        LEDGER_ASSERT(false, "BIP85 entropy failed");
+    }
 
-    LEDGER_ASSERT(bolos_ux_bip85_drng_with_seed(buffer, BIP85_ENTROPY_LENGTH,
-                                                digest, digest_length) == 1,
-                  "BIP85 SHAKE256 hash failed");
+    if (bolos_ux_bip85_drng_with_seed(buffer, BIP85_ENTROPY_LENGTH, digest,
+                                      digest_length) != 1) {
+        memzero(buffer, BIP85_ENTROPY_LENGTH);
+        LEDGER_ASSERT(false, "BIP85 SHAKE256 hash failed");
+    }
 
     memzero(buffer, BIP85_ENTROPY_LENGTH);
 }
@@ -315,8 +320,10 @@ uint8_t bolos_ux_bip85_bip39(uint8_t* hex_out, uint8_t language, uint8_t words,
 
     uint8_t buffer[BIP85_ENTROPY_LENGTH];
 
-    LEDGER_ASSERT(bolos_ux_bip85_entropy(buffer, path, ARRAYLEN(path)) == 1,
-                  "BIP85 entropy failed");
+    if (bolos_ux_bip85_entropy(buffer, path, ARRAYLEN(path)) != 1) {
+        memzero(buffer, BIP85_ENTROPY_LENGTH);
+        LEDGER_ASSERT(false, "BIP85 entropy failed");
+    }
 
     memcpy(hex_out, buffer, words * 4 / 3);
     memzero(buffer, BIP85_ENTROPY_LENGTH);
@@ -337,8 +344,10 @@ void bolos_ux_bip85_hex(uint8_t* hex_out, uint8_t num_bytes,
 
     uint8_t buffer[BIP85_ENTROPY_LENGTH];
 
-    LEDGER_ASSERT(bolos_ux_bip85_entropy(buffer, path, ARRAYLEN(path)) == 1,
-                  "BIP85 entropy failed");
+    if (bolos_ux_bip85_entropy(buffer, path, ARRAYLEN(path)) != 1) {
+        memzero(buffer, BIP85_ENTROPY_LENGTH);
+        LEDGER_ASSERT(false, "BIP85 entropy failed");
+    }
 
     memcpy(hex_out, buffer, num_bytes);
     memzero(buffer, BIP85_ENTROPY_LENGTH);
@@ -357,14 +366,17 @@ uint8_t bolos_ux_bip85_pwd_base64(char* pwd, uint8_t pwd_len,
                                  0x80000000 | index};
     uint8_t buffer_ent[BIP85_ENTROPY_LENGTH];
 
-    LEDGER_ASSERT(bolos_ux_bip85_entropy(buffer_ent, path, ARRAYLEN(path)) == 1,
-                  "BIP85 entropy failed");
+    if (bolos_ux_bip85_entropy(buffer_ent, path, ARRAYLEN(path)) != 1) {
+        memzero(buffer_ent, BIP85_ENTROPY_LENGTH);
+        LEDGER_ASSERT(false, "BIP85 entropy failed");
+    }
 
     char buffer_pwd[BASE64_ENCODE_LENGTH];
 
-    LEDGER_ASSERT(
-        base64_encode_64bytes(buffer_ent, buffer_pwd) == BASE64_ENCODE_LENGTH,
-        "Base64 encoding failed");
+    if (base64_encode_64bytes(buffer_ent, buffer_pwd) != BASE64_ENCODE_LENGTH) {
+        memzero(buffer_ent, BIP85_ENTROPY_LENGTH);
+        LEDGER_ASSERT(false, "Base64 encoding failed");
+    }
 
     memcpy(pwd, buffer_pwd, pwd_len);
     pwd[pwd_len] = '\0';  // Add string termination character
@@ -388,14 +400,17 @@ uint8_t bolos_ux_bip85_pwd_base85(char* pwd, uint8_t pwd_len,
                                  0x80000000 | index};
     uint8_t buffer_ent[BIP85_ENTROPY_LENGTH];
 
-    LEDGER_ASSERT(bolos_ux_bip85_entropy(buffer_ent, path, ARRAYLEN(path)) == 1,
-                  "BIP85 entropy failed");
+    if (bolos_ux_bip85_entropy(buffer_ent, path, ARRAYLEN(path)) != 1) {
+        memzero(buffer_ent, BIP85_ENTROPY_LENGTH);
+        LEDGER_ASSERT(false, "BIP85 entropy failed");
+    }
 
     char buffer_pwd[BASE85_ENCODE_LENGTH];
 
-    LEDGER_ASSERT(
-        base85_encode_64bytes(buffer_ent, buffer_pwd) == BASE85_ENCODE_LENGTH,
-        "Base85 encoding failed");
+    if (base85_encode_64bytes(buffer_ent, buffer_pwd) != BASE85_ENCODE_LENGTH) {
+        memzero(buffer_ent, BIP85_ENTROPY_LENGTH);
+        LEDGER_ASSERT(false, "Base85 encoding failed");
+    }
 
     memcpy(pwd, buffer_pwd, pwd_len);
     pwd[pwd_len] = '\0';  // Add string termination character
@@ -422,8 +437,10 @@ int32_t bolos_ux_bip85_dice(uint32_t* out, size_t out_capacity, uint32_t sides,
 
     uint8_t buffer_ent[BIP85_ENTROPY_LENGTH];
 
-    LEDGER_ASSERT(bolos_ux_bip85_entropy(buffer_ent, path, ARRAYLEN(path)) == 1,
-                  "BIP85 entropy failed");
+    if (bolos_ux_bip85_entropy(buffer_ent, path, ARRAYLEN(path)) != 1) {
+        memzero(buffer_ent, BIP85_ENTROPY_LENGTH);
+        LEDGER_ASSERT(false, "BIP85 entropy failed");
+    }
 
     int32_t produced =
         bip85_dice_roll(out, out_capacity, sides, rolls, buffer_ent);
