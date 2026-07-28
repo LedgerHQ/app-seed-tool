@@ -14,7 +14,16 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  ********************************************************************************/
+#include <stddef.h>
 #include <stdint.h>
+#include <string.h>
+
+#include "./seed_rom_variables.h"
+#include "constants.h"
+
+#ifdef HAVE_SHA3
+#include <lcx_sha3.h>
+#endif
 
 /**
  * @brief Computes the number of bits needed to represent a DICE roll drawn
@@ -32,6 +41,79 @@
 uint8_t bip85_dice_bits_per_roll(uint32_t sides) {
     return (sizeof(sides) << 3) - __builtin_clz(sides - 1);
 }
+
+#ifdef HAVE_SHA3
+
+/**
+ * @brief Draws up to `rolls` values uniformly distributed in `[0, sides)`
+ * from a BIP85-derived seed.
+ *
+ * @details Kept outside the `HAVE_NBGL` guard below, and with external
+ * linkage, purely so it can be linked into a unit test against the real
+ * `cx_shake256_hash()` -- pure software, no BOLOS syscall -- without the
+ * NBGL headers the rest of this file needs. This is a direct extraction of
+ * the loop that used to live in `bolos_ux_bip85_dice()`: same single
+ * `BIP85_DRNG_MAX_DIGEST_SIZE`-byte digest, same rejection sampling, no
+ * behaviour change yet. Rejection sampling means the acceptance rate is
+ * not 100%, so this single fixed-size digest is not guaranteed to yield
+ * `rolls` values -- the return value reports how many it actually
+ * produced, which the caller must check.
+ *
+ * @param[out] out           Buffer to receive the dice results.
+ * @param[in]  out_capacity  Capacity of `out`, in elements.
+ * @param[in]  sides         Number of sides on the die.
+ * @param[in]  rolls         Number of rolls requested.
+ * @param[in]  seed          BIP85 entropy seed, `BIP85_ENTROPY_LENGTH`
+ * bytes.
+ *
+ * @return The number of rolls actually produced (`0 <= n <= rolls`), or a
+ * negative value on error:
+ * - `-1` if `out_capacity < rolls`;
+ * - `-2` if the SHAKE256 call failed.
+ */
+int32_t bip85_dice_roll(uint32_t* out, size_t out_capacity, uint32_t sides,
+                        uint32_t rolls,
+                        const uint8_t seed[BIP85_ENTROPY_LENGTH]) {
+    if (out_capacity < rolls) {
+        return -1;
+    }
+
+    uint8_t bits_per_roll = bip85_dice_bits_per_roll(sides);
+    uint8_t bytes_per_roll = (bits_per_roll + 7) >> 3;
+    uint8_t shift_amount = (bytes_per_roll << 3) - bits_per_roll;
+
+    uint8_t digest[BIP85_DRNG_MAX_DIGEST_SIZE];
+
+    if (cx_shake256_hash(seed, BIP85_ENTROPY_LENGTH, digest, sizeof(digest)) !=
+        CX_OK) {
+        return -2;
+    }
+
+    uint8_t* digest_ptr = digest;
+    uint32_t roll_index = 0;
+
+    while (roll_index < rolls &&
+           (size_t)(digest_ptr - digest) + bytes_per_roll <= sizeof(digest)) {
+        // Construct roll result from bytes_per_roll bytes
+        uint32_t roll_result = 0;
+        uint8_t* end_ptr = digest_ptr + bytes_per_roll;
+        while (digest_ptr < end_ptr) {
+            roll_result = roll_result << 8 | (uint32_t)*digest_ptr++;
+        }
+        // Adjust roll result to keep only bits_per_roll
+        roll_result >>= shift_amount;
+
+        // Check if roll result is within valid range
+        if (roll_result < sides) {
+            out[roll_index++] = roll_result;
+        }
+    }
+
+    explicit_bzero(digest, sizeof(digest));
+    return (int32_t)roll_index;
+}
+
+#endif  // HAVE_SHA3
 
 #if defined(HAVE_NBGL)
 #include <lcx_hmac.h>
