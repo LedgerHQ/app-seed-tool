@@ -49,6 +49,11 @@ ICON_APEX_P = icons/icon_seed_32px.png
 
 #DEFINES += HAVE_ELECTRUM
 
+# Whole-app stack canary written at init and checked on every I/O event loop
+# iteration on nanos-secure-sdk (io_seproxyhal_se_reset() on mismatch); write
+# path only, no observable app-side check, on newer SDKs (nanox/stax/flex/...).
+DEFINES += HAVE_BOLOS_APP_STACK_CANARY
+
 ifeq ($(TARGET_NAME),TARGET_NANOS)
     $(info Using BAGL)
     DISABLE_STANDARD_USB = 1
