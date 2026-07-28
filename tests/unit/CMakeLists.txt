@@ -210,6 +210,21 @@ add_executable(test_sskr_combine_error ./tests/sskr_combine_error.c ../../src/co
 target_include_directories(test_sskr_combine_error PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common)
 target_link_libraries(test_sskr_combine_error PUBLIC cmocka gcov sskr sss testutils)
 
+# Blockchain Commons 128-bit vector, raw Shamir math level (no CBOR/CRC).
+add_executable(test_sskr_interop_bc128 tests/sskr_interop_bc128.c)
+target_link_libraries(test_sskr_interop_bc128 PUBLIC cmocka gcov testutils sskr sss)
+# Unlike test_sskr (tests/sskr.c), this file never references a testutils
+# symbol directly (no cx_rng call: combine-only, no share generation), so
+# the linker's default --as-needed drops libtestutils.so from the resolved
+# set before it gets a chance to satisfy libsss.so's own undefined
+# references to cx_bn_*/cx_hmac_sha256 (sss.c's interpolation code).
+target_link_options(test_sskr_interop_bc128 PRIVATE -Wl,--no-as-needed)
+
+# Blockchain Commons 128-bit vector, ByteWords/CBOR level.
+add_executable(test_sskr_interop_bc128_bytewords ./tests/sskr_interop_bc128_bytewords.c ../../src/common/bip39/seed_rom_variables.c ../../src/common/bip39/seed_bip39.c ../../src/common/sskr/seed_rom_variables.c ../../src/common/sskr/seed_sskr.c)
+target_include_directories(test_sskr_interop_bc128_bytewords PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common)
+target_link_libraries(test_sskr_interop_bc128_bytewords PUBLIC cmocka gcov sskr sss testutils)
+
 add_executable(test_sskr_combine_invariants ./tests/sskr_combine_invariants.c ../../src/common/bip39/seed_rom_variables.c ../../src/common/bip39/seed_bip39.c ../../src/common/sskr/seed_rom_variables.c ../../src/common/sskr/seed_sskr.c)
 target_include_directories(test_sskr_combine_invariants PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common)
 target_link_libraries(test_sskr_combine_invariants PUBLIC cmocka gcov sskr sss testutils)
@@ -299,6 +314,6 @@ add_executable(test_bip85_bip39_entropy tests/bip85_bip39_entropy.c ../../src/co
 target_include_directories(test_bip85_bip39_entropy PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common)
 target_link_libraries(test_bip85_bip39_entropy PUBLIC cmocka gcov testutils)
 
-foreach(target test_sss test_sss_recover_erase_length test_sskr test_sskr_share_len test_sskr_memzero test_sskr_shard_count test_sskr_generate_split_error test_sskr_combine_bounds test_sskr_combine_error test_sskr_combine_invariants test_sskr_entry_bounds test_sskr_byteword_sentinel test_sskr_cbor_additional_info test_bip39 test_roundtrip test_words test_base64 test_base85 test_bip85_dice_bits_per_roll test_bip85_dice_roll test_bip85_bip39_entropy)
+foreach(target test_sss test_sss_recover_erase_length test_sskr test_sskr_share_len test_sskr_memzero test_sskr_shard_count test_sskr_generate_split_error test_sskr_combine_bounds test_sskr_combine_error test_sskr_combine_invariants test_sskr_interop_bc128 test_sskr_interop_bc128_bytewords test_sskr_entry_bounds test_sskr_byteword_sentinel test_sskr_cbor_additional_info test_bip39 test_roundtrip test_words test_base64 test_base85 test_bip85_dice_bits_per_roll test_bip85_dice_roll test_bip85_bip39_entropy)
     add_test(NAME ${target} COMMAND ${target})
 endforeach()
