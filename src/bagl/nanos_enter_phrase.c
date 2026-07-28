@@ -378,14 +378,31 @@ void screen_onboarding_restore_word_validate(void) {
         switch (G_bolos_ux_context.onboarding_step) {
             // 4th byte of CBOR header contains number of data bytes to follow
             case 3:
-                // SSKR bytes = 4 bytes CBOR + n bytes share + 4 bytes CRC
-                // checksum
-                G_bolos_ux_context.bip39_type =
-                    4 +
-                    (G_bolos_ux_context.sskr_words_buffer
+                if ((G_bolos_ux_context.sskr_words_buffer
                          [G_bolos_ux_context.sskr_words_buffer_length] &
-                     0x1F) +
-                    sizeof(uint32_t);
+                     0x1F) <= 24) {
+                    // SSKR bytes = 4 bytes CBOR + n bytes share + 4 bytes CRC
+                    // checksum. This is only a literal length for 0-23; 24
+                    // (one length byte follows) is corrected below once that
+                    // byte is read.
+                    G_bolos_ux_context.bip39_type =
+                        4 +
+                        (G_bolos_ux_context.sskr_words_buffer
+                             [G_bolos_ux_context.sskr_words_buffer_length] &
+                         0x1F) +
+                        sizeof(uint32_t);
+                } else {
+                    // 25-31 are reserved CBOR additional-info values
+                    // (two/four/eight-byte length, reserved, or indefinite
+                    // length) with no literal length of their own -- there is
+                    // nothing valid to compute here. Force the same maximum
+                    // bound used below for an out-of-range declared length,
+                    // so entry can still complete and
+                    // bolos_ux_sskr_hex_check() rejects it, instead of
+                    // treating the reserved value as if it encoded a
+                    // 25-to-31-byte payload.
+                    G_bolos_ux_context.bip39_type = SSKR_SHARE_MAX_WIRE_LENGTH;
+                }
                 break;
             case 4:
                 if ((G_bolos_ux_context.sskr_words_buffer[3] & 0x1F) == 24) {
