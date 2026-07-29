@@ -557,6 +557,7 @@ static int16_t sskr_combine_shards_internal(sskr_shard_t* shards,
     memzero(groups, sizeof(groups));
 
     if (error) {
+        memzero(buffer, buffer_len);
         return error;
     }
 
