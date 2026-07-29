@@ -14,7 +14,12 @@ usual process for whether/how to promote this further.
 
 - `rsp_client.py` — a ~100-line GDB Remote Serial Protocol client (stdlib
   only, no real `gdb` binary needed).
-- `verify_bip39_cancel_clears_buffer.py` — the check itself.
+- `verify_bip39_cancel_clears_buffer.py` — check #1: the `mnemonic` global
+  is cleared when the user cancels mid-entry on "Check BIP39".
+- `verify_compare_recovery_phrase_cleanup.py` — check #2: the two 64-byte
+  stack secrets in `compare_recovery_phrase()` (`src/common/common_seed.c`)
+  are cleared at its `cleanup:` label. See "What it checks (scenario 2)"
+  below.
 
 ## Prerequisites
 
@@ -31,13 +36,28 @@ usual process for whether/how to promote this further.
 
 ```bash
 python3 tests/speculos/verify_bip39_cancel_clears_buffer.py
+python3 tests/speculos/verify_compare_recovery_phrase_cleanup.py
 ```
 
-Takes a few minutes (see "Why is this so slow" below). Prints a snapshot
-table and a `PASS`/`FAIL` line, exits 1 on failure. The script starts and
-always tears down its own Speculos container (`speculos-bip39-cancel-test`)
+Takes a few minutes (see "Why is this so slow" below) for the first script.
+**The second one is much slower** — it types and confirms all 12 words of
+a full mnemonic instead of one partial word, and a full run has taken
+30+ minutes in practice. That is not a hang: the per-keystroke render
+round-trip through the SIGILL-passthrough overhead (gotcha #2) can run
+into the tens of seconds under load, and there is no per-word progress
+line in the script's own output to show it — if you need to confirm it's
+actually making progress rather than stuck, poll the container's screen
+state directly instead of waiting on stdout:
+```bash
+curl -s 'http://localhost:5002/events?currentscreenonly=true' | python3 -m json.tool
+```
+(the `"Enter word n. X/12..."` text tells you exactly which word it's on).
+
+Both scripts print a snapshot table and a `PASS`/`FAIL` line, exit 1 on
+failure, and start/always tear down their own Speculos container
+(`speculos-bip39-cancel-test` / `speculos-compare-recovery-phrase-cleanup-test`)
 — safe to re-run, and safe to Ctrl-C (though a stray container may need
-`docker rm -f speculos-bip39-cancel-test` after a hard interrupt).
+`docker rm -f <name>` after a hard interrupt).
 
 ## What it checks
 
@@ -80,6 +100,45 @@ FAIL: 'abandon' is still present in the mnemonic buffer after cancelling -- type
 That's a real bug (secret residue in RAM after the user cancelled) — not
 an infrastructure problem. Don't dismiss it as flakiness; the memory read
 happens synchronously at a breakpoint, there's no timing race to blame.
+
+## What it checks (scenario 2: `compare_recovery_phrase()` cleanup)
+
+`verify_compare_recovery_phrase_cleanup.py` closes the loop on a fix made
+earlier in this project's history purely by code review: three early
+returns in `compare_recovery_phrase()` (`src/common/common_seed.c`) were
+collapsed into a single `goto cleanup;`, but never actually exercised
+under a debugger until this script.
+
+"Check BIP39", flex layout: type and confirm all 12 words of a known
+128-bit test vector (`fly mule excess resource treat plunge nose soda
+reflect adult ramp planet` — the same one `tests/functional/
+test_bip39_12word.py` already uses, from `sskr-test-vector.md`). Speculos
+is booted with `-s "<that mnemonic>"` so the device's own seed matches
+what's typed — `compare_recovery_phrase()` then takes its match path, and
+its two 64-byte stack locals (`buffer`, the input-derived root key;
+`buffer_device`, the device's root key) both hold the exact same,
+independently computable secret right before cleanup:
+```python
+seed = hashlib.pbkdf2_hmac("sha512", mnemonic.encode(), b"mnemonic", 2048, dklen=64)
+root_key = hmac.new(b"Bitcoin seed", seed, hashlib.sha512).digest()
+```
+Confirming the 12th word triggers `bip39_mnemonic_check()`
+(`src/nbgl/bip39_mnemonic.c`) → `compare_recovery_phrase()` automatically;
+no further navigation is needed once both breakpoints fire.
+
+Unlike the `mnemonic`/`shares` globals check (scenario 1), there's no
+legitimate non-zero bookkeeping field living inside these two raw 64-byte
+arrays, so the pass condition here really is "reads as all-zero after
+cleanup", not just "no longer contains the specific secret".
+
+### What you'd see on a real failure
+
+`buffer` or `buffer_device` still containing the independently-computed
+root key (or just being non-all-zero) after the `after cleanup`
+breakpoint — the script prints which buffer and its hex on failure. That
+would mean a real regression in the `goto cleanup;` fix (e.g. a future
+edit reintroducing an early return that bypasses it) — not an
+infrastructure problem, same reasoning as scenario 1.
 
 ## Gotchas this script works around
 
@@ -182,9 +241,31 @@ in a single-scenario script like this one).
 
 `rsp_client.py` and the `MemorySampler` breakpoint-snapshot pattern in
 `verify_bip39_cancel_clears_buffer.py` are generic — reusable for other
-secret-buffer-lifecycle scenarios (SSKR shares, BIP-85 passwords, the
-stack-based `buffer[64]` in `compare_recovery_phrase()`, etc.) without
-needing to re-solve any of the four gotchas above. A stack buffer would
-need one more thing this script didn't: its address changes per call, so
-you'd resolve it the same way as `mnemonic` (register-relative, likely SP-
-or frame-pointer-relative) rather than reading a fixed offset once.
+secret-buffer-lifecycle scenarios (SSKR shares, BIP-85 passwords, etc.)
+without needing to re-solve any of the four gotchas above.
+
+### 5. Stack-local secrets (as opposed to globals) are SP-relative, and simpler than they look
+
+`verify_compare_recovery_phrase_cleanup.py` needed this for
+`compare_recovery_phrase()`'s `buffer`/`buffer_device` (both plain
+`uint8_t foo[64]` stack locals, not globals). Confirmed by disassembling
+the function (`objdump -d`, or `arm-none-eabi-objdump -d` if the image's
+default `objdump` can't disassemble ARM for you — see below): the
+prologue is `push {r4,r5,r7,lr}` then a single `sub sp, #N`, and every
+reference to a stack local in the function body compiles to `add rX, sp,
+#offset` — plain SP-relative, no frame pointer involved, *and* SP itself
+is stable for the entire function body (set once by that `sub`, restored
+only by the matching `add sp, #N` in the epilogue). That means, unlike a
+global's `R9`-relative address (gotcha #4), there's no separate "capture
+the frame base" step needed: read `regs[13]` (SP) directly at whichever
+breakpoint you've placed inside the function, add the fixed offset you
+got from the disassembly, done. This is simpler than register-relative
+globals, not harder — the speculation in an earlier version of this
+section ("likely SP- or frame-pointer-relative, to be confirmed") is now
+resolved: it's SP-relative, and it's stable.
+
+One extra gotcha specific to disassembly (not memory reads): the generic
+`objdump` in the `ledger-app-builder-lite` image can read section/symbol
+tables fine (`nm`, `readelf` work unprefixed) but fails to disassemble
+ARM code at all (`can't disassemble for architecture UNKNOWN`) — use
+`arm-none-eabi-objdump -d` explicitly for that.
