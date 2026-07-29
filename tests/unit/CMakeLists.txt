@@ -210,6 +210,16 @@ add_executable(test_sskr_combine_error ./tests/sskr_combine_error.c ../../src/co
 target_include_directories(test_sskr_combine_error PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common)
 target_link_libraries(test_sskr_combine_error PUBLIC cmocka gcov sskr sss testutils)
 
+# Built with AddressSanitizer: like test_sskr_combine_bounds, this is about
+# what the code writes (past the fixed-size `groups[SSKR_MAX_GROUP_COUNT]`
+# local array), not what it returns, so the sanitizer is the assertion for
+# the two oversized-groups_len cases.
+add_executable(test_sskr_generate_bound_groups ./tests/sskr_generate_bound_groups.c ../../src/common/bip39/seed_rom_variables.c ../../src/common/bip39/seed_bip39.c ../../src/common/sskr/seed_rom_variables.c ../../src/common/sskr/seed_sskr.c)
+target_include_directories(test_sskr_generate_bound_groups PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common/sskr/sss)
+target_compile_options(test_sskr_generate_bound_groups PRIVATE -fsanitize=address -fno-omit-frame-pointer)
+target_link_options(test_sskr_generate_bound_groups PRIVATE -fsanitize=address)
+target_link_libraries(test_sskr_generate_bound_groups PUBLIC cmocka gcov testutils sskr sss)
+
 # Blockchain Commons 128-bit vector, raw Shamir math level (no CBOR/CRC).
 add_executable(test_sskr_interop_bc128 tests/sskr_interop_bc128.c)
 target_link_libraries(test_sskr_interop_bc128 PUBLIC cmocka gcov testutils sskr sss)
@@ -321,6 +331,6 @@ add_executable(test_bip85_hex_vector tests/bip85_hex_vector.c ../../src/common/b
 target_include_directories(test_bip85_hex_vector PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src)
 target_link_libraries(test_bip85_hex_vector PUBLIC cmocka gcov testutils)
 
-foreach(target test_sss test_sss_recover_erase_length test_sskr test_sskr_share_len test_sskr_memzero test_sskr_shard_count test_sskr_generate_split_error test_sskr_combine_bounds test_sskr_combine_error test_sskr_combine_invariants test_sskr_interop_bc128 test_sskr_interop_bc128_bytewords test_sskr_entry_bounds test_sskr_byteword_sentinel test_sskr_cbor_additional_info test_bip39 test_roundtrip test_words test_base64 test_base85 test_bip85_dice_bits_per_roll test_bip85_dice_roll test_bip85_bip39_entropy test_bip85_hex_vector)
+foreach(target test_sss test_sss_recover_erase_length test_sskr test_sskr_share_len test_sskr_memzero test_sskr_shard_count test_sskr_generate_split_error test_sskr_generate_bound_groups test_sskr_combine_bounds test_sskr_combine_error test_sskr_combine_invariants test_sskr_interop_bc128 test_sskr_interop_bc128_bytewords test_sskr_entry_bounds test_sskr_byteword_sentinel test_sskr_cbor_additional_info test_bip39 test_roundtrip test_words test_base64 test_base85 test_bip85_dice_bits_per_roll test_bip85_dice_roll test_bip85_bip39_entropy test_bip85_hex_vector)
     add_test(NAME ${target} COMMAND ${target})
 endforeach()

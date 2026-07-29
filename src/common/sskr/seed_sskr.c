@@ -37,6 +37,9 @@
 int16_t bolos_ux_sskr_size_get(uint8_t bip39_type, uint8_t groups_threshold,
                                unsigned int* group_descriptor,
                                uint8_t groups_len, uint8_t* share_len) {
+    if (groups_len > SSKR_MAX_GROUP_COUNT) {
+        return SSKR_ERROR_INVALID_GROUP_LENGTH;
+    }
     sskr_group_descriptor_t groups[SSKR_MAX_GROUP_COUNT];
     for (uint8_t i = 0; i < groups_len; i++) {
         groups[i].threshold =
@@ -128,6 +131,9 @@ unsigned int bolos_ux_sskr_generate(uint8_t groups_threshold,
                                     unsigned int share_buffer_len,
                                     uint8_t share_len_expected,
                                     int16_t share_count_expected) {
+    if (groups_len > SSKR_MAX_GROUP_COUNT) {
+        return 0;
+    }
     sskr_group_descriptor_t groups[SSKR_MAX_GROUP_COUNT];
 
     for (uint8_t i = 0; i < (uint8_t)groups_len; i++) {
