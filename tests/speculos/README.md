@@ -18,6 +18,7 @@ touching secret-buffer lifecycle code in the NBGL UI layer.
 | `verify_compare_recovery_phrase_cleanup.py` | Check 2 — `compare_recovery_phrase()` stack secrets. |
 | `verify_sskr_share_cancel_clears_buffer.py` | Check 3 — SSKR share entry, cancel mid-word. |
 | `verify_sskr_generated_shares_dashboard_return.py` | Check 4 — generated SSKR shares, dashboard return. |
+| `verify_bip85_bip39_output_cleanup.py` | Check 5 — generated BIP-85 BIP39 output, dashboard return. |
 
 ## Prerequisites
 
@@ -37,6 +38,7 @@ python3 tests/speculos/verify_bip39_cancel_clears_buffer.py
 python3 tests/speculos/verify_compare_recovery_phrase_cleanup.py
 python3 tests/speculos/verify_sskr_share_cancel_clears_buffer.py
 python3 tests/speculos/verify_sskr_generated_shares_dashboard_return.py
+python3 tests/speculos/verify_bip85_bip39_output_cleanup.py
 ```
 
 | Script | Typical duration | Why |
@@ -45,6 +47,7 @@ python3 tests/speculos/verify_sskr_generated_shares_dashboard_return.py
 | Check 2 (`compare_recovery_phrase`) | 15–30+ minutes | Types and confirms a full 12-word mnemonic. |
 | Check 3 (SSKR cancel) | A few minutes | Types one word plus a couple of letters. |
 | Check 4 (generated shares) | 15–30+ minutes | Types the full 12-word mnemonic, then generates and pages through 3 shares. |
+| Check 5 (BIP-85 BIP39 output) | A few minutes | Button taps and one numeric-keypad entry only, no mnemonic typing. |
 
 The long runs are not hangs. Every guest syscall round-trips through this
 script while GDB is attached (see gotcha 2), and individual keystroke
@@ -60,12 +63,13 @@ curl -s 'http://localhost:5002/events?currentscreenonly=true' | python3 -m json.
 (the `"Enter word n. X/12..."` text shows exactly which word is in
 progress; the API port differs per script — see each script's `API_PORT`).
 
-All four scripts print a snapshot table and a `PASS`/`FAIL` line, exit 1 on
+All five scripts print a snapshot table and a `PASS`/`FAIL` line, exit 1 on
 failure, and always tear down their own Speculos container
 (`speculos-bip39-cancel-test` / `speculos-compare-recovery-phrase-cleanup-test`
-/ `speculos-sskr-cancel-test` / `speculos-sskr-generated-shares-reset-test`).
-Safe to re-run, and safe to Ctrl-C — though a stray container may need
-`docker rm -f <name>` after a hard interrupt.
+/ `speculos-sskr-cancel-test` / `speculos-sskr-generated-shares-reset-test`
+/ `speculos-bip85-bip39-output-cleanup-test`). Safe to re-run, and safe to
+Ctrl-C — though a stray container may need `docker rm -f <name>` after a
+hard interrupt.
 
 ## Checks
 
@@ -237,6 +241,60 @@ doesn't actually wipe), or — the more structurally interesting failure —
 script distinguishes these explicitly rather than lumping them into one
 generic `FAIL`, since they point at different bugs: a broken `memzero()`
 versus a missing call on some exit path.
+
+### Check 5 — Generated BIP-85 BIP39 output, dashboard return
+
+`verify_bip85_bip39_output_cleanup.py` covers the most sensitive of the
+three BIP-85 apps: `bip85_app_bip39_gen()` (`src/nbgl/bip85_app.c`)
+produces a real recovery-phrase-shaped mnemonic, not just a password. One
+call writes into two `static` globals: `app_data.buffer`
+(`src/nbgl/bip85_app.c`) with the raw derived entropy, then
+`mnemonic.buffer` (`src/nbgl/bip39_mnemonic.c` — the same static already
+watched by check 1) with the encoded phrase, via
+`bip39_mnemonic_encode(app_data.buffer, app_data.length)`.
+
+Flow: home → "BIP85 Generate" → "BIP39" → "12 words" → index `1` → review
+screen → "Done". No mnemonic typing is needed anywhere on this path (it is
+all button taps and one numeric-keypad entry), so a run takes a few
+minutes, not the 15–30+ of the checks that type a full 12-word phrase.
+
+**Clearing mechanism, confirmed by reading `ui.c`, not assumed going in:**
+the erase path is `reset_globals()` (`static`, called from `review_done()`
+after "Done" on the same `nbgl_useCaseGenericReview` widget already proven
+not to be bypassable, in check 4). `reset_globals()` is small enough that
+the compiler could plausibly inline it into its callers, so this script
+watches the two real, non-static functions it calls directly instead:
+`bip39_mnemonic_reset()` (already known from check 1) and
+`bip85_app_reset()` (new — confirmed to be a full
+`memzero(&app_data, sizeof(app_data))`, unlike `bip39_mnemonic_reset()`,
+which does the same for `mnemonic` but then deliberately leaves
+`current_word_index` at its `(size_t)-1` sentinel, exactly like check 1).
+Since `bip85_app_reset()` runs last in that sequence, its return is a
+clean point to snapshot both buffers at once.
+
+**On a real run**, `bip85_app_bip39_gen()` returned with real generated
+content in both buffers — the captured `mnemonic` bytes decode as
+`"reduce burger sign project owner gun caught clarify monster occur
+sustain hazard"`, a genuine 12-word phrase. After "Done",
+`bip85_app_reset()` fired and both buffers were clear: `app_data.buffer`
+(96/96 bytes) fully zero, and `mnemonic.buffer`'s phrase-text portion
+(the first 216 of its 324 bytes — the rest is the same bookkeeping tail as
+check 1: `length`/`current_word_index`/`word_lengths[]`/`final_size`)
+fully zero too, with only the expected sentinel in the excluded tail.
+
+**Non-obvious pitfall while building this check, worth recording:** an
+early version asserted the *entire* `mnemonic` struct must read all-zero
+after cleanup, reasoning from `bip85_app_reset()`'s own full-`memzero()`
+body — but `mnemonic` is cleared by `bip39_mnemonic_reset()`, not
+`bip85_app_reset()`, and that function's sentinel-setting behavior is
+exactly what check 1 already documents. The blanket "whole struct is
+zero" property from `app_data` does not carry over to `mnemonic`; each
+buffer's actual clearing function has to be checked on its own terms, not
+assumed uniform because they get wiped from the same reset path.
+
+**On a real failure**, either buffer still containing generated content
+after `bip85_app_reset()` fires — the script prints the offending bytes
+and distinguishes `app_data` from `mnemonic.buffer` explicitly.
 
 ## Gotchas
 
