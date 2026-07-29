@@ -84,11 +84,44 @@ static void test_dice_roll_extension_preserves_prior_rolls(void** state) {
                         sizeof(out_no_extension));
 }
 
+// out_capacity < rolls is checked before anything else -- the content of
+// seed/sides is irrelevant, and the function must return before writing
+// anything to out.
+static void test_dice_roll_rejects_insufficient_capacity(void** state) {
+    (void)state;
+
+    uint32_t out[5];
+    int32_t produced = bip85_dice_roll(out, 5, 2, 10, seed);
+
+    assert_int_equal(produced, -1);
+}
+
+// Each attempt re-derives the digest from scratch rather than accumulating
+// across attempts, so the most rolls any single attempt can ever produce is
+// bounded by its own digest length, not by the sum of all attempts. The
+// largest digest ever tried is BIP85_DRNG_MAX_DIGEST_SIZE (256) doubled
+// BIP85_DICE_MAX_DRNG_DOUBLINGS (3) times, i.e. 2048 bytes -- and at d2's
+// 100% acceptance rate (see the seed comment above), that is also the most
+// rolls that final attempt can produce. Asking for one more than that
+// (2049) therefore deterministically exhausts every attempt without ever
+// depending on chance.
+static void test_dice_roll_reports_drng_exhaustion(void** state) {
+    (void)state;
+
+    uint32_t out[2049];
+    int32_t produced =
+        bip85_dice_roll(out, sizeof(out) / sizeof(out[0]), 2, 2049, seed);
+
+    assert_int_equal(produced, -3);
+}
+
 int main(void) {
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(test_dice_roll_extends_past_256_bytes),
         cmocka_unit_test(test_dice_roll_exact_when_well_under_capacity),
         cmocka_unit_test(test_dice_roll_extension_preserves_prior_rolls),
+        cmocka_unit_test(test_dice_roll_rejects_insufficient_capacity),
+        cmocka_unit_test(test_dice_roll_reports_drng_exhaustion),
     };
     return cmocka_run_group_tests(tests, NULL, NULL);
 }
