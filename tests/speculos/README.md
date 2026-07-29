@@ -16,10 +16,11 @@ touching secret-buffer lifecycle code in the NBGL UI layer.
 - [Running](#running)
 - [Checks](#checks)
   - [Check 1 — BIP39 mnemonic buffer, cancel mid-entry](#check-1--bip39-mnemonic-buffer-cancel-mid-entry)
-  - [Check 2 — `compare_recovery_phrase()` stack secrets](#check-2--compare_recovery_phrase-stack-secrets)
+  - [Check 2 — `compare_recovery_phrase_finish()` buffer erasure](#check-2--compare_recovery_phrase_finish-buffer-erasure)
   - [Check 3 — SSKR share entry buffer, cancel mid-entry](#check-3--sskr-share-entry-buffer-cancel-mid-entry)
   - [Check 4 — Generated SSKR shares, dashboard return](#check-4--generated-sskr-shares-dashboard-return)
   - [Check 5 — Generated BIP-85 BIP39 output, dashboard return](#check-5--generated-bip-85-bip39-output-dashboard-return)
+  - [Check 6 — App reopen clears the mnemonic buffer](#check-6--app-reopen-clears-the-mnemonic-buffer)
 - [Gotchas](#gotchas)
   - [1. The published Speculos debug image is broken](#1-the-published-speculos-debug-image-is-broken)
   - [2. A live GDB connection freezes the app unless SIGILL is passed through](#2-a-live-gdb-connection-freezes-the-app-unless-sigill-is-passed-through)
@@ -34,10 +35,11 @@ touching secret-buffer lifecycle code in the NBGL UI layer.
 |---|---|
 | `rsp_client.py` | ~100-line GDB Remote Serial Protocol client (stdlib only, no `gdb` binary required). |
 | `verify_bip39_cancel_clears_buffer.py` | Check 1 — BIP39 mnemonic entry, cancel mid-word. |
-| `verify_compare_recovery_phrase_cleanup.py` | Check 2 — `compare_recovery_phrase()` stack secrets. |
+| `verify_compare_recovery_phrase_cleanup.py` | Check 2 — `compare_recovery_phrase_finish()` buffer erasure. |
 | `verify_sskr_share_cancel_clears_buffer.py` | Check 3 — SSKR share entry, cancel mid-word. |
 | `verify_sskr_generated_shares_dashboard_return.py` | Check 4 — generated SSKR shares, dashboard return. |
 | `verify_bip85_bip39_output_cleanup.py` | Check 5 — generated BIP-85 BIP39 output, dashboard return. |
+| `verify_app_reopen_clears_mnemonic.py` | Check 6 — app reopen, no residual mnemonic across a close/reopen. |
 
 ## Prerequisites
 
@@ -58,15 +60,17 @@ python3 tests/speculos/verify_compare_recovery_phrase_cleanup.py
 python3 tests/speculos/verify_sskr_share_cancel_clears_buffer.py
 python3 tests/speculos/verify_sskr_generated_shares_dashboard_return.py
 python3 tests/speculos/verify_bip85_bip39_output_cleanup.py
+python3 tests/speculos/verify_app_reopen_clears_mnemonic.py
 ```
 
 | Script | Typical duration | Why |
 |---|---|---|
 | Check 1 (BIP39 cancel) | A few minutes | Types one word only. |
-| Check 2 (`compare_recovery_phrase`) | 15–30+ minutes | Types and confirms a full 12-word mnemonic. |
+| Check 2 (`compare_recovery_phrase_finish`) | 15–30+ minutes | Types and confirms a full 12-word mnemonic. |
 | Check 3 (SSKR cancel) | A few minutes | Types one word plus a couple of letters. |
 | Check 4 (generated shares) | 15–30+ minutes | Types the full 12-word mnemonic, then generates and pages through 3 shares. |
 | Check 5 (BIP-85 BIP39 output) | A few minutes | Button taps and one numeric-keypad entry only, no mnemonic typing. |
+| Check 6 (app reopen) | 15–30+ minutes | Types and confirms a full 12-word mnemonic, then boots a second container. |
 
 The long runs are not hangs. Every guest syscall round-trips through this
 script while GDB is attached (see gotcha 2), and individual keystroke
@@ -82,21 +86,26 @@ curl -s 'http://localhost:5002/events?currentscreenonly=true' | python3 -m json.
 (the `"Enter word n. X/12..."` text shows exactly which word is in
 progress; the API port differs per script — see each script's `API_PORT`).
 
-All five scripts print a snapshot table and a `PASS`/`FAIL` line, exit 1 on
-failure, and always tear down their own Speculos container
+All six scripts print a snapshot table and a `PASS`/`FAIL` line, exit 1 on
+failure, and always tear down their own Speculos container(s)
 (`speculos-bip39-cancel-test` / `speculos-compare-recovery-phrase-cleanup-test`
 / `speculos-sskr-cancel-test` / `speculos-sskr-generated-shares-reset-test`
-/ `speculos-bip85-bip39-output-cleanup-test`). Safe to re-run, and safe to
-Ctrl-C — though a stray container may need `docker rm -f <name>` after a
-hard interrupt.
+/ `speculos-bip85-bip39-output-cleanup-test` /
+`speculos-app-reopen-test-1`+`speculos-app-reopen-test-2`, check 6 being the
+one script that runs two containers, one after the other). Safe to re-run,
+and safe to Ctrl-C — though a stray container may need `docker rm -f <name>`
+after a hard interrupt.
 
 ## Checks
 
 Each check follows the same shape: what screen/flow it drives, which
 function actually does the clearing (confirmed by reading the code, never
-assumed), and what a real failure looks like. All four read memory via
+assumed), and what a real failure looks like. All read memory via
 synchronous breakpoints, not a timing-based sample — a reported `FAIL` is a
-real regression, not flakiness.
+real regression, not flakiness. Check 6 is the one exception to "which
+function actually does the clearing": it verifies a platform guarantee (RAM
+reset across an app close/reopen), not this app's own cleanup code — see its
+section below for why that distinction matters.
 
 ### Check 1 — BIP39 mnemonic buffer, cancel mid-entry
 
@@ -131,23 +140,54 @@ FAIL: 'abandon' is still present in the mnemonic buffer after cancelling -- type
   6162616e646f6e00...
 ```
 
-### Check 2 — `compare_recovery_phrase()` stack secrets
+### Check 2 — `compare_recovery_phrase_finish()` buffer erasure
 
 `verify_compare_recovery_phrase_cleanup.py`. Closes the loop on a fix made
 earlier in this project purely by code review: three early returns in
 `compare_recovery_phrase()` (`src/common/common_seed.c`) were collapsed
 into a single `goto cleanup;`, but were never exercised under a debugger
-until this script.
+until this script was first written.
+
+**Mechanism update.** `compare_recovery_phrase()`'s tail — everything
+after the device-seed derivation, including both `explicit_bzero()` calls
+this check watches — has since been extracted into its own function,
+`compare_recovery_phrase_finish(cx_err_t derivation_status, uint8_t
+buffer[64], uint8_t buffer_device[64])`, so the derivation-failure path
+could get unit-test coverage on host (the syscall itself still can't be).
+Confirmed by disassembly (`arm-none-eabi-nm -S` on the `flex` build), not
+assumed: this stayed a real, separate symbol rather than being inlined
+back into its one caller —
+
+```
+c0de08d4 000000a8 T compare_recovery_phrase
+c0de08a2 00000030 T compare_recovery_phrase_finish
+```
+
+— so this script's breakpoints now resolve `compare_recovery_phrase_finish`
+and disassemble *that* function instead of `compare_recovery_phrase`
+itself. The user-visible behavior this check verifies is unchanged (both
+buffers are still erased on the same path); only where the two
+`explicit_bzero()` calls physically live moved. This also simplified the
+addressing: `compare_recovery_phrase_finish()` receives `buffer`/
+`buffer_device` as plain pointer arguments rather than declaring them as
+its own stack-local arrays, so its prologue is a bare `push
+{r4,r5,r6,lr}` with no `sub sp, #N` at all — the compiler keeps both
+pointers in call-preserved registers for the function's whole body instead
+of spilling them to the stack. That means this check no longer needs
+gotcha 5's SP-relative-offset approach: it reads the two argument
+registers directly at each breakpoint (which register holds which buffer
+is read back from the disassembly, not hardcoded — see
+`resolve_cleanup_breakpoints()`).
 
 On "Check BIP39": type and confirm all 12 words of a known 128-bit test
 vector (`fly mule excess resource treat plunge nose soda reflect adult
 ramp planet` — the same one `tests/functional/test_bip39_12word.py` uses,
 sourced from `sskr-test-vector.md`). Speculos boots with `-s "<that
 mnemonic>"` so the device's own seed matches what is typed;
-`compare_recovery_phrase()` then takes its match path, and its two 64-byte
-stack locals (`buffer`, the input-derived root key; `buffer_device`, the
-device's root key) both hold the same, independently computable secret
-right before cleanup:
+`compare_recovery_phrase()` then takes its match path and calls
+`compare_recovery_phrase_finish()`, whose two 64-byte buffers (`buffer`,
+the input-derived root key; `buffer_device`, the device's root key) both
+hold the same, independently computable secret right before erasure:
 
 ```python
 seed = hashlib.pbkdf2_hmac("sha512", mnemonic.encode(), b"mnemonic", 2048, dklen=64)
@@ -155,19 +195,20 @@ root_key = hmac.new(b"Bitcoin seed", seed, hashlib.sha512).digest()
 ```
 
 Confirming the 12th word triggers `bip39_mnemonic_check()`
-(`src/nbgl/bip39_mnemonic.c`) → `compare_recovery_phrase()` automatically;
-no further navigation is needed once both breakpoints fire.
+(`src/nbgl/bip39_mnemonic.c`) → `compare_recovery_phrase()` →
+`compare_recovery_phrase_finish()` automatically; no further navigation is
+needed once both breakpoints fire.
 
 Unlike the global-buffer checks (1 and 3), neither `buffer` nor
 `buffer_device` has a legitimate non-zero bookkeeping field, so the pass
-condition here is "reads as all-zero after cleanup", not just "no longer
+condition here is "reads as all-zero after erasure", not just "no longer
 contains the specific secret".
 
 **On a real failure**, `buffer` or `buffer_device` still contains the
 independently-computed root key (or is simply non-zero) after the
 `after cleanup` breakpoint; the script prints the offending buffer and its
-hex. That would mean a regression in the `goto cleanup;` fix — for example
-a future edit reintroducing an early return that bypasses it.
+hex. That would mean a regression in the buffer-erasure logic — for
+example a future edit reintroducing an early return that bypasses it.
 
 ### Check 3 — SSKR share entry buffer, cancel mid-entry
 
@@ -315,6 +356,77 @@ assumed uniform because they get wiped from the same reset path.
 after `bip85_app_reset()` fires — the script prints the offending bytes
 and distinguishes `app_data` from `mnemonic.buffer` explicitly.
 
+### Check 6 — App reopen clears the mnemonic buffer
+
+`verify_app_reopen_clears_mnemonic.py` is different in kind from checks 1-5.
+`git grep -n "nvm_write\|nvm_erase" -- src/` finds nothing: this app never
+writes to NVM/flash, so every secret buffer — the `mnemonic` global watched
+here included — lives exclusively in RAM. The only way a secret could
+survive an app close-then-reopen is if BOLOS does not actually reset that
+RAM when (re)loading the app process — a platform guarantee, not something
+this app's own code controls. This script verifies that guarantee
+empirically rather than looking for an application bug.
+
+Flow: start a first Speculos container, type and confirm all 12 words of the
+same test mnemonic used by check 2 (`fly mule excess resource treat plunge
+nose soda reflect adult ramp planet`) on "Check BIP39", then read the real
+`mnemonic` buffer at the return of `bip39_mnemonic_check()`
+(`src/nbgl/bip39_mnemonic.c`) — the point furthest into the flow where the
+buffer is still guaranteed to hold the full typed phrase, since that
+function deliberately does not reset it on a valid-checksum path ("Don't
+clear the mnemonic just yet as we may need it to generate BIP39 mnemonic").
+Tear that container down entirely, start a second, completely independent
+container from the same `app.elf` (no shared volumes/state with the first),
+and read the same global — its `R9`-relative address re-resolved from
+scratch, never assumed identical to the first session, see gotcha 4 — before
+any simulated user interaction, at the entry of `ui_idle_init()` /
+`display_home_page()` (`src/nbgl/ui.c`), the very first UI code a fresh
+process runs at boot.
+
+**Why `docker stop`/`rm` rather than tapping the real "Quit app" action,
+decided deliberately, not a shortcut for lack of trying:** `on_quit()`
+(`src/nbgl/ui.c`, `os_sched_exit(-1)`) is trivially reachable — confirmed
+empirically, it is a "Quit app" footer link directly on the home screen
+(`nbgl_useCaseHomeAndSettings`) — but reaching it from the
+just-confirmed-12-words state requires first navigating back to the
+dashboard, and `display_home_page()` unconditionally calls
+`reset_globals()` (→ `bip39_mnemonic_reset()`) as its first statement,
+before it ever draws that screen. Doing that would wipe the buffer with this
+app's own defense-in-depth code (already verified by checks 1/4/5) before
+the platform-level guarantee under test is ever exercised — a `PASS` reached
+that way would be ambiguous (clean because of BOLOS, or clean because of
+application code that had nothing to do with the platform question this
+script asks?). Tearing the first container down directly, right after the
+sanity-check read, keeps the buffer populated with real content up to the
+moment the first process actually disappears — the more rigorous test.
+Symmetrically, the second container's read point is deliberately
+`ui_idle_init()`'s entry rather than "as soon as GDB can attach": reading
+after `display_home_page()`'s own `reset_globals()` call would let this
+fresh process's own init code launder away whatever the loader actually
+left behind, which is exactly what this script needs to observe untouched.
+
+**On a real run**, the first container's buffer at `bip39_mnemonic_check()`
+return held the full typed phrase (88/324 bytes nonzero — the 73-byte phrase
+text plus the same non-secret bookkeeping tail documented in check 5:
+`length`/`current_word_index`/`word_lengths[]`/`final_size`):
+
+```
+666c79206d756c6520657863657373207265736f7572636520747265617420706c756e6765...
+```
+(decodes as `"fly mule excess resource treat plunge nose soda reflect adult
+ramp planet"`, followed by zero padding and the expected bookkeeping tail).
+The second container's buffer, read at `ui_idle_init()` entry before any
+interaction (with a freshly re-resolved `R9`, confirmed different from the
+first container's), was entirely zero (0/324 bytes nonzero) — `PASS`.
+
+**On a real failure** (any of the first session's 12 typed words present in
+the second container's buffer): do not treat this as a routine one-line
+application fix. Possible causes range from a test-infrastructure artifact
+(unintended shared state between the two Docker containers, a wrong address
+resolution reading the wrong buffer) to something genuinely significant
+about BOLOS's RAM loading/initialization under Speculos — either way, this
+warrants understanding before proposing any fix.
+
 ## Gotchas
 
 None of the following was documented anywhere before these scripts
@@ -403,21 +515,40 @@ was actually built.
 
 ### 5. Stack-local secrets are SP-relative, and simpler than globals
 
-`verify_compare_recovery_phrase_cleanup.py` needed this for
+`verify_compare_recovery_phrase_cleanup.py` originally needed this for
 `compare_recovery_phrase()`'s `buffer`/`buffer_device` (plain
 `uint8_t foo[64]` stack locals, not globals). Confirmed by disassembling
 the function (`arm-none-eabi-objdump -d`; see the note below on why the
-generic `objdump` cannot be used here): the prologue is
+generic `objdump` cannot be used here): the prologue was
 `push {r4,r5,r7,lr}` then a single `sub sp, #N`, and every reference to a
-stack local in the function body compiles to `add rX, sp, #offset` — plain
-SP-relative, no frame pointer involved. SP itself is stable for the entire
-function body, set once by that `sub` and restored only by the matching
-`add sp, #N` in the epilogue. Unlike a global's `R9`-relative address
-(gotcha 4), no separate "capture the frame base" step is needed: read
-`regs[13]` (SP) directly at whichever breakpoint is placed inside the
+stack local in the function body compiled to `add rX, sp, #offset` — plain
+SP-relative, no frame pointer involved. SP itself was stable for the
+entire function body, set once by that `sub` and restored only by the
+matching `add sp, #N` in the epilogue. Unlike a global's `R9`-relative
+address (gotcha 4), no separate "capture the frame base" step was needed:
+read `regs[13]` (SP) directly at whichever breakpoint is placed inside the
 function, add the fixed offset from the disassembly. This is simpler than
 register-relative globals, not harder — it is SP-relative, and stable for
 the whole call.
+
+**Update: this no longer describes how Check 2 locates its two buffers.**
+Since `compare_recovery_phrase()`'s tail (the two `explicit_bzero()` calls)
+was extracted into `compare_recovery_phrase_finish()` — see Check 2 above
+— `buffer`/`buffer_device` arrive there as plain pointer *arguments*
+rather than that function's own stack-local arrays, and its prologue
+(`push {r4,r5,r6,lr}`, no `sub sp, #N` at all) has no stack frame to be
+SP-relative *into* in the first place. The compiler instead keeps both
+pointers in call-preserved registers for the whole function body — an
+even simpler case than the SP-relative one above: read the two argument
+registers directly at either breakpoint and dereference them, no offset
+arithmetic at all. Which register holds which buffer is read back from
+each call's `mov r0, rN` in the disassembly (see
+`resolve_cleanup_breakpoints()` in `verify_compare_recovery_phrase_cleanup.py`),
+not hardcoded — the pattern in this gotcha (SP-relative stack locals) is
+kept here as-is because it remains the right approach for a genuine
+stack-local secret in a function with its own frame; a future check
+should use whichever of the two actually matches what disassembly shows
+for its target function, not assume either one.
 
 Disassembly note: the generic `objdump` in the `ledger-app-builder-lite`
 image reads section/symbol tables fine (`nm`, `readelf` work unprefixed)
@@ -436,7 +567,11 @@ Ragger's navigator/backend layer, and mixing the two would add coupling
 for no benefit in single-scenario scripts like these.
 
 `rsp_client.py` and the `MemorySampler` breakpoint-snapshot pattern are
-generic and are reused as-is across checks 1, 3, and 4 (all R9-relative
+generic and are reused as-is across checks 1, 3, 4, and 6 (all R9-relative
 globals) and adapted for check 2 (SP-relative stack locals, gotcha 5).
 They remain applicable to other secret-buffer-lifecycle scenarios, such as
 BIP-85 passwords, without needing to re-solve any of the gotchas above.
+Check 6 additionally shows the pattern extends cleanly to a two-container
+scenario (a "before" process and an independent "after" process) with no new
+Speculos/GDB gotcha of its own — only the address re-resolution already
+required per-run by gotcha 4.

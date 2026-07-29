@@ -1,22 +1,29 @@
 #!/usr/bin/env python3
-"""Speculos regression check: compare_recovery_phrase() must not leave the
-derived root key sitting in RAM after it reaches its cleanup label.
+"""Speculos regression check: compare_recovery_phrase_finish() must not
+leave the derived root key sitting in RAM after it erases both buffers.
 
 Scenario: on the "Check BIP39" screen, type and confirm all 12 words of a
 known test mnemonic. Confirming the 12th word triggers
 bip39_mnemonic_check() (src/nbgl/bip39_mnemonic.c), which calls
 compare_recovery_phrase() (src/common/common_seed.c) -- the function fixed
 earlier in this project's history by collapsing three early returns into a
-single `goto cleanup;`, verified only by code review until this script.
+single `goto cleanup;`, verified only by code review until this script was
+first written. compare_recovery_phrase() now delegates everything past the
+device-seed derivation to compare_recovery_phrase_finish(), a plain
+function taking both buffers as pointer arguments (extracted so the
+derivation-failure path could be covered on host too, see the unit test
+this shares a commit with) -- this script's breakpoints now sit inside
+that extracted function instead, since that is where the two erasures
+this check cares about actually run today.
 
-compare_recovery_phrase() has two 64-byte stack locals:
+compare_recovery_phrase_finish() receives two 64-byte buffers by pointer:
   - `buffer`: filled with the BIP39 seed derived from the typed mnemonic,
     then overwritten in place with HMAC-SHA512("Bitcoin seed", seed) -- the
     root key derived from the *input*.
   - `buffer_device`: the device's own root key, from
     os_derive_bip32_no_throw().
-Both are supposed to be wiped by two back-to-back explicit_bzero() calls at
-the `cleanup:` label before the function returns.
+Both are supposed to be wiped by two back-to-back explicit_bzero() calls
+before the function returns.
 
 Speculos is booted with `-s <mnemonic>` (the same 128-bit BlockchainCommons
 test vector already used by tests/functional/test_bip39_12word.py), so the
@@ -32,13 +39,15 @@ Usage:
     python3 tests/speculos/verify_compare_recovery_phrase_cleanup.py
 
 Exit code 0 and "PASS" if neither buffer contains the root key (and both
-read all-zero) after compare_recovery_phrase() reaches its cleanup label.
+read all-zero) after compare_recovery_phrase_finish() erases them.
 Exit code 1 and "FAIL" otherwise -- a real bug (a derived root key staying
 resident in RAM after the comparison is done), not a test infra problem.
 
 See README.md in this directory for the Speculos/GDB gotchas this script
-relies on (shared with verify_bip39_cancel_clears_buffer.py), and the new
-entry on SP-relative stack-local addressing added for this script.
+relies on (shared with verify_bip39_cancel_clears_buffer.py), and the
+entry on register-argument addressing this script now uses instead of the
+SP-relative stack-local approach it used before the buffers moved into
+their own function.
 """
 import hashlib
 import hmac
@@ -126,40 +135,51 @@ def docker_run_tool(*args):
     ).stdout
 
 
-def resolve_compare_recovery_phrase():
-    """nm -S the built ELF for compare_recovery_phrase's link address and
-    size -- never hardcoded, they shift on any source change to this
-    function."""
+def resolve_symbol(name):
+    """nm -S the built ELF for a function's link address and size -- never
+    hardcoded, they shift on any source change to that function."""
     out = docker_run_tool("nm", "-S", "/app/app.elf")
     for line in out.splitlines():
         parts = line.split()
-        if len(parts) == 4 and parts[3] == "compare_recovery_phrase":
+        if len(parts) == 4 and parts[3] == name:
             return int(parts[0], 16) & ~1, int(parts[1], 16)
-    die("could not resolve compare_recovery_phrase in app.elf "
+    die(f"could not resolve {name} in app.elf "
         "(did common_seed.c change the function name?)")
 
 
 def resolve_cleanup_breakpoints(link_addr, size):
-    """Disassemble compare_recovery_phrase (arm-none-eabi-objdump -- the
-    generic `objdump` in this image can't disassemble ARM, see README.md)
-    and locate the two explicit_bzero() calls that implement the
-    `cleanup:` label. Returns (before_link_addr, after_link_addr,
-    buffer_device_offset, buffer_offset):
+    """Disassemble compare_recovery_phrase_finish (arm-none-eabi-objdump --
+    the generic `objdump` in this image can't disassemble ARM, see
+    README.md) and locate the two explicit_bzero() calls that implement
+    what used to be compare_recovery_phrase()'s `cleanup:` label, before
+    that tail was split into its own function (see README.md Check 2 for
+    why the two calls now live here instead). Returns (before_link_addr,
+    after_link_addr, buffer_device_reg, buffer_reg):
 
     - before_link_addr: address of the *first* `bl ... <explicit_bzero>`
       instruction itself -- fires before either call has run, so both
-      stack buffers still hold whatever secret was actually computed.
+      buffers still hold whatever secret was actually computed.
     - after_link_addr: address of the disassembly line immediately
       following the *second* `bl ... <explicit_bzero>` -- both calls have
       completed by the time this fires.
-    - the two offsets are read back from the `add rX, sp, #N` immediately
-      preceding each bl, as a sanity check that the two calls really do
-      target the two known 64-byte stack locals (buffer_device then
-      buffer, per the source's cleanup: order) rather than something else.
+    - buffer_device_reg/buffer_reg: the register numbers (e.g. 5, 4) each
+      call's `mov r0, rN` loads its first argument from, read back from
+      the `mov r0, rN` immediately preceding each bl. Unlike
+      compare_recovery_phrase() itself, this function receives buffer/
+      buffer_device as plain pointer arguments (not local stack arrays),
+      so the compiler keeps them in call-preserved registers across both
+      calls instead of spilling them to the stack -- confirmed by
+      disassembly, not assumed: this function's prologue is
+      `push {r4,r5,r6,lr}` with no `sub sp, #N` at all, so there is no
+      per-buffer SP offset to resolve here, unlike the SP-relative
+      approach Check 1/3's globals and this function's own former host
+      (compare_recovery_phrase()) need -- see README.md gotcha 5.
 
-    Nothing here is hardcoded as a raw address -- only the function's own
-    resolved link_addr/size (from resolve_compare_recovery_phrase) are used
-    to bound the disassembly window.
+    Nothing here is hardcoded as a raw address or register number --
+    only the function's own resolved link_addr/size (from
+    resolve_symbol("compare_recovery_phrase_finish")) are used to bound
+    the disassembly window, and the register numbers are read back from
+    the disassembly itself.
     """
     out = docker_run_tool(
         "arm-none-eabi-objdump", "-d",
@@ -175,29 +195,29 @@ def resolve_cleanup_breakpoints(link_addr, size):
             lines.append((int(m.group(1), 16), m.group(2)))
 
     bl_bzero_re = re.compile(r"bl\s+\S+\s+<explicit_bzero>")
-    add_sp_re = re.compile(r"add(?:\.w)?\s+r\d+,\s*sp,\s*#(\d+)")
+    mov_r0_re = re.compile(r"mov\s+r0,\s*r(\d+)")
 
     bl_indices = [i for i, (_, text) in enumerate(lines)
                   if bl_bzero_re.search(text)]
     if len(bl_indices) != 2:
         die(f"expected exactly 2 explicit_bzero() calls in "
-            f"compare_recovery_phrase, found {len(bl_indices)} -- the "
-            "function's cleanup path changed, this script needs "
+            f"compare_recovery_phrase_finish, found {len(bl_indices)} -- "
+            "the function's cleanup path changed, this script needs "
             "re-checking by hand")
 
-    offsets = []
+    regs = []
     for idx in bl_indices:
-        offset = None
+        reg = None
         for j in range(idx - 1, max(idx - 4, -1), -1):
-            m = add_sp_re.search(lines[j][1])
+            m = mov_r0_re.search(lines[j][1])
             if m:
-                offset = int(m.group(1))
+                reg = int(m.group(1))
                 break
-        if offset is None:
-            die("could not find the 'add rX, sp, #N' feeding one of the "
+        if reg is None:
+            die("could not find the 'mov r0, rN' feeding one of the "
                 "explicit_bzero() calls -- compiler codegen changed, this "
                 "script needs re-checking by hand")
-        offsets.append(offset)
+        regs.append(reg)
 
     before_addr = lines[bl_indices[0]][0]
     after_idx = bl_indices[1] + 1
@@ -206,12 +226,12 @@ def resolve_cleanup_breakpoints(link_addr, size):
             "-- disassembly window too narrow")
     after_addr = lines[after_idx][0]
 
-    buffer_device_offset, buffer_offset = offsets
+    buffer_device_reg, buffer_reg = regs
     print(f"  cleanup: found at 0x{before_addr:x} (link), first "
-          f"explicit_bzero(sp+{buffer_device_offset}, 64) [buffer_device], "
-          f"second explicit_bzero(sp+{buffer_offset}, 64) [buffer]")
+          f"explicit_bzero(r{buffer_device_reg}, 64) [buffer_device], "
+          f"second explicit_bzero(r{buffer_reg}, 64) [buffer]")
     print(f"  post-cleanup instruction at 0x{after_addr:x} (link)")
-    return before_addr, after_addr, buffer_device_offset, buffer_offset
+    return before_addr, after_addr, buffer_device_reg, buffer_reg
 
 
 def code_runtime_addr(link_addr):
@@ -275,23 +295,29 @@ def screen_texts():
 class MemorySampler:
     """Runs the app to completion under GDB (SIGILL-passthrough, see
     README.md gotcha #2), and takes a synchronous memory snapshot of both
-    `buffer` and `buffer_device` at the two resolved cleanup breakpoints.
+    `buffer` and `buffer_device` at the two resolved cleanup breakpoints,
+    both now inside compare_recovery_phrase_finish() (see README.md
+    Check 2).
 
     Unlike verify_bip39_cancel_clears_buffer.py's MemorySampler (which
     watches R9-relative globals and needs an LR-based return breakpoint to
-    catch a function's exit), these are SP-relative stack locals inside a
-    single function body: SP is stable for the whole body (set once by the
-    prologue's `sub sp, #488`, restored only by the epilogue), so it can be
-    read directly off `regs[13]` at either breakpoint -- no separate
-    "capture the frame base" step, no return-address bookkeeping.
+    catch a function's exit) and unlike this same check's own previous
+    approach (SP-relative stack locals inside compare_recovery_phrase()
+    itself), buffer/buffer_device arrive here as plain pointer arguments
+    that the compiler keeps in two call-preserved registers for the whole
+    function body (confirmed by disassembly, see
+    resolve_cleanup_breakpoints -- no stack frame at all, so no per-buffer
+    offset to add to anything): read those two registers directly at
+    either breakpoint and dereference them, no SP/frame-base bookkeeping
+    needed at all.
     """
 
-    def __init__(self, before_addr, after_addr, buffer_device_offset, buffer_offset):
+    def __init__(self, before_addr, after_addr, buffer_device_reg, buffer_reg):
         self.rsp = RSP(port=GDB_PORT, timeout=SOCKET_TIMEOUT)
         self.before_addr = before_addr
         self.after_addr = after_addr
-        self.buffer_device_offset = buffer_device_offset
-        self.buffer_offset = buffer_offset
+        self.buffer_device_reg = buffer_device_reg
+        self.buffer_reg = buffer_reg
         self.snapshots = {}  # "before"/"after" -> (buffer, buffer_device)
         self._thread = threading.Thread(target=self._pump, daemon=True)
 
@@ -301,9 +327,9 @@ class MemorySampler:
         self.rsp.cont()
         self._thread.start()
 
-    def _sample(self, sp):
-        buffer = self.rsp.read_mem(sp + self.buffer_offset, 64)
-        buffer_device = self.rsp.read_mem(sp + self.buffer_device_offset, 64)
+    def _sample(self, regs):
+        buffer = self.rsp.read_mem(regs[self.buffer_reg], 64)
+        buffer_device = self.rsp.read_mem(regs[self.buffer_device_reg], 64)
         return buffer, buffer_device
 
     def _pump(self):
@@ -322,17 +348,16 @@ class MemorySampler:
 
                 regs = self.rsp.read_regs()
                 pc = regs[15] & ~1
-                sp = regs[13]
 
                 if pc == self.before_addr and "before" not in self.snapshots:
-                    self.snapshots["before"] = self._sample(sp)
+                    self.snapshots["before"] = self._sample(regs)
                     self.rsp.remove_bp(pc, kind=2)
                     self.rsp.step()
                     self.rsp.cont()
                     continue
 
                 if pc == self.after_addr and "after" not in self.snapshots:
-                    self.snapshots["after"] = self._sample(sp)
+                    self.snapshots["after"] = self._sample(regs)
                     self.rsp.remove_bp(pc, kind=2)
                     self.rsp.step()
                     self.rsp.cont()
@@ -396,10 +421,10 @@ def navigate_and_check():
 
 def main():
     check_build()
-    print("Resolving compare_recovery_phrase from build/flex/bin/app.elf ...")
-    link_addr, size = resolve_compare_recovery_phrase()
-    print(f"  compare_recovery_phrase: link addr 0x{link_addr:x}, size 0x{size:x}")
-    before_link, after_link, buffer_device_offset, buffer_offset = \
+    print("Resolving compare_recovery_phrase_finish from build/flex/bin/app.elf ...")
+    link_addr, size = resolve_symbol("compare_recovery_phrase_finish")
+    print(f"  compare_recovery_phrase_finish: link addr 0x{link_addr:x}, size 0x{size:x}")
+    before_link, after_link, buffer_device_reg, buffer_reg = \
         resolve_cleanup_breakpoints(link_addr, size)
     before_addr = code_runtime_addr(before_link)
     after_addr = code_runtime_addr(after_link)
@@ -420,7 +445,7 @@ def main():
         try:
             time.sleep(2)
             sampler = MemorySampler(before_addr, after_addr,
-                                    buffer_device_offset, buffer_offset)
+                                    buffer_device_reg, buffer_reg)
             sampler.start()
             print("Navigating: home -> BIP39 Check -> 12 words -> type+confirm "
                   "all 12 words of the test mnemonic ...")
@@ -440,12 +465,17 @@ def main():
 
     if sampler is None or "before" not in sampler.snapshots:
         die("the 'before cleanup' breakpoint never fired -- "
-            "compare_recovery_phrase() was never reached (did the UI flow "
-            "change, or did the typed mnemonic fail its checksum?)")
+            "compare_recovery_phrase_finish() was never reached (did the "
+            "UI flow change, did the typed mnemonic fail its checksum, or "
+            "did a LEDGER_ASSERT on compare_recovery_phrase()'s own HMAC "
+            "init/final path terminate the app first?)")
     if "after" not in sampler.snapshots:
         die("the 'before cleanup' breakpoint fired but 'after cleanup' "
-            "never did -- compare_recovery_phrase() didn't return normally "
-            "(LEDGER_ASSERT on the HMAC init/final path?)")
+            "never did -- compare_recovery_phrase_finish() didn't reach "
+            "its second explicit_bzero() call (there is no branch or "
+            "assert between the two in this function's current shape, so "
+            "this points at the first explicit_bzero() call itself never "
+            "returning, or the process crashing)")
 
     before_buffer, before_buffer_device = sampler.snapshots["before"]
     after_buffer, after_buffer_device = sampler.snapshots["after"]
@@ -496,8 +526,9 @@ def main():
         sys.exit(1)
 
     print("\nPASS: both 'buffer' and 'buffer_device' read as all-zero after "
-          "compare_recovery_phrase() reaches its cleanup label (the "
-          "goto-cleanup fix does clear both secrets on this path)")
+          "compare_recovery_phrase_finish() erases them (the original "
+          "goto-cleanup fix still clears both secrets on this path, now "
+          "from its own extracted function)")
     sys.exit(0)
 
 
