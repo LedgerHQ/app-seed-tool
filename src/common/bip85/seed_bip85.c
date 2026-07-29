@@ -23,6 +23,7 @@
 
 #ifdef HAVE_SHA3
 #include <lcx_sha3.h>
+#include <os.h>
 #endif
 
 /**
@@ -148,6 +149,41 @@ int32_t bip85_dice_roll(uint32_t* out, size_t out_capacity, uint32_t sides,
     return result;
 }
 
+/**
+ * @brief Generates a random digest using SHAKE-256.
+ *
+ * @details This function generates a random digest of the specified length
+ * using the SHAKE-256 hash function, seeded with the provided seed data.
+ *
+ * Kept outside the `HAVE_NBGL` guard below, and with external linkage,
+ * purely so it can be linked into a unit test against the real
+ * `cx_shake256_hash()` -- pure software, no BOLOS syscall, taking `seed` as a
+ * raw byte buffer rather than deriving it from the device via
+ * `bolos_ux_bip85_entropy()` (which `bolos_ux_bip85_drng_test()` below does,
+ * and which cannot be tested on host). Same pattern as `bip85_dice_roll()`
+ * above, which calls the same `cx_shake256_hash()`.
+ *
+ * @param[out] digest         Pointer to the buffer to store the generated
+ * digest.
+ * @param[in]  digest_length  Length of the digest in bytes.
+ * @param[in]  seed           Pointer to the seed data.
+ * @param[in]  seed_length    Length of the seed data in bytes.
+ *
+ * @return 1 on success, 0 on failure.
+ */
+bool bolos_ux_bip85_drng_with_seed(uint8_t* seed, size_t seed_length,
+                                   uint8_t* digest, size_t digest_length) {
+    LEDGER_ASSERT(digest_length <= BIP85_DRNG_MAX_DIGEST_SIZE,
+                  "BIP85 DRNG digest length exceeds maximum");
+    if (cx_shake256_hash(seed, seed_length, digest, digest_length) != CX_OK) {
+        PRINTF("SHAKE256 hash error\n");
+        return 0;
+    }
+    PRINTF("BIP85 DRNG output: %u bytes\n", digest_length);
+
+    return 1;
+}
+
 #endif  // HAVE_SHA3
 
 #ifdef HAVE_HMAC
@@ -263,33 +299,6 @@ bool bolos_ux_bip85_entropy(uint8_t* entropy, const unsigned int* path,
         LEDGER_ASSERT(false, "HMAC failed");
     }
     PRINTF("BIP85 entropy from root key: %u bytes\n", BIP85_ENTROPY_LENGTH);
-
-    return 1;
-}
-
-/**
- * @brief Generates a random digest using SHAKE-256.
- *
- * @details This function generates a random digest of the specified length
- * using the SHAKE-256 hash function, seeded with the provided seed data.
- *
- * @param[out] digest         Pointer to the buffer to store the generated
- * digest.
- * @param[in]  digest_length  Length of the digest in bytes.
- * @param[in]  seed           Pointer to the seed data.
- * @param[in]  seed_length    Length of the seed data in bytes.
- *
- * @return 1 on success, 0 on failure.
- */
-bool bolos_ux_bip85_drng_with_seed(uint8_t* seed, size_t seed_length,
-                                   uint8_t* digest, size_t digest_length) {
-    LEDGER_ASSERT(digest_length <= BIP85_DRNG_MAX_DIGEST_SIZE,
-                  "BIP85 DRNG digest length exceeds maximum");
-    if (cx_shake256_hash(seed, seed_length, digest, digest_length) != CX_OK) {
-        PRINTF("SHAKE256 hash error\n");
-        return 0;
-    }
-    PRINTF("BIP85 DRNG output: %u bytes\n", digest_length);
 
     return 1;
 }
