@@ -30,6 +30,74 @@ static void test_bip39(void** state) {
     assert_memory_equal(buffer, seed, sizeof(seed));
 }
 
+// bolos_ux_bip39_mnemonic_to_seed() only pre-hashes the mnemonic (SHA-512,
+// truncated to 64 bytes) before PBKDF2 when its length exceeds 128 bytes;
+// below that threshold it feeds PBKDF2 the raw mnemonic bytes directly. The
+// test above uses a 152-character mnemonic and exercises only the
+// pre-hashed branch -- the far more common case in practice (a
+// standard-length phrase stays well under 128 characters) was untested.
+// This drives that branch directly against an independently computed
+// PBKDF2-HMAC-SHA512 vector (salt "mnemonic", 2048 iterations); the
+// mnemonic is the same 12-word vector already used by the roundtrip tests
+// below.
+static void test_bip39_seed_short_mnemonic(void** state) {
+    (void)state;
+    static const unsigned char mnemonic[] =
+        "girl mad pet galaxy egg matter matrix prison refuse sense ordinary "
+        "nose";
+    static const uint8_t expected_seed[64] = {
+        0x24, 0x2a, 0xbe, 0x4d, 0xed, 0x79, 0x03, 0xcd, 0xb6, 0xcf, 0xcb,
+        0x3e, 0x0a, 0xed, 0x5e, 0x62, 0x7d, 0x95, 0x00, 0x52, 0x09, 0x4e,
+        0x51, 0xa7, 0x40, 0x47, 0x89, 0x2d, 0xc1, 0xed, 0x1d, 0xb5, 0x37,
+        0xf0, 0x0c, 0xc0, 0x42, 0xd5, 0xd8, 0x3c, 0x1e, 0x40, 0x7c, 0xc7,
+        0x3f, 0xfc, 0xe5, 0x5f, 0xf5, 0xfb, 0xaa, 0x4f, 0x24, 0x04, 0xd8,
+        0x19, 0xef, 0xdf, 0xd2, 0x61, 0x7b, 0x49, 0xeb, 0xe3};
+    uint8_t out_seed[64];
+
+    bolos_ux_bip39_mnemonic_to_seed((unsigned char*)mnemonic,
+                                    sizeof(mnemonic) - 1, out_seed);
+
+    assert_memory_equal(out_seed, expected_seed, sizeof(expected_seed));
+}
+
+// Exercises the exact 128/129-byte boundary of the pre-hash guard above.
+// bolos_ux_bip39_mnemonic_to_seed() does not validate its input as a real
+// BIP-39 phrase -- it hashes whatever bytes it is given -- so an arbitrary,
+// deterministic buffer (repeating A-Z) is enough. Both expected seeds are
+// computed independently (128: direct PBKDF2 on the 128 raw bytes; 129:
+// PBKDF2 on SHA-512(129 bytes) truncated to 64), confirming the
+// implementation lands on the correct side of the guard at each length.
+static void test_bip39_seed_length_boundary(void** state) {
+    (void)state;
+    unsigned char buf[129];
+    for (size_t i = 0; i < sizeof(buf); i++) {
+        buf[i] = 'A' + (i % 26);
+    }
+
+    static const uint8_t expected_seed_128[64] = {
+        0x9b, 0xc3, 0x17, 0x45, 0x6c, 0xfa, 0x41, 0x0c, 0xb7, 0x07, 0xb7,
+        0x91, 0xc2, 0x2e, 0x59, 0xad, 0xc9, 0x57, 0xf1, 0x4f, 0xcd, 0x91,
+        0xb9, 0x42, 0xf7, 0xec, 0x95, 0x15, 0x74, 0xb2, 0xfa, 0xc2, 0x5b,
+        0x63, 0x3e, 0x02, 0x52, 0xbb, 0x76, 0x13, 0xa1, 0xaa, 0xcf, 0xa8,
+        0x6c, 0x2f, 0x07, 0x27, 0xd0, 0xed, 0x04, 0xed, 0xd3, 0x83, 0xb2,
+        0x86, 0x7d, 0x05, 0xb6, 0xb3, 0xce, 0x83, 0xd5, 0x12};
+    static const uint8_t expected_seed_129[64] = {
+        0xd2, 0x96, 0xf1, 0xf4, 0xaa, 0x20, 0xb3, 0xfb, 0x72, 0x59, 0xfc,
+        0x7b, 0xbf, 0xcc, 0xd1, 0x43, 0x26, 0x39, 0x49, 0x22, 0x13, 0x51,
+        0xb1, 0xff, 0x47, 0x82, 0xb9, 0x12, 0xd2, 0x97, 0x3b, 0x79, 0x95,
+        0xa2, 0x40, 0x6d, 0x2f, 0x1f, 0x5f, 0x8d, 0xb8, 0xc4, 0xc6, 0xe1,
+        0x52, 0xfa, 0xb7, 0x26, 0xf1, 0xc2, 0xb1, 0x48, 0x4b, 0x9e, 0x57,
+        0x0b, 0x45, 0xff, 0x6f, 0xb5, 0x2e, 0x6a, 0x01, 0xfc};
+    uint8_t seed_128[64];
+    uint8_t seed_129[64];
+
+    bolos_ux_bip39_mnemonic_to_seed(buf, 128, seed_128);
+    assert_memory_equal(seed_128, expected_seed_128, sizeof(expected_seed_128));
+
+    bolos_ux_bip39_mnemonic_to_seed(buf, 129, seed_129);
+    assert_memory_equal(seed_129, expected_seed_129, sizeof(expected_seed_129));
+}
+
 // All twelve words exist in the wordlist; only the last word differs from
 // the valid vector (whose last word is "nose") -- the checksum byte no
 // longer matches, so decode() must reject it despite every word being
@@ -110,6 +178,31 @@ static void test_bip39_encode_insufficient_buffer(void** state) {
     assert_int_equal(result, 0);
 }
 
+// bolos_ux_bip39_mnemonic_encode() rejects seed_len before touching `out` if
+// it fails any of three conditions: not a multiple of 4, below 16, or above
+// 32. Only the valid lengths (16/24/32) are exercised elsewhere (the
+// roundtrip tests below); each case here isolates exactly one condition,
+// satisfying the other two, and a generously sized `out` confirms the
+// rejection is a clean early return (0) rather than a controlled partial
+// write.
+static void test_bip39_encode_rejects_invalid_seed_len(void** state) {
+    (void)state;
+    static const uint8_t seed_bytes[36] = {0};
+    unsigned char out[256];
+
+    // Not a multiple of 4, but within [16, 32].
+    assert_int_equal(
+        bolos_ux_bip39_mnemonic_encode(seed_bytes, 17, out, sizeof(out)), 0);
+
+    // Multiple of 4, but below 16.
+    assert_int_equal(
+        bolos_ux_bip39_mnemonic_encode(seed_bytes, 12, out, sizeof(out)), 0);
+
+    // Multiple of 4, but above 32.
+    assert_int_equal(
+        bolos_ux_bip39_mnemonic_encode(seed_bytes, 36, out, sizeof(out)), 0);
+}
+
 // The three entropy/mnemonic pairs below are the same independently-verified
 // vectors already used by tests/bip85_bip39_entropy.c (12/18/24 words).
 static void run_roundtrip(const uint8_t* entropy, uint8_t entropy_len,
@@ -171,10 +264,13 @@ static void test_bip39_roundtrip_24_words(void** state) {
 int main(void) {
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(test_bip39),
+        cmocka_unit_test(test_bip39_seed_short_mnemonic),
+        cmocka_unit_test(test_bip39_seed_length_boundary),
         cmocka_unit_test(test_bip39_decode_unknown_word),
         cmocka_unit_test(test_bip39_decode_bad_checksum),
         cmocka_unit_test(test_bip39_decode_wrong_length),
         cmocka_unit_test(test_bip39_encode_insufficient_buffer),
+        cmocka_unit_test(test_bip39_encode_rejects_invalid_seed_len),
         cmocka_unit_test(test_bip39_roundtrip_12_words),
         cmocka_unit_test(test_bip39_roundtrip_18_words),
         cmocka_unit_test(test_bip39_roundtrip_24_words),
