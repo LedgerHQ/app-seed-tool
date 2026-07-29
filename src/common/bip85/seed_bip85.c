@@ -23,6 +23,7 @@
 
 #ifdef HAVE_SHA3
 #include <lcx_sha3.h>
+#include <os.h>
 #endif
 
 /**
@@ -148,6 +149,41 @@ int32_t bip85_dice_roll(uint32_t* out, size_t out_capacity, uint32_t sides,
     return result;
 }
 
+/**
+ * @brief Generates a random digest using SHAKE-256.
+ *
+ * @details This function generates a random digest of the specified length
+ * using the SHAKE-256 hash function, seeded with the provided seed data.
+ *
+ * Kept outside the `HAVE_NBGL` guard below, and with external linkage,
+ * purely so it can be linked into a unit test against the real
+ * `cx_shake256_hash()` -- pure software, no BOLOS syscall, taking `seed` as a
+ * raw byte buffer rather than deriving it from the device via
+ * `bolos_ux_bip85_entropy()` (which `bolos_ux_bip85_drng_test()` below does,
+ * and which cannot be tested on host). Same pattern as `bip85_dice_roll()`
+ * above, which calls the same `cx_shake256_hash()`.
+ *
+ * @param[out] digest         Pointer to the buffer to store the generated
+ * digest.
+ * @param[in]  digest_length  Length of the digest in bytes.
+ * @param[in]  seed           Pointer to the seed data.
+ * @param[in]  seed_length    Length of the seed data in bytes.
+ *
+ * @return 1 on success, 0 on failure.
+ */
+bool bolos_ux_bip85_drng_with_seed(uint8_t* seed, size_t seed_length,
+                                   uint8_t* digest, size_t digest_length) {
+    LEDGER_ASSERT(digest_length <= BIP85_DRNG_MAX_DIGEST_SIZE,
+                  "BIP85 DRNG digest length exceeds maximum");
+    if (cx_shake256_hash(seed, seed_length, digest, digest_length) != CX_OK) {
+        PRINTF("SHAKE256 hash error\n");
+        return 0;
+    }
+    PRINTF("BIP85 DRNG output: %u bytes\n", digest_length);
+
+    return 1;
+}
+
 #endif  // HAVE_SHA3
 
 #ifdef HAVE_HMAC
@@ -192,6 +228,31 @@ bool bip85_entropy_from_key(const uint8_t key[32], uint8_t* out,
     return true;
 }
 #endif  // HAVE_HMAC
+
+/**
+ * @brief Copies the first `pwd_len` bytes of an encoded password buffer into
+ * the caller's output buffer and NUL-terminates it.
+ *
+ * @details Kept outside the `HAVE_NBGL` guard below, and with external
+ * linkage, purely so it can be linked into a unit test: `buffer_pwd` comes
+ * from `base64_encode_64bytes()`/`base85_encode_64bytes()`, already tested
+ * directly, but this final truncation-and-terminate step -- the one that
+ * previously had a missing `pwd[pwd_len] = '\0';` on the Base64 side -- had
+ * no test of its own. Same pattern as `bip85_dice_roll()`/
+ * `bip85_entropy_from_key()` above.
+ *
+ * @param[in]  buffer_pwd  Fully encoded password, at least `pwd_len` bytes.
+ * @param[out] pwd         Buffer to receive the truncated, NUL-terminated
+ * password; must have room for `pwd_len + 1` bytes.
+ * @param[in]  pwd_len     Number of bytes to copy from `buffer_pwd`.
+ *
+ * @return `pwd_len`.
+ */
+uint8_t bip85_finalize_pwd(const char* buffer_pwd, char* pwd, uint8_t pwd_len) {
+    memcpy(pwd, buffer_pwd, pwd_len);
+    pwd[pwd_len] = '\0';  // Add string termination character
+    return pwd_len;
+}
 
 #if defined(HAVE_NBGL)
 #include <lcx_hmac.h>
@@ -238,33 +299,6 @@ bool bolos_ux_bip85_entropy(uint8_t* entropy, const unsigned int* path,
         LEDGER_ASSERT(false, "HMAC failed");
     }
     PRINTF("BIP85 entropy from root key: %u bytes\n", BIP85_ENTROPY_LENGTH);
-
-    return 1;
-}
-
-/**
- * @brief Generates a random digest using SHAKE-256.
- *
- * @details This function generates a random digest of the specified length
- * using the SHAKE-256 hash function, seeded with the provided seed data.
- *
- * @param[out] digest         Pointer to the buffer to store the generated
- * digest.
- * @param[in]  digest_length  Length of the digest in bytes.
- * @param[in]  seed           Pointer to the seed data.
- * @param[in]  seed_length    Length of the seed data in bytes.
- *
- * @return 1 on success, 0 on failure.
- */
-bool bolos_ux_bip85_drng_with_seed(uint8_t* seed, size_t seed_length,
-                                   uint8_t* digest, size_t digest_length) {
-    LEDGER_ASSERT(digest_length <= BIP85_DRNG_MAX_DIGEST_SIZE,
-                  "BIP85 DRNG digest length exceeds maximum");
-    if (cx_shake256_hash(seed, seed_length, digest, digest_length) != CX_OK) {
-        PRINTF("SHAKE256 hash error\n");
-        return 0;
-    }
-    PRINTF("BIP85 DRNG output: %u bytes\n", digest_length);
 
     return 1;
 }
@@ -377,8 +411,7 @@ uint8_t bolos_ux_bip85_pwd_base64(char* pwd, uint8_t pwd_len,
         LEDGER_ASSERT(false, "Base64 encoding failed");
     }
 
-    memcpy(pwd, buffer_pwd, pwd_len);
-    pwd[pwd_len] = '\0';  // Add string termination character
+    bip85_finalize_pwd(buffer_pwd, pwd, pwd_len);
 
     memzero(buffer_ent, BIP85_ENTROPY_LENGTH);
     memzero(buffer_pwd, BASE64_ENCODE_LENGTH);
@@ -411,8 +444,7 @@ uint8_t bolos_ux_bip85_pwd_base85(char* pwd, uint8_t pwd_len,
         LEDGER_ASSERT(false, "Base85 encoding failed");
     }
 
-    memcpy(pwd, buffer_pwd, pwd_len);
-    pwd[pwd_len] = '\0';  // Add string termination character
+    bip85_finalize_pwd(buffer_pwd, pwd, pwd_len);
 
     memzero(buffer_ent, BIP85_ENTROPY_LENGTH);
     memzero(buffer_pwd, BASE85_ENCODE_LENGTH);

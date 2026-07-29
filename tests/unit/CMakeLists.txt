@@ -319,6 +319,16 @@ target_compile_definitions(test_bip85_dice_roll PRIVATE HAVE_SHA3)
 target_include_directories(test_bip85_dice_roll PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src $ENV{LEDGER_SECURE_SDK})
 target_link_libraries(test_bip85_dice_roll PUBLIC cmocka gcov testutils)
 
+# bolos_ux_bip85_drng_with_seed() (also outside the HAVE_NBGL guard, moved
+# there alongside bip85_dice_roll() since it needs the same HAVE_SHA3
+# cx_shake256_hash()) takes its seed as a raw byte buffer rather than
+# deriving it via bolos_ux_bip85_entropy() -- no BOLOS syscall, same
+# reasoning and same compilation pattern as test_bip85_dice_roll above.
+add_executable(test_bip85_drng_with_seed tests/bip85_drng_with_seed.c ../../src/common/bip85/seed_bip85.c $ENV{LEDGER_SECURE_SDK}/src/cx_hash_iovec.c)
+target_compile_definitions(test_bip85_drng_with_seed PRIVATE HAVE_SHA3)
+target_include_directories(test_bip85_drng_with_seed PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src $ENV{LEDGER_SECURE_SDK})
+target_link_libraries(test_bip85_drng_with_seed PUBLIC cmocka gcov testutils)
+
 # bip85_entropy_from_key() (also outside the HAVE_NBGL guard) is the
 # HMAC-SHA512("bip-entropy-from-k", key) half of bolos_ux_bip85_entropy();
 # the BIP32 derivation that produces `key` is a BOLOS syscall
@@ -384,6 +394,16 @@ target_link_libraries(test_compare_recovery_phrase_finish PUBLIC cmocka gcov tes
 #   common_seed.c:126:1: warning: label 'cleanup' defined but not used
 #     [-Wunused-label]
 
-foreach(target test_sss test_sss_recover_erase_length test_sskr test_sskr_share_len test_sskr_memzero test_sskr_shard_count test_sskr_generate_split_error test_sskr_combine_bounds test_sskr_combine_error test_sskr_combine_invariants test_sskr_interop_bc128 test_sskr_interop_bc128_bytewords test_sskr_entry_bounds test_sskr_byteword_sentinel test_sskr_cbor_additional_info test_bip39 test_roundtrip test_words test_base64 test_base85 test_bip85_dice_bits_per_roll test_bip85_dice_roll test_bip85_bip39_entropy test_bip85_hex_vector test_compare_recovery_phrase_finish)
+# bip85_finalize_pwd() (also outside the HAVE_NBGL guard) is the
+# memcpy-and-terminate tail shared by bolos_ux_bip85_pwd_base64()/
+# bolos_ux_bip85_pwd_base85(); no crypto dependency, so no extra compile
+# definitions are needed beyond the globally-defined HAVE_HMAC (already
+# required to link bip85_entropy_from_key(), also in this file, same as
+# test_bip85_dice_bits_per_roll above).
+add_executable(test_bip85_finalize_pwd tests/bip85_finalize_pwd.c ../../src/common/bip85/seed_bip85.c)
+target_include_directories(test_bip85_finalize_pwd PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src)
+target_link_libraries(test_bip85_finalize_pwd PUBLIC cmocka gcov testutils)
+
+foreach(target test_sss test_sss_recover_erase_length test_sskr test_sskr_share_len test_sskr_memzero test_sskr_shard_count test_sskr_generate_split_error test_sskr_generate_bound_groups test_sskr_combine_erase_on_failure test_sskr_count_shards_invariants test_sskr_generate_erase_on_split_failure test_sskr_combine_bounds test_sskr_combine_error test_sskr_combine_invariants test_sskr_interop_bc128 test_sskr_interop_bc128_bytewords test_sskr_entry_bounds test_sskr_byteword_sentinel test_sskr_cbor_additional_info test_bip39 test_roundtrip test_words test_base64 test_base85 test_bip85_dice_bits_per_roll test_bip85_dice_roll test_bip85_bip39_entropy test_bip85_hex_vector test_bip85_finalize_pwd test_bip85_drng_with_seed)
     add_test(NAME ${target} COMMAND ${target})
 endforeach()

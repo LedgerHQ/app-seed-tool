@@ -1,7 +1,20 @@
-#include <stdint.h>
+#include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
+#include <stdlib.h>
 
 #include "bolos/cxlib.h"
+
+// LEDGER_ASSERT() calls this on a failing condition (see the SDK's
+// ledger_assert_internals.h). The SDK's own unit tests stub this the same
+// way (unit-tests/lib_tlv/mock_os.c) but with exit(0); this uses exit(1)
+// instead so that a LEDGER_ASSERT unexpectedly firing inside any function
+// linked into a test target makes ctest report a failure, rather than the
+// process silently exiting 0 with no cmocka summary printed.
+void assert_exit(bool confirm) {
+    (void)confirm;
+    exit(1);
+}
 
 // Fake random generator used only for testing
 void cx_rng_no_throw(uint8_t *buffer, size_t len)
