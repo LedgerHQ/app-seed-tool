@@ -193,6 +193,31 @@ bool bip85_entropy_from_key(const uint8_t key[32], uint8_t* out,
 }
 #endif  // HAVE_HMAC
 
+/**
+ * @brief Copies the first `pwd_len` bytes of an encoded password buffer into
+ * the caller's output buffer and NUL-terminates it.
+ *
+ * @details Kept outside the `HAVE_NBGL` guard below, and with external
+ * linkage, purely so it can be linked into a unit test: `buffer_pwd` comes
+ * from `base64_encode_64bytes()`/`base85_encode_64bytes()`, already tested
+ * directly, but this final truncation-and-terminate step -- the one that
+ * previously had a missing `pwd[pwd_len] = '\0';` on the Base64 side -- had
+ * no test of its own. Same pattern as `bip85_dice_roll()`/
+ * `bip85_entropy_from_key()` above.
+ *
+ * @param[in]  buffer_pwd  Fully encoded password, at least `pwd_len` bytes.
+ * @param[out] pwd         Buffer to receive the truncated, NUL-terminated
+ * password; must have room for `pwd_len + 1` bytes.
+ * @param[in]  pwd_len     Number of bytes to copy from `buffer_pwd`.
+ *
+ * @return `pwd_len`.
+ */
+uint8_t bip85_finalize_pwd(const char* buffer_pwd, char* pwd, uint8_t pwd_len) {
+    memcpy(pwd, buffer_pwd, pwd_len);
+    pwd[pwd_len] = '\0';  // Add string termination character
+    return pwd_len;
+}
+
 #if defined(HAVE_NBGL)
 #include <lcx_hmac.h>
 #include <lcx_sha3.h>
@@ -377,8 +402,7 @@ uint8_t bolos_ux_bip85_pwd_base64(char* pwd, uint8_t pwd_len,
         LEDGER_ASSERT(false, "Base64 encoding failed");
     }
 
-    memcpy(pwd, buffer_pwd, pwd_len);
-    pwd[pwd_len] = '\0';  // Add string termination character
+    bip85_finalize_pwd(buffer_pwd, pwd, pwd_len);
 
     memzero(buffer_ent, BIP85_ENTROPY_LENGTH);
     memzero(buffer_pwd, BASE64_ENCODE_LENGTH);
@@ -411,8 +435,7 @@ uint8_t bolos_ux_bip85_pwd_base85(char* pwd, uint8_t pwd_len,
         LEDGER_ASSERT(false, "Base85 encoding failed");
     }
 
-    memcpy(pwd, buffer_pwd, pwd_len);
-    pwd[pwd_len] = '\0';  // Add string termination character
+    bip85_finalize_pwd(buffer_pwd, pwd, pwd_len);
 
     memzero(buffer_ent, BIP85_ENTROPY_LENGTH);
     memzero(buffer_pwd, BASE85_ENCODE_LENGTH);
