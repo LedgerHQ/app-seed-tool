@@ -9,7 +9,26 @@ still sitting in memory after the user backed out?"
 They are not wired into CI or the cmocka harness. Run them by hand when
 touching secret-buffer lifecycle code in the NBGL UI layer.
 
-## Contents
+## Table of contents
+
+- [Files](#files)
+- [Prerequisites](#prerequisites)
+- [Running](#running)
+- [Checks](#checks)
+  - [Check 1 — BIP39 mnemonic buffer, cancel mid-entry](#check-1--bip39-mnemonic-buffer-cancel-mid-entry)
+  - [Check 2 — `compare_recovery_phrase()` stack secrets](#check-2--compare_recovery_phrase-stack-secrets)
+  - [Check 3 — SSKR share entry buffer, cancel mid-entry](#check-3--sskr-share-entry-buffer-cancel-mid-entry)
+  - [Check 4 — Generated SSKR shares, dashboard return](#check-4--generated-sskr-shares-dashboard-return)
+  - [Check 5 — Generated BIP-85 BIP39 output, dashboard return](#check-5--generated-bip-85-bip39-output-dashboard-return)
+- [Gotchas](#gotchas)
+  - [1. The published Speculos debug image is broken](#1-the-published-speculos-debug-image-is-broken)
+  - [2. A live GDB connection freezes the app unless SIGILL is passed through](#2-a-live-gdb-connection-freezes-the-app-unless-sigill-is-passed-through)
+  - [3. Async Ctrl-C interrupts are unreliable; breakpoints are not](#3-async-ctrl-c-interrupts-are-unreliable-breakpoints-are-not)
+  - [4. Global variables are not at their linked address at runtime](#4-global-variables-are-not-at-their-linked-address-at-runtime)
+  - [5. Stack-local secrets are SP-relative, and simpler than globals](#5-stack-local-secrets-are-sp-relative-and-simpler-than-globals)
+- [Adapting to stax/apex, or another scenario](#adapting-to-staxapex-or-another-scenario)
+
+## Files
 
 | File | Role |
 |---|---|
