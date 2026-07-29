@@ -16,7 +16,7 @@ touching secret-buffer lifecycle code in the NBGL UI layer.
 - [Running](#running)
 - [Checks](#checks)
   - [Check 1 — BIP39 mnemonic buffer, cancel mid-entry](#check-1--bip39-mnemonic-buffer-cancel-mid-entry)
-  - [Check 2 — `compare_recovery_phrase()` stack secrets](#check-2--compare_recovery_phrase-stack-secrets)
+  - [Check 2 — `compare_recovery_phrase_finish()` buffer erasure](#check-2--compare_recovery_phrase_finish-buffer-erasure)
   - [Check 3 — SSKR share entry buffer, cancel mid-entry](#check-3--sskr-share-entry-buffer-cancel-mid-entry)
   - [Check 4 — Generated SSKR shares, dashboard return](#check-4--generated-sskr-shares-dashboard-return)
   - [Check 5 — Generated BIP-85 BIP39 output, dashboard return](#check-5--generated-bip-85-bip39-output-dashboard-return)
@@ -34,7 +34,7 @@ touching secret-buffer lifecycle code in the NBGL UI layer.
 |---|---|
 | `rsp_client.py` | ~100-line GDB Remote Serial Protocol client (stdlib only, no `gdb` binary required). |
 | `verify_bip39_cancel_clears_buffer.py` | Check 1 — BIP39 mnemonic entry, cancel mid-word. |
-| `verify_compare_recovery_phrase_cleanup.py` | Check 2 — `compare_recovery_phrase()` stack secrets. |
+| `verify_compare_recovery_phrase_cleanup.py` | Check 2 — `compare_recovery_phrase_finish()` buffer erasure. |
 | `verify_sskr_share_cancel_clears_buffer.py` | Check 3 — SSKR share entry, cancel mid-word. |
 | `verify_sskr_generated_shares_dashboard_return.py` | Check 4 — generated SSKR shares, dashboard return. |
 | `verify_bip85_bip39_output_cleanup.py` | Check 5 — generated BIP-85 BIP39 output, dashboard return. |
@@ -63,7 +63,7 @@ python3 tests/speculos/verify_bip85_bip39_output_cleanup.py
 | Script | Typical duration | Why |
 |---|---|---|
 | Check 1 (BIP39 cancel) | A few minutes | Types one word only. |
-| Check 2 (`compare_recovery_phrase`) | 15–30+ minutes | Types and confirms a full 12-word mnemonic. |
+| Check 2 (`compare_recovery_phrase_finish`) | 15–30+ minutes | Types and confirms a full 12-word mnemonic. |
 | Check 3 (SSKR cancel) | A few minutes | Types one word plus a couple of letters. |
 | Check 4 (generated shares) | 15–30+ minutes | Types the full 12-word mnemonic, then generates and pages through 3 shares. |
 | Check 5 (BIP-85 BIP39 output) | A few minutes | Button taps and one numeric-keypad entry only, no mnemonic typing. |
@@ -131,23 +131,54 @@ FAIL: 'abandon' is still present in the mnemonic buffer after cancelling -- type
   6162616e646f6e00...
 ```
 
-### Check 2 — `compare_recovery_phrase()` stack secrets
+### Check 2 — `compare_recovery_phrase_finish()` buffer erasure
 
 `verify_compare_recovery_phrase_cleanup.py`. Closes the loop on a fix made
 earlier in this project purely by code review: three early returns in
 `compare_recovery_phrase()` (`src/common/common_seed.c`) were collapsed
 into a single `goto cleanup;`, but were never exercised under a debugger
-until this script.
+until this script was first written.
+
+**Mechanism update.** `compare_recovery_phrase()`'s tail — everything
+after the device-seed derivation, including both `explicit_bzero()` calls
+this check watches — has since been extracted into its own function,
+`compare_recovery_phrase_finish(cx_err_t derivation_status, uint8_t
+buffer[64], uint8_t buffer_device[64])`, so the derivation-failure path
+could get unit-test coverage on host (the syscall itself still can't be).
+Confirmed by disassembly (`arm-none-eabi-nm -S` on the `flex` build), not
+assumed: this stayed a real, separate symbol rather than being inlined
+back into its one caller —
+
+```
+c0de08d4 000000a8 T compare_recovery_phrase
+c0de08a2 00000030 T compare_recovery_phrase_finish
+```
+
+— so this script's breakpoints now resolve `compare_recovery_phrase_finish`
+and disassemble *that* function instead of `compare_recovery_phrase`
+itself. The user-visible behavior this check verifies is unchanged (both
+buffers are still erased on the same path); only where the two
+`explicit_bzero()` calls physically live moved. This also simplified the
+addressing: `compare_recovery_phrase_finish()` receives `buffer`/
+`buffer_device` as plain pointer arguments rather than declaring them as
+its own stack-local arrays, so its prologue is a bare `push
+{r4,r5,r6,lr}` with no `sub sp, #N` at all — the compiler keeps both
+pointers in call-preserved registers for the function's whole body instead
+of spilling them to the stack. That means this check no longer needs
+gotcha 5's SP-relative-offset approach: it reads the two argument
+registers directly at each breakpoint (which register holds which buffer
+is read back from the disassembly, not hardcoded — see
+`resolve_cleanup_breakpoints()`).
 
 On "Check BIP39": type and confirm all 12 words of a known 128-bit test
 vector (`fly mule excess resource treat plunge nose soda reflect adult
 ramp planet` — the same one `tests/functional/test_bip39_12word.py` uses,
 sourced from `sskr-test-vector.md`). Speculos boots with `-s "<that
 mnemonic>"` so the device's own seed matches what is typed;
-`compare_recovery_phrase()` then takes its match path, and its two 64-byte
-stack locals (`buffer`, the input-derived root key; `buffer_device`, the
-device's root key) both hold the same, independently computable secret
-right before cleanup:
+`compare_recovery_phrase()` then takes its match path and calls
+`compare_recovery_phrase_finish()`, whose two 64-byte buffers (`buffer`,
+the input-derived root key; `buffer_device`, the device's root key) both
+hold the same, independently computable secret right before erasure:
 
 ```python
 seed = hashlib.pbkdf2_hmac("sha512", mnemonic.encode(), b"mnemonic", 2048, dklen=64)
@@ -155,19 +186,20 @@ root_key = hmac.new(b"Bitcoin seed", seed, hashlib.sha512).digest()
 ```
 
 Confirming the 12th word triggers `bip39_mnemonic_check()`
-(`src/nbgl/bip39_mnemonic.c`) → `compare_recovery_phrase()` automatically;
-no further navigation is needed once both breakpoints fire.
+(`src/nbgl/bip39_mnemonic.c`) → `compare_recovery_phrase()` →
+`compare_recovery_phrase_finish()` automatically; no further navigation is
+needed once both breakpoints fire.
 
 Unlike the global-buffer checks (1 and 3), neither `buffer` nor
 `buffer_device` has a legitimate non-zero bookkeeping field, so the pass
-condition here is "reads as all-zero after cleanup", not just "no longer
+condition here is "reads as all-zero after erasure", not just "no longer
 contains the specific secret".
 
 **On a real failure**, `buffer` or `buffer_device` still contains the
 independently-computed root key (or is simply non-zero) after the
 `after cleanup` breakpoint; the script prints the offending buffer and its
-hex. That would mean a regression in the `goto cleanup;` fix — for example
-a future edit reintroducing an early return that bypasses it.
+hex. That would mean a regression in the buffer-erasure logic — for
+example a future edit reintroducing an early return that bypasses it.
 
 ### Check 3 — SSKR share entry buffer, cancel mid-entry
 
@@ -403,21 +435,40 @@ was actually built.
 
 ### 5. Stack-local secrets are SP-relative, and simpler than globals
 
-`verify_compare_recovery_phrase_cleanup.py` needed this for
+`verify_compare_recovery_phrase_cleanup.py` originally needed this for
 `compare_recovery_phrase()`'s `buffer`/`buffer_device` (plain
 `uint8_t foo[64]` stack locals, not globals). Confirmed by disassembling
 the function (`arm-none-eabi-objdump -d`; see the note below on why the
-generic `objdump` cannot be used here): the prologue is
+generic `objdump` cannot be used here): the prologue was
 `push {r4,r5,r7,lr}` then a single `sub sp, #N`, and every reference to a
-stack local in the function body compiles to `add rX, sp, #offset` — plain
-SP-relative, no frame pointer involved. SP itself is stable for the entire
-function body, set once by that `sub` and restored only by the matching
-`add sp, #N` in the epilogue. Unlike a global's `R9`-relative address
-(gotcha 4), no separate "capture the frame base" step is needed: read
-`regs[13]` (SP) directly at whichever breakpoint is placed inside the
+stack local in the function body compiled to `add rX, sp, #offset` — plain
+SP-relative, no frame pointer involved. SP itself was stable for the
+entire function body, set once by that `sub` and restored only by the
+matching `add sp, #N` in the epilogue. Unlike a global's `R9`-relative
+address (gotcha 4), no separate "capture the frame base" step was needed:
+read `regs[13]` (SP) directly at whichever breakpoint is placed inside the
 function, add the fixed offset from the disassembly. This is simpler than
 register-relative globals, not harder — it is SP-relative, and stable for
 the whole call.
+
+**Update: this no longer describes how Check 2 locates its two buffers.**
+Since `compare_recovery_phrase()`'s tail (the two `explicit_bzero()` calls)
+was extracted into `compare_recovery_phrase_finish()` — see Check 2 above
+— `buffer`/`buffer_device` arrive there as plain pointer *arguments*
+rather than that function's own stack-local arrays, and its prologue
+(`push {r4,r5,r6,lr}`, no `sub sp, #N` at all) has no stack frame to be
+SP-relative *into* in the first place. The compiler instead keeps both
+pointers in call-preserved registers for the whole function body — an
+even simpler case than the SP-relative one above: read the two argument
+registers directly at either breakpoint and dereference them, no offset
+arithmetic at all. Which register holds which buffer is read back from
+each call's `mov r0, rN` in the disassembly (see
+`resolve_cleanup_breakpoints()` in `verify_compare_recovery_phrase_cleanup.py`),
+not hardcoded — the pattern in this gotcha (SP-relative stack locals) is
+kept here as-is because it remains the right approach for a genuine
+stack-local secret in a function with its own frame; a future check
+should use whichever of the two actually matches what disassembly shows
+for its target function, not assume either one.
 
 Disassembly note: the generic `objdump` in the `ledger-app-builder-lite`
 image reads section/symbol tables fine (`nm`, `readelf` work unprefixed)

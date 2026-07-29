@@ -28,6 +28,28 @@
 extern unsigned int tool_type;
 #endif
 
+// Only the derivation status is a hardware-dependent input here --
+// os_derive_bip32_no_throw() itself (a BOLOS syscall) is not testable on
+// host, but everything that happens with its result is pure logic:
+// comparing the two root keys on success, and erasing both buffers either
+// way. Splitting it out lets that logic -- including the derivation-failure
+// path, never exercised anywhere until now -- be covered without the
+// syscall.
+bool compare_recovery_phrase_finish(cx_err_t derivation_status,
+                                    uint8_t buffer[64],
+                                    uint8_t buffer_device[64]) {
+    bool result = false;
+
+    if (derivation_status == CX_OK) {
+        result = os_secure_memcmp(buffer, buffer_device, 64) ? false : true;
+    }
+
+    memzero(buffer_device, 64);
+    memzero(buffer, 64);
+
+    return result;
+}
+
 bool compare_recovery_phrase(bool* reconstructed) {
     // convert mnemonic to hex-seed
     uint8_t buffer[64];
@@ -90,15 +112,16 @@ bool compare_recovery_phrase(bool* reconstructed) {
     PRINTF("Root key from input: 64 bytes\n");
 
     // get rootkey from device's seed
-    if (os_derive_bip32_no_throw(CX_CURVE_256K1, &empty_path, 0, buffer_device,
-                                 buffer_device + 32) != CX_OK) {
+    cx_err_t derivation_status = os_derive_bip32_no_throw(
+        CX_CURVE_256K1, &empty_path, 0, buffer_device, buffer_device + 32);
+    if (derivation_status != CX_OK) {
         PRINTF("An error occurred while comparing the recovery phrase\n");
-        goto cleanup;
+    } else {
+        PRINTF("Root key from device: 64 bytes\n");
     }
-    PRINTF("Root key from device: 64 bytes\n");
 
-    // compare both rootkey
-    result = os_secure_memcmp(buffer, buffer_device, 64) ? false : true;
+    return compare_recovery_phrase_finish(derivation_status, buffer,
+                                          buffer_device);
 
 cleanup:
     memzero(buffer_device, 64);
