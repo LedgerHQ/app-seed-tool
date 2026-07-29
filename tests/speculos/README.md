@@ -24,6 +24,11 @@ usual process for whether/how to promote this further.
   global (`src/nbgl/sskr_shares.c`) is cleared when the user cancels
   mid-entry on "Check SSKR", the SSKR analogue of check #1. See "What it
   checks (scenario 3)" below.
+- `verify_sskr_generated_shares_dashboard_return.py` — check #4: *generated*
+  SSKR shares (same `shares` global, written by
+  `sskr_shares_from_bip39_mnemonic()`) are cleared once the user pages
+  through and exits the share-review screen back to the dashboard. See
+  "What it checks (scenario 4)" below.
 
 ## Prerequisites
 
@@ -42,6 +47,7 @@ usual process for whether/how to promote this further.
 python3 tests/speculos/verify_bip39_cancel_clears_buffer.py
 python3 tests/speculos/verify_compare_recovery_phrase_cleanup.py
 python3 tests/speculos/verify_sskr_share_cancel_clears_buffer.py
+python3 tests/speculos/verify_sskr_generated_shares_dashboard_return.py
 ```
 
 Takes a few minutes (see "Why is this so slow" below) for the first script.
@@ -58,13 +64,18 @@ curl -s 'http://localhost:5002/events?currentscreenonly=true' | python3 -m json.
 ```
 (the `"Enter word n. X/12..."` text tells you exactly which word it's on).
 The SSKR check only types one word plus a couple of letters, so it's back
-to a few-minutes run like the first script, not 30+.
+to a few-minutes run like the first script, not 30+. **The fourth script is
+slow again, for the same reason as the second** — it also types and
+confirms the full 12-word mnemonic (needed so `seed_match` is true and the
+UI actually offers "Generate SSKR"), on top of the share-generation and
+review-paging steps; budget the same 15-30+ minutes.
 
-All three scripts print a snapshot table and a `PASS`/`FAIL` line, exit 1
+All four scripts print a snapshot table and a `PASS`/`FAIL` line, exit 1
 on failure, and start/always tear down their own Speculos container
 (`speculos-bip39-cancel-test` / `speculos-compare-recovery-phrase-cleanup-test`
-/ `speculos-sskr-cancel-test`) — safe to re-run, and safe to Ctrl-C (though
-a stray container may need `docker rm -f <name>` after a hard interrupt).
+/ `speculos-sskr-cancel-test` / `speculos-sskr-generated-shares-reset-test`)
+— safe to re-run, and safe to Ctrl-C (though a stray container may need
+`docker rm -f <name>` after a hard interrupt).
 
 ## What it checks
 
@@ -185,6 +196,64 @@ should have cleared it — the script prints the full captured bytes on
 failure. Same reasoning as the other two checks: this is a synchronous
 breakpoint read, not a timing-sensitive guess, so a FAIL here is real.
 
+## What it checks (scenario 4: generated SSKR shares, dashboard return)
+
+`verify_sskr_generated_shares_dashboard_return.py` answers a genuinely open
+question, not a presupposed bug: `sskr_shares_from_bip39_mnemonic()`
+(`src/nbgl/sskr_shares.c`) writes *generated* shares into the same `shares`
+global used by manual entry (check #3), and its caller,
+`sskr_shares_check()`, has a comment explicitly deferring the erase:
+"Don't clear the shares just yet as we may need it to generate BIP39
+mnemonic". Does the real generate → view → return-to-dashboard flow always
+reach `sskr_shares_reset()` before the buffer goes out of scope, or is
+there an exit path that skips it?
+
+Flow: type and confirm the full 12-word test mnemonic (same vector and
+`-s` boot as check #2, needed so `bip39_mnemonic_check()`'s `seed_match`
+comes back `true` — the UI only offers "Generate SSKR" on a real match),
+choose "Generate SSKR" with 3 shares / threshold 2 (the same combination
+`tests/functional/test_bip39_12word.py` already exercises for real — this
+script sanity-checks the rendered share text against that test's known
+`"tuna next keep gyro"` prefix before proceeding, so a UI/navigation drift
+fails loudly as a setup problem rather than a false result), page through
+all 3 generated shares, then tap the review screen's exit control — the
+same `next`/`next`/`exit` sequence `tests/functional/conftest.py`'s
+`all_eink_bip39_12word()` already proves works on this exact screen.
+
+**Result: `sskr_shares_reset()` does fire on this path, and the buffer is
+genuinely cleared.** Captured on a real run:
+```
+sskr_shares_from_bip39_mnemonic: after=74756e61206e657874206b656570206779726f20706c757320696365642061626c6520616369642061626c65206c656773207065636b206269617320626c7565  (64/64 bytes nonzero)
+sskr_shares_reset:               before=<same bytes>  after=00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000  (all zero)
+```
+
+Two things worth noting, neither a bug:
+
+- **Unlike check #3's decoded-byte-per-word encoding, generated
+  `shares.buffer` holds literal ASCII ByteWords text.** The captured
+  "before" bytes above decode directly as `"tuna next keep gyro plus iced
+  able acid able legs peck bias blue"` — the share's rendered words
+  themselves, space-separated, not one decoded byte per word like the
+  manually-entered path in check #3. Don't assume the encoding is uniform
+  across every code path that touches this struct; check per call site.
+- **`sskr_shares_reset()` fires twice in a row on this exit path** (visible
+  as two `before=all-zero after=all-zero` no-op snapshots bracketing the
+  real one in a full capture) — `review_done()` calls `reset_globals()`
+  explicitly, and `display_home_page()` (which it then calls) calls
+  `reset_globals()` again itself at its own top. Redundant, not harmful;
+  the second call has nothing left to clear.
+
+### What you'd see on a real failure
+
+Either `shares.buffer` still non-zero right after the exit tap (even
+though `sskr_shares_reset()` did fire — a wipe that doesn't actually wipe),
+or — the more structurally interesting failure — `sskr_shares_reset()`
+**never firing at all** despite the script confirming (via `screen_texts()`)
+that navigation genuinely reached the dashboard. The script distinguishes
+these explicitly in its output rather than lumping them into one generic
+FAIL, since they'd point at different bugs (a broken `memzero()` vs. a
+missing call on some exit path).
+
 ## Gotchas this script works around
 
 None of this was documented anywhere before this script existed; recorded
@@ -286,10 +355,10 @@ in a single-scenario script like this one).
 
 `rsp_client.py` and the `MemorySampler` breakpoint-snapshot pattern in
 `verify_bip39_cancel_clears_buffer.py` are generic — reused as-is for
-`shares` in `verify_sskr_share_cancel_clears_buffer.py` (check #3), and
-still applicable to other secret-buffer-lifecycle scenarios (BIP-85
-passwords, *generated* SSKR shares on dashboard return, etc.) without
-needing to re-solve any of the four gotchas above.
+`shares` in `verify_sskr_share_cancel_clears_buffer.py` (check #3) and
+`verify_sskr_generated_shares_dashboard_return.py` (check #4), and still
+applicable to other secret-buffer-lifecycle scenarios (BIP-85 passwords,
+etc.) without needing to re-solve any of the four gotchas above.
 
 ### 5. Stack-local secrets (as opposed to globals) are SP-relative, and simpler than they look
 
