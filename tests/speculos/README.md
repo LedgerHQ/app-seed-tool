@@ -20,6 +20,10 @@ usual process for whether/how to promote this further.
   stack secrets in `compare_recovery_phrase()` (`src/common/common_seed.c`)
   are cleared at its `cleanup:` label. See "What it checks (scenario 2)"
   below.
+- `verify_sskr_share_cancel_clears_buffer.py` — check #3: the `shares`
+  global (`src/nbgl/sskr_shares.c`) is cleared when the user cancels
+  mid-entry on "Check SSKR", the SSKR analogue of check #1. See "What it
+  checks (scenario 3)" below.
 
 ## Prerequisites
 
@@ -37,6 +41,7 @@ usual process for whether/how to promote this further.
 ```bash
 python3 tests/speculos/verify_bip39_cancel_clears_buffer.py
 python3 tests/speculos/verify_compare_recovery_phrase_cleanup.py
+python3 tests/speculos/verify_sskr_share_cancel_clears_buffer.py
 ```
 
 Takes a few minutes (see "Why is this so slow" below) for the first script.
@@ -52,12 +57,14 @@ state directly instead of waiting on stdout:
 curl -s 'http://localhost:5002/events?currentscreenonly=true' | python3 -m json.tool
 ```
 (the `"Enter word n. X/12..."` text tells you exactly which word it's on).
+The SSKR check only types one word plus a couple of letters, so it's back
+to a few-minutes run like the first script, not 30+.
 
-Both scripts print a snapshot table and a `PASS`/`FAIL` line, exit 1 on
-failure, and start/always tear down their own Speculos container
-(`speculos-bip39-cancel-test` / `speculos-compare-recovery-phrase-cleanup-test`)
-— safe to re-run, and safe to Ctrl-C (though a stray container may need
-`docker rm -f <name>` after a hard interrupt).
+All three scripts print a snapshot table and a `PASS`/`FAIL` line, exit 1
+on failure, and start/always tear down their own Speculos container
+(`speculos-bip39-cancel-test` / `speculos-compare-recovery-phrase-cleanup-test`
+/ `speculos-sskr-cancel-test`) — safe to re-run, and safe to Ctrl-C (though
+a stray container may need `docker rm -f <name>` after a hard interrupt).
 
 ## What it checks
 
@@ -139,6 +146,44 @@ breakpoint — the script prints which buffer and its hex on failure. That
 would mean a real regression in the `goto cleanup;` fix (e.g. a future
 edit reintroducing an early return that bypasses it) — not an
 infrastructure problem, same reasoning as scenario 1.
+
+## What it checks (scenario 3: SSKR share entry cancel)
+
+`verify_sskr_share_cancel_clears_buffer.py` is check #1's direct sibling,
+for the `shares` global (`src/nbgl/sskr_shares.c`) instead of `mnemonic`.
+
+"Check SSKR" screen, flex layout: type an SSKR share word, confirm it (so
+it lands in the real `shares.buffer` via `sskr_shares_word_add()`), start
+a second word without confirming it, then cancel (back button). Unlike
+BIP39, selecting "SSKR Check" from the tool-select screen goes straight to
+the entry keyboard — there's no length-selection step in between
+(`select_tool_callback()` in `src/nbgl/ui.c`).
+
+**Confirmed by reading `sskr_shares_word_remove()`, not assumed going in:**
+it calls `sskr_shares_shrink()`, the real clearing mechanism on this path
+— same structure as `bip39_mnemonic_word_remove()` →
+`bip39_mnemonic_shrink()` in check #1. `sskr_shares_reset()` is, again,
+defense in depth: exercised by the second "back" tap, but by then the
+buffer is already empty.
+
+**Non-obvious pick: the test word is `"acid"`, not `"able"`.**
+`bolos_ux_sskr_byteword_to_hex()` (`src/common/sskr/seed_sskr.c`) decodes
+a typed word via a linear scan of `SSKR_WORDLIST`
+(`src/common/sskr/seed_rom_variables.c`) and returns the word's index in
+that list as the byte value. `"able"` is index 0 — decoding it writes
+`0x00` into `shares.buffer[0]`, which is indistinguishable from "never
+written" or "correctly cleared". `"acid"`, index 1, decodes to `0x01`: an
+unambiguous non-zero value to check for both presence (right after
+confirming) and absence (right after cancelling). Worth remembering for
+any future SSKR-buffer scenario — the all-zero-by-default trap isn't
+specific to this one.
+
+### What you'd see on a real failure
+
+Byte `0x01` still present at `shares.buffer[0]` after the "back" tap that
+should have cleared it — the script prints the full captured bytes on
+failure. Same reasoning as the other two checks: this is a synchronous
+breakpoint read, not a timing-sensitive guess, so a FAIL here is real.
 
 ## Gotchas this script works around
 
@@ -240,9 +285,11 @@ navigator/backend layer, and mixing the two adds coupling for no benefit
 in a single-scenario script like this one).
 
 `rsp_client.py` and the `MemorySampler` breakpoint-snapshot pattern in
-`verify_bip39_cancel_clears_buffer.py` are generic — reusable for other
-secret-buffer-lifecycle scenarios (SSKR shares, BIP-85 passwords, etc.)
-without needing to re-solve any of the four gotchas above.
+`verify_bip39_cancel_clears_buffer.py` are generic — reused as-is for
+`shares` in `verify_sskr_share_cancel_clears_buffer.py` (check #3), and
+still applicable to other secret-buffer-lifecycle scenarios (BIP-85
+passwords, *generated* SSKR shares on dashboard return, etc.) without
+needing to re-solve any of the four gotchas above.
 
 ### 5. Stack-local secrets (as opposed to globals) are SP-relative, and simpler than they look
 
