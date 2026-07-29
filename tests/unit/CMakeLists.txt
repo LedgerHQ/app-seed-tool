@@ -340,6 +340,50 @@ add_executable(test_bip85_hex_vector tests/bip85_hex_vector.c ../../src/common/b
 target_include_directories(test_bip85_hex_vector PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src)
 target_link_libraries(test_bip85_hex_vector PUBLIC cmocka gcov testutils)
 
-foreach(target test_sss test_sss_recover_erase_length test_sskr test_sskr_share_len test_sskr_memzero test_sskr_shard_count test_sskr_generate_split_error test_sskr_generate_bound_groups test_sskr_combine_erase_on_failure test_sskr_count_shards_invariants test_sskr_generate_erase_on_split_failure test_sskr_combine_bounds test_sskr_combine_error test_sskr_combine_invariants test_sskr_interop_bc128 test_sskr_interop_bc128_bytewords test_sskr_entry_bounds test_sskr_byteword_sentinel test_sskr_cbor_additional_info test_bip39 test_roundtrip test_words test_base64 test_base85 test_bip85_dice_bits_per_roll test_bip85_dice_roll test_bip85_bip39_entropy test_bip85_hex_vector)
+# compare_recovery_phrase_finish() is the tail of compare_recovery_phrase()
+# (common_seed.c) that runs once os_derive_bip32_no_throw() -- a BOLOS
+# syscall, not testable on host -- has returned; splitting on that call's
+# *result* rather than the call itself makes the comparison and buffer
+# erasure logic testable, including the derivation-failure path, never
+# exercised anywhere in this suite before. First time common_seed.c enters
+# the test suite: compiling it whole still compiles the untouched
+# compare_recovery_phrase() body too, whose own unconditional (not gated
+# by HAVE_BAGL/HAVE_NBGL) call to os_derive_bip32_no_throw() would
+# otherwise need the real SYSCALL os_perso_derive_node_with_seed_key() (and
+# the BEGIN_TRY/CATCH machinery wrapping it) to resolve at link time --
+# none of it defined for host builds, and none of it exercised by this
+# target, which never calls compare_recovery_phrase() itself. Rather than
+# add link-only stubs for that machinery to testutils.c (shared by every
+# target in this suite, for something only this one needs), this target
+# compiles with -ffunction-sections/-fdata-sections and links with
+# --gc-sections so the linker drops compare_recovery_phrase() and
+# everything it alone pulls in before ever needing to resolve those
+# symbols -- verified with nm on the built test binary, not assumed: only
+# compare_recovery_phrase_finish() and its own gcov counters remain: the
+# defined text symbol for compare_recovery_phrase() itself is gone.
+add_executable(test_compare_recovery_phrase_finish ./tests/compare_recovery_phrase_finish.c ../../src/common/common_seed.c)
+target_include_directories(test_compare_recovery_phrase_finish PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common)
+# common_seed.c's untouched compare_recovery_phrase() body uses
+# CX_CURVE_256K1 (ox_ec.h). The real app build gets it from Makefile.conf.cx
+# (HAVE_ECC_WEIERSTRASS + HAVE_SECP256K1_CURVE, both gating the enum value
+# in ox_ec.h) via the app's own Makefile -- this test target reaches
+# ox_ec.h through <cx.h> the same way, but does not otherwise go through
+# that Makefile, so the two curve flags are forced here too, matching the
+# SCREEN_SIZE_WALLET/HAVE_SHA3 precedent above. Needed regardless of the
+# --gc-sections trick above: the file still has to compile before the
+# linker gets a chance to drop anything.
+target_compile_options(test_compare_recovery_phrase_finish PRIVATE -include cx.h -ffunction-sections -fdata-sections)
+target_compile_definitions(test_compare_recovery_phrase_finish PRIVATE HAVE_ECC_WEIERSTRASS HAVE_SECP256K1_CURVE)
+target_link_options(test_compare_recovery_phrase_finish PRIVATE -Wl,--gc-sections)
+target_link_libraries(test_compare_recovery_phrase_finish PUBLIC cmocka gcov testutils)
+# Expected, harmless compiler warning from this target only: with neither
+# HAVE_BAGL nor HAVE_NBGL defined (a combination the real app build never
+# hits -- one of the two is always set), the two `goto cleanup;` sites
+# inside compare_recovery_phrase()'s UI-specific block are preprocessed
+# out, leaving its `cleanup:` label with no remaining jump to it:
+#   common_seed.c:126:1: warning: label 'cleanup' defined but not used
+#     [-Wunused-label]
+
+foreach(target test_sss test_sss_recover_erase_length test_sskr test_sskr_share_len test_sskr_memzero test_sskr_shard_count test_sskr_generate_split_error test_sskr_combine_bounds test_sskr_combine_error test_sskr_combine_invariants test_sskr_interop_bc128 test_sskr_interop_bc128_bytewords test_sskr_entry_bounds test_sskr_byteword_sentinel test_sskr_cbor_additional_info test_bip39 test_roundtrip test_words test_base64 test_base85 test_bip85_dice_bits_per_roll test_bip85_dice_roll test_bip85_bip39_entropy test_bip85_hex_vector test_compare_recovery_phrase_finish)
     add_test(NAME ${target} COMMAND ${target})
 endforeach()
