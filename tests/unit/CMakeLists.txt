@@ -274,6 +274,32 @@ target_compile_definitions(test_sskr_entry_bounds PRIVATE SCREEN_SIZE_WALLET)
 target_include_directories(test_sskr_entry_bounds PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common ${CMAKE_CURRENT_SOURCE_DIR}/../../src)
 target_link_libraries(test_sskr_entry_bounds PUBLIC cmocka gcov sskr sss testutils)
 
+# src/nbgl/bip39_mnemonic.c is the direct counterpart of src/nbgl/sskr_shares.c
+# just above, and was not compiled into any test target until this one. Same
+# SCREEN_SIZE_WALLET requirement: the whole file sits behind that guard.
+# sskr_shares.c comes along because bip39_mnemonic_from_sskr_shares() calls into
+# it, and the two files reference each other's accessors; the only symbol left
+# unresolved after that is compare_recovery_phrase(), which the test file stubs
+# out rather than dragging common_seed.c and the BIP32 syscall in behind it.
+add_executable(test_bip39_entry_bounds ./tests/bip39_entry_bounds.c ../../src/common/bip39/seed_rom_variables.c ../../src/common/bip39/seed_bip39.c ../../src/common/sskr/seed_rom_variables.c ../../src/common/sskr/seed_sskr.c ../../src/nbgl/bip39_mnemonic.c ../../src/nbgl/sskr_shares.c)
+target_compile_definitions(test_bip39_entry_bounds PRIVATE SCREEN_SIZE_WALLET)
+target_include_directories(test_bip39_entry_bounds PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common ${CMAKE_CURRENT_SOURCE_DIR}/../../src)
+# Expected, harmless compiler warning from this target only, in the same spirit
+# as the -Wunused-label note further down: bip39_mnemonic_from_sskr_shares()
+# hands &mnemonic.length (size_t *) to bolos_ux_sskr_to_seed_convert(), which
+# takes unsigned int *. Those are the same type on every device this app is
+# built for (32-bit ARM, ILP32) and a different one on a 64-bit test host, where
+# GCC 14 makes the mismatch a hard error by default. Downgraded back to a
+# warning rather than silenced, so a genuine one in this target would still be
+# visible, and rather than changing the signature in src/, which is correct for
+# the targets that matter:
+#   src/nbgl/bip39_mnemonic.c:139:9: warning: passing argument 5 of
+#     'bolos_ux_sskr_to_seed_convert' from incompatible pointer type
+#     [-Wincompatible-pointer-types]
+# The function itself is never called from this test.
+target_compile_options(test_bip39_entry_bounds PRIVATE -Wno-error=incompatible-pointer-types)
+target_link_libraries(test_bip39_entry_bounds PUBLIC cmocka gcov sskr sss testutils)
+
 add_executable(test_sskr_byteword_sentinel ./tests/sskr_byteword_sentinel.c ../../src/common/bip39/seed_rom_variables.c ../../src/common/bip39/seed_bip39.c ../../src/common/sskr/seed_rom_variables.c ../../src/common/sskr/seed_sskr.c ../../src/nbgl/sskr_shares.c)
 target_compile_definitions(test_sskr_byteword_sentinel PRIVATE SCREEN_SIZE_WALLET)
 target_include_directories(test_sskr_byteword_sentinel PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common ${CMAKE_CURRENT_SOURCE_DIR}/../../src)
@@ -417,6 +443,6 @@ add_executable(test_bip85_finalize_pwd tests/bip85_finalize_pwd.c ../../src/comm
 target_include_directories(test_bip85_finalize_pwd PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src)
 target_link_libraries(test_bip85_finalize_pwd PUBLIC cmocka gcov testutils)
 
-foreach(target test_sss test_sss_recover_erase_length test_sss_validate_parameters test_sskr test_sskr_to_seed_convert test_sskr_generate_combine_guards test_sskr_threshold_three_roundtrip test_sskr_share_len test_sskr_memzero test_sskr_shard_count test_sskr_generate_split_error test_sskr_generate_bound_groups test_sskr_combine_erase_on_failure test_sskr_count_shards_invariants test_sskr_generate_erase_on_split_failure test_sskr_combine_bounds test_sskr_combine_error test_sskr_combine_invariants test_sskr_interop_bc128 test_sskr_interop_bc128_bytewords test_sskr_entry_bounds test_sskr_byteword_sentinel test_sskr_cbor_additional_info test_bip39 test_roundtrip test_words test_base64 test_base85 test_bip85_dice_bits_per_roll test_bip85_dice_roll test_bip85_bip39_entropy test_bip85_hex_vector test_bip85_finalize_pwd test_bip85_drng_with_seed test_compare_recovery_phrase_finish)
+foreach(target test_sss test_sss_recover_erase_length test_sss_validate_parameters test_sskr test_sskr_to_seed_convert test_sskr_generate_combine_guards test_sskr_threshold_three_roundtrip test_sskr_share_len test_sskr_memzero test_sskr_shard_count test_sskr_generate_split_error test_sskr_generate_bound_groups test_sskr_combine_erase_on_failure test_sskr_count_shards_invariants test_sskr_generate_erase_on_split_failure test_sskr_combine_bounds test_sskr_combine_error test_sskr_combine_invariants test_sskr_interop_bc128 test_sskr_interop_bc128_bytewords test_sskr_entry_bounds test_sskr_byteword_sentinel test_sskr_cbor_additional_info test_bip39 test_bip39_entry_bounds test_roundtrip test_words test_base64 test_base85 test_bip85_dice_bits_per_roll test_bip85_dice_roll test_bip85_bip39_entropy test_bip85_hex_vector test_bip85_finalize_pwd test_bip85_drng_with_seed test_compare_recovery_phrase_finish)
     add_test(NAME ${target} COMMAND ${target})
 endforeach()
