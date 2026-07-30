@@ -181,8 +181,21 @@ target_compile_options(test_sss_recover_erase_length PRIVATE -fsanitize=address 
 target_link_options(test_sss_recover_erase_length PRIVATE -fsanitize=address)
 target_link_libraries(test_sss_recover_erase_length PUBLIC cmocka gcov testutils)
 
+add_executable(test_sss_validate_parameters tests/sss_validate_parameters.c)
+target_link_libraries(test_sss_validate_parameters PUBLIC cmocka gcov testutils sss)
+
 add_executable(test_sskr tests/sskr.c)
 target_link_libraries(test_sskr PUBLIC cmocka gcov testutils sskr sss)
+
+add_executable(test_sskr_to_seed_convert ./tests/sskr_to_seed_convert.c ../../src/common/bip39/seed_rom_variables.c ../../src/common/bip39/seed_bip39.c ../../src/common/sskr/seed_rom_variables.c ../../src/common/sskr/seed_sskr.c)
+target_include_directories(test_sskr_to_seed_convert PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common)
+target_link_libraries(test_sskr_to_seed_convert PUBLIC cmocka gcov sskr sss testutils)
+
+add_executable(test_sskr_generate_combine_guards tests/sskr_generate_combine_guards.c)
+target_link_libraries(test_sskr_generate_combine_guards PUBLIC cmocka gcov testutils sskr sss)
+
+add_executable(test_sskr_threshold_three_roundtrip tests/sskr_threshold_three_roundtrip.c)
+target_link_libraries(test_sskr_threshold_three_roundtrip PUBLIC cmocka gcov testutils sskr sss)
 
 add_executable(test_sskr_share_len ./tests/sskr_share_len.c ../../src/common/bip39/seed_rom_variables.c ../../src/common/bip39/seed_bip39.c ../../src/common/sskr/seed_rom_variables.c ../../src/common/sskr/seed_sskr.c)
 target_include_directories(test_sskr_share_len PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common)
@@ -404,6 +417,6 @@ add_executable(test_bip85_finalize_pwd tests/bip85_finalize_pwd.c ../../src/comm
 target_include_directories(test_bip85_finalize_pwd PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src)
 target_link_libraries(test_bip85_finalize_pwd PUBLIC cmocka gcov testutils)
 
-foreach(target test_sss test_sss_recover_erase_length test_sskr test_sskr_share_len test_sskr_memzero test_sskr_shard_count test_sskr_generate_split_error test_sskr_generate_bound_groups test_sskr_combine_erase_on_failure test_sskr_count_shards_invariants test_sskr_generate_erase_on_split_failure test_sskr_combine_bounds test_sskr_combine_error test_sskr_combine_invariants test_sskr_interop_bc128 test_sskr_interop_bc128_bytewords test_sskr_entry_bounds test_sskr_byteword_sentinel test_sskr_cbor_additional_info test_bip39 test_roundtrip test_words test_base64 test_base85 test_bip85_dice_bits_per_roll test_bip85_dice_roll test_bip85_bip39_entropy test_bip85_hex_vector test_bip85_finalize_pwd test_bip85_drng_with_seed)
+foreach(target test_sss test_sss_recover_erase_length test_sss_validate_parameters test_sskr test_sskr_to_seed_convert test_sskr_generate_combine_guards test_sskr_threshold_three_roundtrip test_sskr_share_len test_sskr_memzero test_sskr_shard_count test_sskr_generate_split_error test_sskr_generate_bound_groups test_sskr_combine_erase_on_failure test_sskr_count_shards_invariants test_sskr_generate_erase_on_split_failure test_sskr_combine_bounds test_sskr_combine_error test_sskr_combine_invariants test_sskr_interop_bc128 test_sskr_interop_bc128_bytewords test_sskr_entry_bounds test_sskr_byteword_sentinel test_sskr_cbor_additional_info test_bip39 test_roundtrip test_words test_base64 test_base85 test_bip85_dice_bits_per_roll test_bip85_dice_roll test_bip85_bip39_entropy test_bip85_hex_vector test_bip85_finalize_pwd test_bip85_drng_with_seed test_compare_recovery_phrase_finish)
     add_test(NAME ${target} COMMAND ${target})
 endforeach()
