@@ -27,6 +27,7 @@ touching secret-buffer lifecycle code in the NBGL UI layer.
   - [3. Async Ctrl-C interrupts are unreliable; breakpoints are not](#3-async-ctrl-c-interrupts-are-unreliable-breakpoints-are-not)
   - [4. Global variables are not at their linked address at runtime](#4-global-variables-are-not-at-their-linked-address-at-runtime)
   - [5. Stack-local secrets are SP-relative, and simpler than globals](#5-stack-local-secrets-are-sp-relative-and-simpler-than-globals)
+  - [6. The GDB stub is not ready when the container is](#6-the-gdb-stub-is-not-ready-when-the-container-is)
 - [Adapting to stax/apex, or another scenario](#adapting-to-staxapex-or-another-scenario)
 
 ## Files
@@ -54,23 +55,33 @@ touching secret-buffer lifecycle code in the NBGL UI layer.
 
 ## Running
 
+All six are executable and carry a `#!/usr/bin/env python3` shebang, so they
+can be run directly (prefixing `python3` also works):
+
 ```bash
-python3 tests/speculos/verify_bip39_cancel_clears_buffer.py
-python3 tests/speculos/verify_compare_recovery_phrase_cleanup.py
-python3 tests/speculos/verify_sskr_share_cancel_clears_buffer.py
-python3 tests/speculos/verify_sskr_generated_shares_dashboard_return.py
-python3 tests/speculos/verify_bip85_bip39_output_cleanup.py
-python3 tests/speculos/verify_app_reopen_clears_mnemonic.py
+./tests/speculos/verify_bip39_cancel_clears_buffer.py
+./tests/speculos/verify_compare_recovery_phrase_cleanup.py
+./tests/speculos/verify_sskr_share_cancel_clears_buffer.py
+./tests/speculos/verify_sskr_generated_shares_dashboard_return.py
+./tests/speculos/verify_bip85_bip39_output_cleanup.py
+./tests/speculos/verify_app_reopen_clears_mnemonic.py
 ```
 
-| Script | Typical duration | Why |
+Durations below are measured, from one sequential run of all six on a single
+host — treat them as an order of magnitude, not a guarantee; the dominant
+cost is the per-syscall GDB round-trip (gotcha 2), so they scale with host
+load.
+
+| Script | Measured | Why |
 |---|---|---|
-| Check 1 (BIP39 cancel) | A few minutes | Types one word only. |
-| Check 2 (`compare_recovery_phrase_finish`) | 15–30+ minutes | Types and confirms a full 12-word mnemonic. |
-| Check 3 (SSKR cancel) | A few minutes | Types one word plus a couple of letters. |
-| Check 4 (generated shares) | 15–30+ minutes | Types the full 12-word mnemonic, then generates and pages through 3 shares. |
-| Check 5 (BIP-85 BIP39 output) | A few minutes | Button taps and one numeric-keypad entry only, no mnemonic typing. |
-| Check 6 (app reopen) | 15–30+ minutes | Types and confirms a full 12-word mnemonic, then boots a second container. |
+| Check 1 (BIP39 cancel) | ~4.5 min | Types one word only. |
+| Check 2 (`compare_recovery_phrase_finish`) | ~33 min | Types and confirms a full 12-word mnemonic. |
+| Check 3 (SSKR cancel) | ~4 min | Types one word plus a couple of letters. |
+| Check 4 (generated shares) | ~35 min | Types the full 12-word mnemonic, then generates and pages through 3 shares. |
+| Check 5 (BIP-85 BIP39 output) | ~1 min | Button taps and one numeric-keypad entry only, no mnemonic typing. |
+| Check 6 (app reopen) | ~33 min | Types and confirms a full 12-word mnemonic, then boots a second container. |
+
+Running all six back to back therefore takes roughly two hours.
 
 The long runs are not hangs. Every guest syscall round-trips through this
 script while GDB is attached (see gotcha 2), and individual keystroke
@@ -555,6 +566,45 @@ image reads section/symbol tables fine (`nm`, `readelf` work unprefixed)
 but fails to disassemble ARM code at all
 (`can't disassemble for architecture UNKNOWN`) — use
 `arm-none-eabi-objdump -d` explicitly for that.
+
+### 6. The GDB stub is not ready when the container is
+
+`docker run` returning does not mean the gdbstub inside is listening. These
+scripts originally slept a flat 2 seconds before connecting, which is
+enough on some hosts and not on others; when it isn't, the failure lands on
+the *first RSP command* rather than at `connect()`:
+
+```
+  File "tests/speculos/rsp_client.py", line 78, in insert_bp
+    if self.send_command(f"Z0,{addr:x},{kind}") != "OK":
+ConnectionResetError: [Errno 104] Connection reset by peer
+```
+
+`wait_for_gdb()` (`rsp_client.py`) replaces that sleep in every script: it
+polls the port with a plain TCP connect until it is accepted, then allows a
+short settle before returning.
+
+**Do not "improve" it into an RSP-level probe.** The obvious objection to a
+TCP-only check is that it can succeed too early — and that is real, and
+Docker-configuration-dependent. With Docker's userland proxy (check with
+`ps aux | grep docker-proxy`) the host port is bound the instant the
+container starts, so `connect()` succeeds while the stub is still coming
+up; one host measured TCP accepted at +0.20s but the stub only answering at
++0.70s, with `ConnectionResetError` on every RSP attempt in between.
+Without the userland proxy (iptables DNAT), the connection is refused until
+the stub listens, so there the two coincide. Tightening the probe to send
+`?` and require a well-formed reply was tried, and it *broke the run*:
+QEMU's gdbstub serves a single GDB session, so a throwaway connection that
+actually speaks RSP and then closes reads as a client attaching and
+detaching, after which the real connection hangs on its first command. The
+trailing settle sleep is the deliberate, working alternative — the probe
+must stay silent.
+
+(A related framing trap, if anyone does revisit this: the stub's `+` ack
+and its `$T05...#xx` stop-reply may arrive coalesced in one TCP segment or
+split across two. Both were observed on the same host on consecutive runs,
+so any reply-parsing logic must read until it has a complete packet rather
+than trusting a single `recv()`.)
 
 ## Adapting to stax/apex, or another scenario
 

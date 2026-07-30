@@ -35,7 +35,7 @@ import time
 import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from rsp_client import RSP
+from rsp_client import RSP, wait_for_gdb
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 ELF_PATH = os.path.join(REPO_ROOT, "build", "flex", "bin", "app.elf")
@@ -346,7 +346,9 @@ def main():
         print("Starting Speculos ...")
         start_container(patched_main)
         try:
-            time.sleep(2)
+            if not wait_for_gdb(GDB_PORT):
+                die(f"Speculos GDB stub on port {GDB_PORT} did not "
+                    "become ready in time")
             sampler = MemorySampler(watch, shares_offset, read_len)
             sampler.start()
             print("Navigating: home -> SSKR Check -> type+confirm 'acid' -> "
