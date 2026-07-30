@@ -14,6 +14,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  ********************************************************************************/
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
@@ -254,6 +255,242 @@ uint8_t bip85_finalize_pwd(const char* buffer_pwd, char* pwd, uint8_t pwd_len) {
     return pwd_len;
 }
 
+/*
+ * BIP-85 derivation paths and the parameter ranges the applications below
+ * accept.
+ *
+ * Kept outside the `HAVE_NBGL` guard, and with external linkage, purely so
+ * they can be linked into a unit test -- same pattern as
+ * `bip85_dice_roll()`/`bip85_entropy_from_key()`/`bip85_finalize_pwd()`
+ * above. The `bolos_ux_bip85_*` entry points that use them are BOLOS-only
+ * (they reach `os_derive_bip32_no_throw()` through
+ * `bolos_ux_bip85_entropy()`), but building the path and range-checking the
+ * parameters is pure arithmetic that happens strictly *before* that syscall,
+ * so it needs none of it.
+ *
+ * These path components are the whole of this application's BIP-85
+ * conformance surface: a one-character slip in any of them still derives a
+ * perfectly well-formed secret, just not the one BIP-85 specifies, and
+ * nothing on the device would show it. They are split out here so a test can
+ * pin every component against the decimal numbers in the specification.
+ *
+ * Each builder fills the caller's array and returns the number of components
+ * it wrote, so the length handed to `bolos_ux_bip85_entropy()` comes from the
+ * same place as the values themselves. Callers size their array with the
+ * matching `BIP85_PATH_LEN_*` macro.
+ */
+
+#define BIP85_PATH_LEN_DRNG 3
+#define BIP85_PATH_LEN_BIP39 5
+#define BIP85_PATH_LEN_HEX 4
+#define BIP85_PATH_LEN_PWD_BASE64 4
+#define BIP85_PATH_LEN_PWD_BASE85 4
+#define BIP85_PATH_LEN_DICE 5
+
+/**
+ * @brief Builds the BIP-85 DRNG derivation path.
+ *
+ * @param[out] path  Array of at least `BIP85_PATH_LEN_DRNG` components.
+ * @param[in]  index Index to be used in the path.
+ *
+ * @return The number of path components written.
+ */
+unsigned int bip85_path_drng(unsigned int* path, unsigned int index) {
+    // m / purpose'   / app_no' / index'
+    // m / 83696968'  / 0'      / index'
+    path[0] = 0x84FD1D48;
+    path[1] = 0x80000000;
+    path[2] = 0x80000000 | index;
+    return BIP85_PATH_LEN_DRNG;
+}
+
+/**
+ * @brief Builds the BIP-85 BIP39 derivation path.
+ *
+ * @param[out] path     Array of at least `BIP85_PATH_LEN_BIP39` components.
+ * @param[in]  language Language code for the mnemonic words.
+ * @param[in]  words    Number of mnemonic words to generate.
+ * @param[in]  index    Index to be used in the path.
+ *
+ * @return The number of path components written.
+ */
+unsigned int bip85_path_bip39(unsigned int* path, uint8_t language,
+                              uint8_t words, unsigned int index) {
+    // m / purpose'   / app_no' / language' / words' / index'
+    // m / 83696968'  / 39'     / language' / words' / index'
+    path[0] = 0x84FD1D48;
+    path[1] = 0x80000027;
+    path[2] = 0x80000000 | language;
+    path[3] = 0x80000000 | words;
+    path[4] = 0x80000000 | index;
+    return BIP85_PATH_LEN_BIP39;
+}
+
+/**
+ * @brief Builds the BIP-85 HEX derivation path.
+ *
+ * @param[out] path      Array of at least `BIP85_PATH_LEN_HEX` components.
+ * @param[in]  num_bytes Number of bytes to generate.
+ * @param[in]  index     Index to be used in the path.
+ *
+ * @return The number of path components written.
+ */
+unsigned int bip85_path_hex(unsigned int* path, uint8_t num_bytes,
+                            unsigned int index) {
+    // m / purpose'   / app_no' / num_bytes' / index'
+    // m / 83696968'  / 128169' / num_bytes' / index'
+    path[0] = 0x84FD1D48;
+    path[1] = 0x8001F4A9;
+    path[2] = 0x80000000 | num_bytes;
+    path[3] = 0x80000000 | index;
+    return BIP85_PATH_LEN_HEX;
+}
+
+/**
+ * @brief Builds the BIP-85 Base64 password derivation path.
+ *
+ * @param[out] path    Array of at least `BIP85_PATH_LEN_PWD_BASE64`
+ * components.
+ * @param[in]  pwd_len Length of the password in characters.
+ * @param[in]  index   Index to be used in the path.
+ *
+ * @return The number of path components written.
+ */
+unsigned int bip85_path_pwd_base64(unsigned int* path, uint8_t pwd_len,
+                                   unsigned int index) {
+    // m / purpose'   / app_no' / pwd_len' / index'
+    // m / 83696968'  / 707764' / pwd_len' / index'
+    path[0] = 0x84FD1D48;
+    path[1] = 0x800ACCB4;
+    path[2] = 0x80000000 | pwd_len;
+    path[3] = 0x80000000 | index;
+    return BIP85_PATH_LEN_PWD_BASE64;
+}
+
+/**
+ * @brief Builds the BIP-85 Base85 password derivation path.
+ *
+ * @param[out] path    Array of at least `BIP85_PATH_LEN_PWD_BASE85`
+ * components.
+ * @param[in]  pwd_len Length of the password in characters.
+ * @param[in]  index   Index to be used in the path.
+ *
+ * @return The number of path components written.
+ */
+unsigned int bip85_path_pwd_base85(unsigned int* path, uint8_t pwd_len,
+                                   unsigned int index) {
+    // m / purpose'   / app_no' / pwd_len' / index'
+    // m / 83696968'  / 707785' / pwd_len' / index'
+    path[0] = 0x84FD1D48;
+    path[1] = 0x800ACCC9;
+    path[2] = 0x80000000 | pwd_len;
+    path[3] = 0x80000000 | index;
+    return BIP85_PATH_LEN_PWD_BASE85;
+}
+
+/**
+ * @brief Builds the BIP-85 DICE derivation path.
+ *
+ * @param[out] path  Array of at least `BIP85_PATH_LEN_DICE` components.
+ * @param[in]  sides Number of sides on each die.
+ * @param[in]  rolls Number of dice rolls to generate.
+ * @param[in]  index Index to be used in the path.
+ *
+ * @return The number of path components written.
+ */
+unsigned int bip85_path_dice(unsigned int* path, uint32_t sides, uint32_t rolls,
+                             unsigned int index) {
+    // m / purpose'   / app_no' / sides' / rolls' / index'
+    // m / 83696968'  / 89101' /  sides' / rolls' / index'
+    path[0] = 0x84FD1D48;
+    path[1] = 0x80015C0D;
+    path[2] = 0x80000000 | sides;
+    path[3] = 0x80000000 | rolls;
+    path[4] = 0x80000000 | index;
+    return BIP85_PATH_LEN_DICE;
+}
+
+/**
+ * @brief Reports whether `words` is a mnemonic length the BIP39 application
+ * accepts.
+ *
+ * @details The `LEDGER_ASSERT` that enforces this still terminates the
+ * process on a violation exactly as before; only the condition moved here, so
+ * that both sides of each bound can be checked by a unit test.
+ *
+ * @param[in] words Number of mnemonic words requested.
+ *
+ * @return `true` if the value is in range.
+ */
+bool bip85_bip39_words_valid(uint8_t words) {
+    return (words >= BIP39_MNEMONIC_SIZE_12) && (words % 3 == 0) &&
+           (words <= BIP39_MNEMONIC_SIZE_24);
+}
+
+/**
+ * @brief Reports whether `num_bytes` is an output length the HEX application
+ * accepts. See `bip85_bip39_words_valid()` for why this is a separate
+ * function.
+ *
+ * @param[in] num_bytes Number of bytes requested.
+ *
+ * @return `true` if the value is in range.
+ */
+bool bip85_hex_num_bytes_valid(uint8_t num_bytes) {
+    return (num_bytes >= 16) && (num_bytes <= BIP85_ENTROPY_LENGTH);
+}
+
+/**
+ * @brief Reports whether `pwd_len` is a password length the Base64
+ * application accepts. See `bip85_bip39_words_valid()` for why this is a
+ * separate function.
+ *
+ * @param[in] pwd_len Password length requested, in characters.
+ *
+ * @return `true` if the value is in range.
+ */
+bool bip85_pwd_base64_len_valid(uint8_t pwd_len) {
+    return (pwd_len >= 20) && (pwd_len <= BASE64_ENCODE_LENGTH - 2);
+}
+
+/**
+ * @brief Reports whether `pwd_len` is a password length the Base85
+ * application accepts. See `bip85_bip39_words_valid()` for why this is a
+ * separate function.
+ *
+ * @param[in] pwd_len Password length requested, in characters.
+ *
+ * @return `true` if the value is in range.
+ */
+bool bip85_pwd_base85_len_valid(uint8_t pwd_len) {
+    return (pwd_len >= 10) && (pwd_len <= BASE85_ENCODE_LENGTH);
+}
+
+/**
+ * @brief Reports whether `sides` is a die size the DICE application accepts.
+ * See `bip85_bip39_words_valid()` for why this is a separate function.
+ *
+ * @param[in] sides Number of sides on the die.
+ *
+ * @return `true` if the value is in range.
+ */
+bool bip85_dice_sides_valid(uint32_t sides) {
+    return (sides >= 2) && (sides <= (UINT32_MAX >> 1));
+}
+
+/**
+ * @brief Reports whether `rolls` is a roll count the DICE application
+ * accepts. See `bip85_bip39_words_valid()` for why this is a separate
+ * function.
+ *
+ * @param[in] rolls Number of rolls requested.
+ *
+ * @return `true` if the value is in range.
+ */
+bool bip85_dice_rolls_valid(uint32_t rolls) {
+    return (rolls >= 1) && (rolls <= (UINT32_MAX >> 1));
+}
+
 #if defined(HAVE_NBGL)
 #include <lcx_hmac.h>
 #include <lcx_sha3.h>
@@ -320,13 +557,12 @@ bool bolos_ux_bip85_entropy(uint8_t* entropy, const unsigned int* path,
  */
 void bolos_ux_bip85_drng_test(uint8_t* digest, size_t digest_length,
                               unsigned int index) {
-    // m / purpose'   / app_no' / index'
-    // m / 83696968'  / 0'      / index'
-    const unsigned int path[] = {0x84FD1D48, 0x80000000, 0x80000000 | index};
+    unsigned int path[BIP85_PATH_LEN_DRNG];
+    unsigned int path_len = bip85_path_drng(path, index);
 
     uint8_t buffer[BIP85_ENTROPY_LENGTH];
 
-    if (bolos_ux_bip85_entropy(buffer, path, ARRAYLEN(path)) != 1) {
+    if (bolos_ux_bip85_entropy(buffer, path, path_len) != 1) {
         memzero(buffer, BIP85_ENTROPY_LENGTH);
         LEDGER_ASSERT(false, "BIP85 entropy failed");
     }
@@ -342,18 +578,15 @@ void bolos_ux_bip85_drng_test(uint8_t* digest, size_t digest_length,
 
 uint8_t bolos_ux_bip85_bip39(uint8_t* hex_out, uint8_t language, uint8_t words,
                              unsigned int index) {
-    LEDGER_ASSERT((words >= BIP39_MNEMONIC_SIZE_12) && (words % 3 == 0) &&
-                      (words <= BIP39_MNEMONIC_SIZE_24),
+    LEDGER_ASSERT(bip85_bip39_words_valid(words),
                   "Invalid value for BIP85 BIP89 words");
 
-    // m / purpose'   / app_no' / language' / words' / index'
-    // m / 83696968'  / 39'     / language' / words' / index'
-    const unsigned int path[] = {0x84FD1D48, 0x80000027, 0x80000000 | language,
-                                 0x80000000 | words, 0x80000000 | index};
+    unsigned int path[BIP85_PATH_LEN_BIP39];
+    unsigned int path_len = bip85_path_bip39(path, language, words, index);
 
     uint8_t buffer[BIP85_ENTROPY_LENGTH];
 
-    if (bolos_ux_bip85_entropy(buffer, path, ARRAYLEN(path)) != 1) {
+    if (bolos_ux_bip85_entropy(buffer, path, path_len) != 1) {
         memzero(buffer, BIP85_ENTROPY_LENGTH);
         LEDGER_ASSERT(false, "BIP85 entropy failed");
     }
@@ -367,17 +600,15 @@ uint8_t bolos_ux_bip85_bip39(uint8_t* hex_out, uint8_t language, uint8_t words,
 
 void bolos_ux_bip85_hex(uint8_t* hex_out, uint8_t num_bytes,
                         unsigned int index) {
-    LEDGER_ASSERT((num_bytes >= 16) && (num_bytes <= BIP85_ENTROPY_LENGTH),
+    LEDGER_ASSERT(bip85_hex_num_bytes_valid(num_bytes),
                   "Invalid value for BIP85 HEX length");
 
-    // m / purpose'   / app_no' / num_bytes' / index'
-    // m / 83696968'  / 128169' / num_bytes' / index'
-    const unsigned int path[] = {0x84FD1D48, 0x8001F4A9, 0x80000000 | num_bytes,
-                                 0x80000000 | index};
+    unsigned int path[BIP85_PATH_LEN_HEX];
+    unsigned int path_len = bip85_path_hex(path, num_bytes, index);
 
     uint8_t buffer[BIP85_ENTROPY_LENGTH];
 
-    if (bolos_ux_bip85_entropy(buffer, path, ARRAYLEN(path)) != 1) {
+    if (bolos_ux_bip85_entropy(buffer, path, path_len) != 1) {
         memzero(buffer, BIP85_ENTROPY_LENGTH);
         LEDGER_ASSERT(false, "BIP85 entropy failed");
     }
@@ -390,16 +621,15 @@ void bolos_ux_bip85_hex(uint8_t* hex_out, uint8_t num_bytes,
 
 uint8_t bolos_ux_bip85_pwd_base64(char* pwd, uint8_t pwd_len,
                                   unsigned int index) {
-    LEDGER_ASSERT((pwd_len >= 20) && (pwd_len <= BASE64_ENCODE_LENGTH - 2),
+    LEDGER_ASSERT(bip85_pwd_base64_len_valid(pwd_len),
                   "Invalid value for BIP85 PWD BASE64 length");
 
-    // m / purpose'   / app_no' / pwd_len' / index'
-    // m / 83696968'  / 707764' / pwd_len' / index'
-    const unsigned int path[] = {0x84FD1D48, 0x800ACCB4, 0x80000000 | pwd_len,
-                                 0x80000000 | index};
+    unsigned int path[BIP85_PATH_LEN_PWD_BASE64];
+    unsigned int path_len = bip85_path_pwd_base64(path, pwd_len, index);
+
     uint8_t buffer_ent[BIP85_ENTROPY_LENGTH];
 
-    if (bolos_ux_bip85_entropy(buffer_ent, path, ARRAYLEN(path)) != 1) {
+    if (bolos_ux_bip85_entropy(buffer_ent, path, path_len) != 1) {
         memzero(buffer_ent, BIP85_ENTROPY_LENGTH);
         LEDGER_ASSERT(false, "BIP85 entropy failed");
     }
@@ -423,16 +653,15 @@ uint8_t bolos_ux_bip85_pwd_base64(char* pwd, uint8_t pwd_len,
 
 uint8_t bolos_ux_bip85_pwd_base85(char* pwd, uint8_t pwd_len,
                                   unsigned int index) {
-    LEDGER_ASSERT((pwd_len >= 10) && (pwd_len <= BASE85_ENCODE_LENGTH),
+    LEDGER_ASSERT(bip85_pwd_base85_len_valid(pwd_len),
                   "Invalid value for BIP85 PWD BASE85 length");
 
-    // m / purpose'   / app_no' / pwd_len' / index'
-    // m / 83696968'  / 707785' / pwd_len' / index'
-    const unsigned int path[] = {0x84FD1D48, 0x800ACCC9, 0x80000000 | pwd_len,
-                                 0x80000000 | index};
+    unsigned int path[BIP85_PATH_LEN_PWD_BASE85];
+    unsigned int path_len = bip85_path_pwd_base85(path, pwd_len, index);
+
     uint8_t buffer_ent[BIP85_ENTROPY_LENGTH];
 
-    if (bolos_ux_bip85_entropy(buffer_ent, path, ARRAYLEN(path)) != 1) {
+    if (bolos_ux_bip85_entropy(buffer_ent, path, path_len) != 1) {
         memzero(buffer_ent, BIP85_ENTROPY_LENGTH);
         LEDGER_ASSERT(false, "BIP85 entropy failed");
     }
@@ -456,19 +685,17 @@ uint8_t bolos_ux_bip85_pwd_base85(char* pwd, uint8_t pwd_len,
 
 int32_t bolos_ux_bip85_dice(uint32_t* out, size_t out_capacity, uint32_t sides,
                             uint32_t rolls, uint32_t index) {
-    LEDGER_ASSERT((sides >= 2) && (sides <= (UINT32_MAX >> 1)),
+    LEDGER_ASSERT(bip85_dice_sides_valid(sides),
                   "Invalid value for BIP85 DICE sides");
-    LEDGER_ASSERT((rolls >= 1) && (rolls <= (UINT32_MAX >> 1)),
+    LEDGER_ASSERT(bip85_dice_rolls_valid(rolls),
                   "Invalid value for BIP85 DICE rolls");
 
-    // m / purpose'   / app_no' / sides' / rolls' / index'
-    // m / 83696968'  / 89101' /  sides' / rolls' / index'
-    const unsigned int path[] = {0x84FD1D48, 0x80015C0D, 0x80000000 | sides,
-                                 0x80000000 | rolls, 0x80000000 | index};
+    unsigned int path[BIP85_PATH_LEN_DICE];
+    unsigned int path_len = bip85_path_dice(path, sides, rolls, index);
 
     uint8_t buffer_ent[BIP85_ENTROPY_LENGTH];
 
-    if (bolos_ux_bip85_entropy(buffer_ent, path, ARRAYLEN(path)) != 1) {
+    if (bolos_ux_bip85_entropy(buffer_ent, path, path_len) != 1) {
         memzero(buffer_ent, BIP85_ENTROPY_LENGTH);
         LEDGER_ASSERT(false, "BIP85 entropy failed");
     }
