@@ -79,7 +79,7 @@ import time
 import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from rsp_client import RSP
+from rsp_client import RSP, wait_for_gdb
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 ELF_PATH = os.path.join(REPO_ROOT, "build", "flex", "bin", "app.elf")
@@ -418,13 +418,16 @@ def main():
         print(f"Starting first Speculos container ({CONTAINER_NAME_1}) ...")
         start_container(CONTAINER_NAME_1, patched_main)
         try:
-            time.sleep(2)
+            if not wait_for_gdb(GDB_PORT):
+                die(f"Speculos GDB stub on port {GDB_PORT} did not "
+                    "become ready in time")
             sampler1 = CheckReturnSampler(check_addr, mnemonic_offset, mnemonic_len)
             sampler1.start()
             print("Navigating: home -> BIP39 Check -> 12 words -> type+confirm "
                   "all 12 words of the test mnemonic ...")
             print("(this is slow -- every guest syscall round-trips through this "
-                  "script while GDB is attached; a full run takes a few minutes)")
+                  "script while GDB is attached; a full run of the 12-word entry "
+                  "alone can take 15-30+ minutes, see README.md)")
             navigate_and_confirm_mnemonic()
             for _ in range(150):
                 if sampler1.after_return is not None:
@@ -466,7 +469,9 @@ def main():
               "volumes/state with the first ...")
         start_container(CONTAINER_NAME_2, patched_main)
         try:
-            time.sleep(2)
+            if not wait_for_gdb(GDB_PORT):
+                die(f"Speculos GDB stub on port {GDB_PORT} did not "
+                    "become ready in time")
             sampler2 = FreshBootSampler(idle_addr, mnemonic_offset, mnemonic_len)
             sampler2.start()
             print("Waiting for the fresh process to reach ui_idle_init() "

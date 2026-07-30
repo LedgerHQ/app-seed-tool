@@ -3,12 +3,51 @@
 Talks directly to the gdbstub speculos/QEMU exposes on the debug port
 (``-d``, port 1234), without depending on a real ``gdb`` binary. Stdlib only.
 
-Only implements what verify_bip39_cancel_clears_buffer.py needs: resume
+Only implements what the verify_*.py checks in this directory need: resume
 execution, insert/remove a software breakpoint, single-step, read general
 registers, read memory, and redeliver a signal (used to pass SIGILL through
 -- see the README in this directory for why that's required).
+
+Also provides wait_for_gdb(), the startup-race guard every verify_*.py
+script needs before opening its RSP connection.
 """
 import socket
+import time
+
+
+def wait_for_gdb(port=1234, host="localhost", timeout=15):
+    """Wait for Speculos's GDB stub to come up before connecting to it.
+    Returns True once it looks ready, False if `timeout` elapses first
+    (callers report that as their own failure).
+
+    A fixed sleep after `docker run` is not enough: how long the stub takes
+    to start listening varies with the host and its load, and connecting too
+    early fails with `ConnectionResetError` on the first RSP command rather
+    than at connect() time.
+
+    Deliberately probes with a bare TCP connect and nothing else. It is
+    tempting to make this stricter by sending a real RSP packet ("?") and
+    requiring a well-formed reply, since a plain connect() can succeed
+    before the stub is truly ready -- with Docker's userland proxy the host
+    port is bound the instant the container starts, and one host measured
+    TCP accepted at +0.20s but the stub only answering at +0.70s, with
+    ConnectionResetError in between. Do not do that: QEMU's gdbstub serves a
+    single GDB session, so a throwaway connection that actually speaks RSP
+    and then disconnects reads as a client attaching and detaching, and the
+    real connection that follows then hangs on its first command. That was
+    tried here and broke the run; the trailing sleep below is the
+    deliberate, working alternative.
+    """
+    start = time.time()
+    while time.time() - start < timeout:
+        try:
+            s = socket.create_connection((host, port), timeout=1)
+            s.close()
+            time.sleep(1)  # brief buffer for GDB stub handshake readiness
+            return True
+        except (ConnectionRefusedError, OSError):
+            time.sleep(0.5)
+    return False
 
 
 class RSP:

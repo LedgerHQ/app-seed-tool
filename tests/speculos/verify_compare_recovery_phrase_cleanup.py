@@ -63,7 +63,7 @@ import time
 import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from rsp_client import RSP
+from rsp_client import RSP, wait_for_gdb
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 ELF_PATH = os.path.join(REPO_ROOT, "build", "flex", "bin", "app.elf")
@@ -443,14 +443,17 @@ def main():
         print(f"Starting Speculos (device seed: \"{MNEMONIC}\") ...")
         start_container(patched_main)
         try:
-            time.sleep(2)
+            if not wait_for_gdb(GDB_PORT):
+                die(f"Speculos GDB stub on port {GDB_PORT} did not "
+                    "become ready in time")
             sampler = MemorySampler(before_addr, after_addr,
                                     buffer_device_reg, buffer_reg)
             sampler.start()
             print("Navigating: home -> BIP39 Check -> 12 words -> type+confirm "
                   "all 12 words of the test mnemonic ...")
             print("(this is slow -- every guest syscall round-trips through this "
-                  "script while GDB is attached; a full run takes a few minutes)")
+                  "script while GDB is attached; a full run of the 12-word entry "
+                  "alone can take 15-30+ minutes, see README.md)")
             navigate_and_check()
             # give the two breakpoints time to fire once the 12th word
             # triggers bip39_mnemonic_check() -> compare_recovery_phrase();
