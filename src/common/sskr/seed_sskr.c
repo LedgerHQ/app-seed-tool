@@ -34,6 +34,14 @@
 #error "What kind of system is this?"
 #endif
 
+// Largest a full set of serialized shards can be, in bytes, and hence the
+// capacity of every share buffer handed to bolos_ux_sskr_generate(): every
+// group at its maximum member count, each shard holding a maximum-strength
+// value plus its metadata.
+#define SSKR_MAX_SHARE_BUFFER_LENGTH              \
+    (SSKR_MAX_GROUP_COUNT * SSS_MAX_SHARE_COUNT * \
+     (SSKR_MAX_STRENGTH_BYTES + SSKR_METADATA_LENGTH_BYTES))
+
 int16_t bolos_ux_sskr_size_get(uint8_t bip39_type, uint8_t groups_threshold,
                                unsigned int* group_descriptor,
                                uint8_t groups_len, uint8_t* share_len) {
@@ -134,6 +142,13 @@ unsigned int bolos_ux_sskr_generate(uint8_t groups_threshold,
     if (groups_len > SSKR_MAX_GROUP_COUNT) {
         return 0;
     }
+    // share_buffer_len is a write length, not just a capacity hint: the
+    // failure path below memzero()s the whole of it. No real share buffer is
+    // longer than a full set of maximum-size shards, so refuse anything
+    // longer rather than write past the end of one.
+    if (share_buffer_len > SSKR_MAX_SHARE_BUFFER_LENGTH) {
+        return 0;
+    }
     sskr_group_descriptor_t groups[SSKR_MAX_GROUP_COUNT];
 
     for (uint8_t i = 0; i < (uint8_t)groups_len; i++) {
@@ -228,11 +243,22 @@ unsigned int bolos_ux_bip39_to_sskr_convert(
             bip39_type, groups_threshold, group_descriptor, groups_len,
             &share_len_expected);
 
+        // bolos_ux_sskr_size_get() propagates sskr_count_shards()'s negative
+        // error codes as-is for an invalid group descriptor. The product
+        // below is a uint16_t, so a negative count would wrap into a length
+        // far larger than share_hex_buffer, which bolos_ux_sskr_generate()
+        // then memzero()s. Reject the descriptor before that product is
+        // formed.
+        if (share_count_expected < 0 || share_len_expected == 0) {
+            *share_count = 0;
+            memzero(seed_buffer, sizeof(seed_buffer));
+            memzero(bip39_words_buffer, bip39_words_buffer_length);
+            return 0;
+        }
+
         uint16_t share_hex_buffer_len =
             share_count_expected * share_len_expected;
-        uint8_t share_hex_buffer[SSKR_MAX_GROUP_COUNT * SSS_MAX_SHARE_COUNT *
-                                 (SSKR_MAX_STRENGTH_BYTES +
-                                  SSKR_METADATA_LENGTH_BYTES)];
+        uint8_t share_hex_buffer[SSKR_MAX_SHARE_BUFFER_LENGTH];
         uint8_t share_len = 0;
         *share_count = bolos_ux_sskr_generate(
             groups_threshold, group_descriptor, groups_len, seed_buffer,
