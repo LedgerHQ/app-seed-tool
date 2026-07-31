@@ -22,7 +22,35 @@ ENABLE_TESTING()
 # specify C standard
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED True)
-set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -Wall -pedantic -g -O0 --coverage")
+# -Wmissing-prototypes is here for a defect this suite could not see: a
+# function whose definition contradicts the declaration callers use, in a
+# file that never includes its own public header. Six such divergences lived
+# in seed_bip39.c and seed_sskr.c for as long as those files did not include
+# common_bip39.h / common_sskr.h. They do now, which makes any future
+# divergence a compilation error; this flag covers the other half of the
+# problem, a function with external linkage and no prototype at all, where
+# there is nothing for the compiler to compare a definition against.
+#
+# It is not at zero. As of this commit it reports 42 functions, 26 of them in
+# src/: 17 in bip85/seed_bip85.c, 2 in sskr/seed_sskr.c, and one each in
+# bip39/seed_bip39.c, common_seed.c, bip85/base64.c, bip85/base85.c,
+# sskr/sss/sss.c, nbgl/bip39_mnemonic.c and nbgl/sskr_shares.c. Making them
+# static is not the automatic answer: several are referenced by extern
+# declarations in tests/unit/tests/, sss.c is kept diffable against upstream
+# bc-sskr, and bolos_ux_bip39_mnemonic_to_seed_hash_length128() exists
+# precisely to keep the pbkdf2 frame off its caller's stack, which static
+# would let the compiler undo. They are left as warnings deliberately; the
+# point of the flag is that a *new* one shows up.
+#
+# -Wstrict-prototypes is already clean everywhere and is here as a ratchet.
+#
+# Not added to the application build: measured there, the two flags report
+# 120 warnings on stax and 151 on nanos, roughly half of them inside the SDK
+# itself (39 and 49 in syscalls.c alone, plus lib_standard_app), which this
+# repository cannot act on. ENABLE_SDK_WERROR defaults to 0 and is not
+# overridden here, so they would not break that build -- they would just bury
+# the app's own diagnostics.
+set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -Wall -Wmissing-prototypes -Wstrict-prototypes -pedantic -g -O0 --coverage")
 
 set(GCC_COVERAGE_LINK_FLAGS "--coverage -lgcov")
 set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${GCC_COVERAGE_LINK_FLAGS}")
@@ -344,20 +372,6 @@ target_link_libraries(test_sskr_entry_bounds PUBLIC cmocka gcov sskr sss testuti
 add_executable(test_bip39_entry_bounds ./tests/bip39_entry_bounds.c ../../src/common/bip39/seed_rom_variables.c ../../src/common/bip39/seed_bip39.c ../../src/common/sskr/seed_rom_variables.c ../../src/common/sskr/seed_sskr.c ../../src/nbgl/bip39_mnemonic.c ../../src/nbgl/sskr_shares.c)
 target_compile_definitions(test_bip39_entry_bounds PRIVATE SCREEN_SIZE_WALLET)
 target_include_directories(test_bip39_entry_bounds PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common ${CMAKE_CURRENT_SOURCE_DIR}/../../src)
-# Expected, harmless compiler warning from this target only, in the same spirit
-# as the -Wunused-label note further down: bip39_mnemonic_from_sskr_shares()
-# hands &mnemonic.length (size_t *) to bolos_ux_sskr_to_seed_convert(), which
-# takes unsigned int *. Those are the same type on every device this app is
-# built for (32-bit ARM, ILP32) and a different one on a 64-bit test host, where
-# GCC 14 makes the mismatch a hard error by default. Downgraded back to a
-# warning rather than silenced, so a genuine one in this target would still be
-# visible, and rather than changing the signature in src/, which is correct for
-# the targets that matter:
-#   src/nbgl/bip39_mnemonic.c:139:9: warning: passing argument 5 of
-#     'bolos_ux_sskr_to_seed_convert' from incompatible pointer type
-#     [-Wincompatible-pointer-types]
-# The function itself is never called from this test.
-target_compile_options(test_bip39_entry_bounds PRIVATE -Wno-error=incompatible-pointer-types)
 target_link_libraries(test_bip39_entry_bounds PUBLIC cmocka gcov sskr sss testutils)
 
 add_executable(test_sskr_byteword_sentinel ./tests/sskr_byteword_sentinel.c ../../src/common/bip39/seed_rom_variables.c ../../src/common/bip39/seed_bip39.c ../../src/common/sskr/seed_rom_variables.c ../../src/common/sskr/seed_sskr.c ../../src/nbgl/sskr_shares.c)

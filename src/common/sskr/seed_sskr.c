@@ -21,6 +21,7 @@
 
 #include "../bip39/common_bip39.h"
 #include "../common.h"
+#include "./common_sskr.h"
 #include "./seed_rom_variables.h"
 #include "./sskr.h"
 

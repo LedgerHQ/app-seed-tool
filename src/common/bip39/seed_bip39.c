@@ -19,6 +19,7 @@
 #include <os.h>
 
 #include "../common.h"
+#include "./common_bip39.h"
 #include "./seed_rom_variables.h"
 
 // separated function to lower the stack usage when jumping into pbkdf algorithm
@@ -32,7 +33,7 @@ unsigned int bolos_ux_bip39_mnemonic_to_seed_hash_length128(
     return mnemonic_length;
 }
 
-void bolos_ux_bip39_mnemonic_to_seed(unsigned char* mnemonic,
+void bolos_ux_bip39_mnemonic_to_seed(const unsigned char* mnemonic,
                                      unsigned int mnemonic_length,
                                      unsigned char* seed) {
     // Need to keep BIP39 mnemonic in case we want to generate SSKR from it
@@ -49,7 +50,7 @@ void bolos_ux_bip39_mnemonic_to_seed(unsigned char* mnemonic,
     PRINTF("BIP39 seed computed: 64 bytes\n");
 }
 
-unsigned int bolos_ux_bip39_mnemonic_decode(unsigned char* mnemonic,
+unsigned int bolos_ux_bip39_mnemonic_decode(const unsigned char* mnemonic,
                                             unsigned int mnemonic_length,
                                             unsigned char* bits,
                                             unsigned int bitslength) {
@@ -141,7 +142,8 @@ unsigned int bolos_ux_bip39_mnemonic_decode(unsigned char* mnemonic,
 }
 
 unsigned int bolos_ux_bip39_mnemonic_encode(const uint8_t* seed,
-                                            uint8_t seed_len, char* out,
+                                            uint8_t seed_len,
+                                            unsigned char* out,
                                             size_t out_len) {
     if (seed_len % 4 || seed_len < 16 || seed_len > 32) {
         return 0;
@@ -187,7 +189,7 @@ unsigned int bolos_ux_bip39_mnemonic_encode(const uint8_t* seed,
     return offset;
 }
 
-unsigned int bolos_ux_bip39_mnemonic_check(unsigned char* mnemonic,
+unsigned int bolos_ux_bip39_mnemonic_check(const unsigned char* mnemonic,
                                            unsigned int mnemonic_length) {
     unsigned char bits[32 + 1];
 
