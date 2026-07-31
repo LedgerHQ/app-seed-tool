@@ -5,11 +5,7 @@
 #include <stdint.h>
 #include <string.h>
 
-#define BASE64_ENCODE_LENGTH 88
-#define BASE85_ENCODE_LENGTH 80
-
-extern uint8_t bip85_finalize_pwd(const char* buffer_pwd, char* pwd,
-                                  uint8_t pwd_len);
+#include "common/bip85/bip85_internal.h"
 
 // Same fully-encoded vectors as tests/base64.c/base85.c -- already verified
 // there against base64_encode_64bytes()/base85_encode_64bytes() directly.

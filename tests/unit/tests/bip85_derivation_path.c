@@ -6,24 +6,7 @@
 #include <stdint.h>
 #include <string.h>
 
-extern unsigned int bip85_path_drng(unsigned int* path, unsigned int index);
-extern unsigned int bip85_path_bip39(unsigned int* path, uint8_t language,
-                                     uint8_t words, unsigned int index);
-extern unsigned int bip85_path_hex(unsigned int* path, uint8_t num_bytes,
-                                   unsigned int index);
-extern unsigned int bip85_path_pwd_base64(unsigned int* path, uint8_t pwd_len,
-                                          unsigned int index);
-extern unsigned int bip85_path_pwd_base85(unsigned int* path, uint8_t pwd_len,
-                                          unsigned int index);
-extern unsigned int bip85_path_dice(unsigned int* path, uint32_t sides,
-                                    uint32_t rolls, unsigned int index);
-
-extern bool bip85_bip39_words_valid(uint8_t words);
-extern bool bip85_hex_num_bytes_valid(uint8_t num_bytes);
-extern bool bip85_pwd_base64_len_valid(uint8_t pwd_len);
-extern bool bip85_pwd_base85_len_valid(uint8_t pwd_len);
-extern bool bip85_dice_sides_valid(uint32_t sides);
-extern bool bip85_dice_rolls_valid(uint32_t rolls);
+#include "common/bip85/bip85_internal.h"
 
 // Everything the expected paths are built from is spelled out here as the
 // decimal numbers BIP-85 itself uses, plus the BIP-32 hardening offset.

@@ -5,11 +5,7 @@
 #include <stdint.h>
 #include <string.h>
 
-#define BIP85_ENTROPY_LENGTH 64
-
-extern int32_t bip85_dice_roll(uint32_t* out, size_t out_capacity,
-                               uint32_t sides, uint32_t rolls,
-                               const uint8_t seed[BIP85_ENTROPY_LENGTH]);
+#include "common/bip85/bip85_internal.h"
 
 // d2 (sides = 2) has bits_per_roll = 1, so every byte of the SHAKE256
 // digest yields either 0 or 1 -- always < sides -- and is accepted. That
