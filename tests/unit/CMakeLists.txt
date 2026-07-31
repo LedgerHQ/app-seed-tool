@@ -274,8 +274,19 @@ add_executable(test_sskr_combine_invariants ./tests/sskr_combine_invariants.c ..
 target_include_directories(test_sskr_combine_invariants PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common)
 target_link_libraries(test_sskr_combine_invariants PUBLIC cmocka gcov sskr sss testutils)
 
+# Built with AddressSanitizer. Both buffer guards this file covers --
+# the "word too long for current_word[]" bail-out in decode() and the
+# "output buffer too small" bail-out in encode() -- are guards whose whole
+# purpose is to prevent a write, so a test that only inspects the return
+# value cannot tell a working guard from a missing one: encode() has a
+# second, later check on `offset` that still returns 0 after an overrun has
+# already happened. seed_bip39.c is compiled directly into the target, so
+# its frames are instrumented and the sanitizer, not the return value, is
+# what observes the write.
 add_executable(test_bip39 ./tests/bip39.c ../../src/common/bip39/seed_rom_variables.c  ../../src/common/bip39/seed_bip39.c)
 target_include_directories(test_bip39 PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common)
+target_compile_options(test_bip39 PRIVATE -fsanitize=address -fno-omit-frame-pointer)
+target_link_options(test_bip39 PRIVATE -fsanitize=address)
 target_link_libraries(test_bip39 PUBLIC cmocka gcov testutils)
 
 add_executable(test_roundtrip ./tests/roundtrip.c ../../src/common/bip39/seed_rom_variables.c ../../src/common/bip39/seed_bip39.c ../../src/common/sskr/seed_rom_variables.c ../../src/common/sskr/seed_sskr.c)

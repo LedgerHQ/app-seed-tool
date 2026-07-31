@@ -117,11 +117,47 @@ static void test_bip39_decode_bad_checksum(void** state) {
     assert_int_equal(result, 0);
 }
 
-// Same phrase as above, but the last word is replaced with a string that
-// does not appear in the BIP-39 English wordlist.
-static const unsigned char bip39_unknown_word_mnemonic[] =
+// Same phrase as above, but the last word is replaced with a 17-character
+// string. bolos_ux_bip39_mnemonic_decode() accumulates each word into a
+// local `unsigned char current_word[10]` and bails out as soon as a word
+// does not fit, before ever consulting the wordlist -- so this vector
+// exercises the buffer guard, not the wordlist lookup. Under the sanitizer
+// this target is built with, dropping that guard is a stack overrun rather
+// than a silently wrong answer, which is why the case is worth naming.
+static const unsigned char bip39_overlong_word_mnemonic[] =
     "girl mad pet galaxy egg matter matrix prison refuse sense ordinary "
     "notarealbip39word";
+
+static void test_bip39_decode_word_too_long_for_buffer(void** state) {
+    (void)state;
+    unsigned char bits[32 + 1];
+
+    unsigned int result = bolos_ux_bip39_mnemonic_decode(
+        bip39_overlong_word_mnemonic, sizeof(bip39_overlong_word_mnemonic) - 1,
+        bits, sizeof(bits));
+
+    assert_int_equal(result, 0);
+}
+
+// Same phrase again, with a last word that is absent from the BIP-39 English
+// wordlist *and* short enough to reach the lookup: the longest word in the
+// list is 8 characters and `current_word` holds 10, so "abandonx" clears the
+// buffer guard above and reaches the "no match in the wordlist" guard, which
+// is the one this test is named for. No 8-character entry of the list starts
+// with "aband", and the lookup requires an exact length match as well as an
+// exact prefix, so "abandon" cannot match it either.
+//
+// What this test does and does not pin down, measured rather than assumed:
+// it is the first test in the suite to reach that guard at all (its two
+// lines had a zero execution count before), but the guard turns out to be
+// redundant for the return value. An unmatched word contributes no bits, so
+// `bi` ends short of `n * 11` and the check below the loop rejects the
+// phrase anyway; deleting the wordlist guard leaves this test green, with
+// that second check firing exactly once in its place. So this asserts that
+// an out-of-list word is rejected -- not that any one guard does it.
+static const unsigned char bip39_unknown_word_mnemonic[] =
+    "girl mad pet galaxy egg matter matrix prison refuse sense ordinary "
+    "abandonx";
 
 static void test_bip39_decode_unknown_word(void** state) {
     (void)state;
@@ -165,6 +201,13 @@ static void test_bip39_decode_wrong_length(void** state) {
 // 16 bytes of entropy encode to a 74-character mnemonic; an output buffer of
 // 10 bytes is far too small for even the first two words, so encode() must
 // fail cleanly (return 0) instead of writing past the buffer it was given.
+//
+// The returned 0 is only half the assertion, and on its own it is not the
+// interesting half: encode() checks `offset` again after each memcpy(), so
+// it still returns 0 when the length guard that precedes the copy is gone --
+// only after the copy has already run off the end. This target is built
+// with AddressSanitizer (see the CMake comment on it), so `out` is a
+// redzoned array and the write itself is observed rather than inferred.
 static void test_bip39_encode_insufficient_buffer(void** state) {
     (void)state;
     static const uint8_t entropy[16] = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05,
@@ -266,6 +309,7 @@ int main(void) {
         cmocka_unit_test(test_bip39),
         cmocka_unit_test(test_bip39_seed_short_mnemonic),
         cmocka_unit_test(test_bip39_seed_length_boundary),
+        cmocka_unit_test(test_bip39_decode_word_too_long_for_buffer),
         cmocka_unit_test(test_bip39_decode_unknown_word),
         cmocka_unit_test(test_bip39_decode_bad_checksum),
         cmocka_unit_test(test_bip39_decode_wrong_length),
