@@ -182,7 +182,8 @@ static int16_t sskr_deserialize_shard(const uint8_t* source,
  * @param[in] groups_len        Number of groups in the `groups` array.
  *
  * @return Total number of shards on success, or a negative error code:
- *         - SSKR_ERROR_INVALID_GROUP_LENGTH: if `groups_len` is less than 1.
+ *         - SSKR_ERROR_INVALID_GROUP_LENGTH: if `groups_len` is less than 1 or
+ * greater than SSKR_MAX_GROUP_COUNT.
  *         - SSKR_ERROR_INVALID_GROUP_THRESHOLD: if `group_threshold` exceeds
  * `groups_len`.
  *         - SSKR_ERROR_INVALID_GROUP_COUNT: if any group has a count less
@@ -197,7 +198,13 @@ int16_t sskr_count_shards(uint8_t group_threshold,
                           uint8_t groups_len) {
     uint8_t shard_count = 0;
 
-    if (groups_len < 1) {
+    // The upper bound matters as much as the lower one: every buffer sized
+    // from a group count in this file is dimensioned on SSKR_MAX_GROUP_COUNT,
+    // starting with sskr_generate_shards_internal()'s group_shares, which
+    // sss_split_secret() then fills with groups_len shares. Rejecting an
+    // over-long group list here holds all of them at once, the same way
+    // bolos_ux_sskr_size_get() already holds its own groups[] array.
+    if (groups_len < 1 || groups_len > SSKR_MAX_GROUP_COUNT) {
         return SSKR_ERROR_INVALID_GROUP_LENGTH;
     }
 
