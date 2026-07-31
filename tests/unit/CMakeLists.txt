@@ -222,6 +222,21 @@ target_compile_options(test_sskr_hex_check_guards PRIVATE -fsanitize=address -fn
 target_link_options(test_sskr_hex_check_guards PRIVATE -fsanitize=address)
 target_link_libraries(test_sskr_hex_check_guards PUBLIC cmocka gcov sskr sss testutils)
 
+# The other half of the bound test_sskr_share_len holds: what happens in
+# sskr_deserialize_shard() when a length that far out reaches it anyway.
+# Built with AddressSanitizer, and with sskr.c compiled into the test itself
+# rather than linked from libsskr -- that function is static, and reached
+# through sskr_combine_shards() the overrun it is about lands inside that
+# caller's own shards[] array, which is intra-object and something ASan does
+# not report. The file says the same at more length. libsskr is deliberately
+# absent from target_link_libraries below: linking it too would duplicate
+# every symbol in the translation unit.
+add_executable(test_sskr_deserialize_shard_bounds ./tests/sskr_deserialize_shard_bounds.c)
+target_include_directories(test_sskr_deserialize_shard_bounds PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common/sskr/sss)
+target_compile_options(test_sskr_deserialize_shard_bounds PRIVATE -fsanitize=address -fno-omit-frame-pointer)
+target_link_options(test_sskr_deserialize_shard_bounds PRIVATE -fsanitize=address)
+target_link_libraries(test_sskr_deserialize_shard_bounds PUBLIC cmocka gcov testutils sss)
+
 add_executable(test_sskr_memzero ./tests/sskr_memzero.c ../../src/common/bip39/seed_rom_variables.c ../../src/common/bip39/seed_bip39.c ../../src/common/sskr/seed_rom_variables.c ../../src/common/sskr/seed_sskr.c)
 target_include_directories(test_sskr_memzero PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common)
 target_link_libraries(test_sskr_memzero PUBLIC cmocka gcov sskr sss testutils)
@@ -499,6 +514,6 @@ add_executable(test_bip85_derivation_path tests/bip85_derivation_path.c ../../sr
 target_include_directories(test_bip85_derivation_path PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src)
 target_link_libraries(test_bip85_derivation_path PUBLIC cmocka gcov testutils)
 
-foreach(target test_sss test_sss_recover_erase_length test_sss_validate_parameters test_sskr test_sskr_to_seed_convert test_sskr_generate_combine_guards test_sskr_threshold_three_roundtrip test_sskr_share_len test_sskr_hex_check_guards test_sskr_memzero test_sskr_shard_count test_sskr_generate_split_error test_sskr_generate_bound_groups test_sskr_combine_erase_on_failure test_sskr_count_shards_invariants test_sskr_generate_erase_on_split_failure test_sskr_combine_bounds test_sskr_invalid_group_descriptor test_sskr_combine_error test_sskr_combine_invariants test_sskr_interop_bc128 test_sskr_interop_bc128_bytewords test_sskr_entry_bounds test_sskr_byteword_sentinel test_sskr_cbor_additional_info test_bip39 test_bip39_entry_bounds test_roundtrip test_words test_base64 test_base85 test_bip85_dice_bits_per_roll test_bip85_dice_roll test_bip85_bip39_entropy test_bip85_hex_vector test_bip85_finalize_pwd test_bip85_drng_with_seed test_bip85_derivation_path test_compare_recovery_phrase_finish)
+foreach(target test_sss test_sss_recover_erase_length test_sss_validate_parameters test_sskr test_sskr_to_seed_convert test_sskr_generate_combine_guards test_sskr_threshold_three_roundtrip test_sskr_share_len test_sskr_hex_check_guards test_sskr_deserialize_shard_bounds test_sskr_memzero test_sskr_shard_count test_sskr_generate_split_error test_sskr_generate_bound_groups test_sskr_combine_erase_on_failure test_sskr_count_shards_invariants test_sskr_generate_erase_on_split_failure test_sskr_combine_bounds test_sskr_invalid_group_descriptor test_sskr_combine_error test_sskr_combine_invariants test_sskr_interop_bc128 test_sskr_interop_bc128_bytewords test_sskr_entry_bounds test_sskr_byteword_sentinel test_sskr_cbor_additional_info test_bip39 test_bip39_entry_bounds test_roundtrip test_words test_base64 test_base85 test_bip85_dice_bits_per_roll test_bip85_dice_roll test_bip85_bip39_entropy test_bip85_hex_vector test_bip85_finalize_pwd test_bip85_drng_with_seed test_bip85_derivation_path test_compare_recovery_phrase_finish)
     add_test(NAME ${target} COMMAND ${target})
 endforeach()
