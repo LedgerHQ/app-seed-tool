@@ -343,6 +343,16 @@ target_compile_options(test_sskr_generate_bound_groups PRIVATE -fsanitize=addres
 target_link_options(test_sskr_generate_bound_groups PRIVATE -fsanitize=address)
 target_link_libraries(test_sskr_generate_bound_groups PUBLIC cmocka gcov testutils sskr sss)
 
+# The seed_len bounds of the same entry point. Same source list and same
+# sanitizer setup as test_sskr_generate_bound_groups above: seed_sskr.c is
+# compiled in rather than linked so its frames are instrumented, since these
+# lengths are what the shard buffers are sized from.
+add_executable(test_sskr_generate_seed_len_bounds ./tests/sskr_generate_seed_len_bounds.c ../../src/common/bip39/seed_rom_variables.c ../../src/common/bip39/seed_bip39.c ../../src/common/sskr/seed_rom_variables.c ../../src/common/sskr/seed_sskr.c)
+target_include_directories(test_sskr_generate_seed_len_bounds PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common/sskr/sss)
+target_compile_options(test_sskr_generate_seed_len_bounds PRIVATE -fsanitize=address -fno-omit-frame-pointer)
+target_link_options(test_sskr_generate_seed_len_bounds PRIVATE -fsanitize=address)
+target_link_libraries(test_sskr_generate_seed_len_bounds PUBLIC cmocka gcov testutils sskr sss)
+
 # Blockchain Commons 128-bit vector, raw Shamir math level (no CBOR/CRC).
 add_executable(test_sskr_interop_bc128 tests/sskr_interop_bc128.c)
 target_link_libraries(test_sskr_interop_bc128 PUBLIC cmocka gcov testutils sskr sss)
