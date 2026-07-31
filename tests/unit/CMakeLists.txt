@@ -197,8 +197,19 @@ target_link_libraries(test_sskr_generate_combine_guards PUBLIC cmocka gcov testu
 add_executable(test_sskr_threshold_three_roundtrip tests/sskr_threshold_three_roundtrip.c)
 target_link_libraries(test_sskr_threshold_three_roundtrip PUBLIC cmocka gcov testutils sskr sss)
 
+# Built with AddressSanitizer, like test_sskr_combine_bounds and
+# test_sskr_generate_bound_groups below. The bound this covers is what keeps
+# sskr_deserialize_shard() from reading an entered length's worth of bytes out
+# of a share buffer that is not that long, and the return value cannot tell
+# the bounded build from the unbounded one -- so the sanitizer is the
+# assertion. sskr.c lives in the shared `sskr` library and is not instrumented
+# itself, but the copy goes through the intercepted memcpy() and the buffer it
+# reads from is a stack array in this instrumented translation unit, so the
+# redzone still catches it.
 add_executable(test_sskr_share_len ./tests/sskr_share_len.c ../../src/common/bip39/seed_rom_variables.c ../../src/common/bip39/seed_bip39.c ../../src/common/sskr/seed_rom_variables.c ../../src/common/sskr/seed_sskr.c)
 target_include_directories(test_sskr_share_len PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common)
+target_compile_options(test_sskr_share_len PRIVATE -fsanitize=address -fno-omit-frame-pointer)
+target_link_options(test_sskr_share_len PRIVATE -fsanitize=address)
 target_link_libraries(test_sskr_share_len PUBLIC cmocka gcov sskr sss testutils)
 
 # The guards bolos_ux_sskr_hex_check() holds on entered shares. Built with
