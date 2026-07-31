@@ -4,7 +4,7 @@
 #include <setjmp.h>
 #include <cmocka.h>
 
-extern uint8_t bip85_dice_bits_per_roll(uint32_t sides);
+#include "common/bip85/bip85_internal.h"
 
 // bits_per_roll must be ceil(log2(sides)): the minimum number of bits that
 // lets a rejection-sampling loop draw uniformly from [0, sides). Non-power-

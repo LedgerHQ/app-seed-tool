@@ -7,9 +7,8 @@
 #include <string.h>
 
 #include "bip39/common_bip39.h"
+#include "common/bip85/bip85_internal.h"
 #include "testutils.h"
-
-#define BIP85_ENTROPY_LENGTH 64
 
 // bip85_entropy_from_key() covers only the HMAC-SHA512("bip-entropy-from-k",
 // key) half of bolos_ux_bip85_entropy(); the BIP32 derivation that produces
@@ -17,8 +16,6 @@
 // syscall against the device's real seed with no host equivalent, so it
 // cannot be exercised here. The three keys below stand in for that
 // derivation's output.
-extern bool bip85_entropy_from_key(const uint8_t key[32], uint8_t* out,
-                                   size_t out_len);
 
 // Independent oracle for all three vectors: the official BIP-85 master
 // xprv (bip-0085.mediawiki, bitcoin/bips), derived on

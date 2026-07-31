@@ -6,9 +6,8 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "common/bip85/bip85_internal.h"
 #include "testutils.h"
-
-#define BIP85_ENTROPY_LENGTH 64
 
 // bip85_entropy_from_key() covers only the HMAC-SHA512("bip-entropy-from-k",
 // key) half of bolos_ux_bip85_entropy(); the BIP32 derivation that produces
@@ -17,8 +16,6 @@
 // os_derive_bip32_no_throw(), a BOLOS syscall against the device's real seed
 // with no host equivalent, so it cannot be exercised here -- same limitation
 // already documented for test_bip85_bip39_entropy.
-extern bool bip85_entropy_from_key(const uint8_t key[32], uint8_t* out,
-                                   size_t out_len);
 
 // Vector 1 is the official BIP-85 HEX-application test vector published in
 // bip-0085.mediawiki (bitcoin/bips) itself, for the official master xprv on

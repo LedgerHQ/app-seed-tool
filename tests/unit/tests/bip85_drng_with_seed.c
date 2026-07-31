@@ -6,11 +6,9 @@
 #include <stdint.h>
 #include <string.h>
 
-#define BIP85_DRNG_MAX_DIGEST_SIZE 256
+#include "common/bip85/bip85_internal.h"
 
-extern bool bolos_ux_bip85_drng_with_seed(uint8_t* seed, size_t seed_length,
-                                          uint8_t* digest,
-                                          size_t digest_length);
+#define BIP85_DRNG_MAX_DIGEST_SIZE 256
 
 static uint8_t seed[] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
                          0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10,
