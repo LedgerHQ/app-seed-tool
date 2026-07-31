@@ -335,6 +335,19 @@ unsigned int bolos_ux_sskr_hex_check(unsigned char* sskr_shares_hex,
     uint32_t checksum = 0;
     uint8_t checksum_len = sizeof(checksum);
 
+    // Every check this function performs -- CBOR tag, metadata shared by all
+    // shares, CRC-32 -- sits inside the loop below, so a zero count would fall
+    // straight through to the accepting return and report data nothing had
+    // looked at as valid. The count comes from the member-threshold nibble of
+    // the entered data and stays zero when the CBOR additional-info byte is one
+    // of the reserved values 25-31, which the share entry screens deliberately
+    // let through so that this function rejects them. Refuse by default here,
+    // the same way bolos_ux_sskr_combine() does.
+    if (sskr_shares_count == 0) {
+        memzero(sskr_shares_hex, sskr_shares_hex_length);
+        return 0;
+    }
+
     for (unsigned int i = 0; i < sskr_shares_count; i++) {
         checksum = crc32_nbo(
             sskr_shares_hex + i * (sskr_shares_hex_length / sskr_shares_count),
