@@ -32,10 +32,10 @@
 bool bolos_ux_sskr_byteword_to_hex(const unsigned char *byteword, uint8_t *value);
 
 // Combine hex value SSKR shares into seed
-void bolos_ux_sskr_to_seed_convert(const unsigned char *sskr_shares_hex,
+void bolos_ux_sskr_to_seed_convert(unsigned char *sskr_shares_hex,
                                    unsigned int sskr_shares_hex_length,
                                    unsigned int sskr_shares_count,
-                                   const unsigned char *words_buffer,
+                                   unsigned char *words_buffer,
                                    unsigned int *words_buffer_length,
                                    unsigned char *seed);
 
@@ -48,7 +48,7 @@ unsigned int bolos_ux_bip39_to_sskr_convert(unsigned char *bip39_words_buffer,
                                             unsigned char *sskr_words_buffer,
                                             unsigned int *sskr_words_buffer_length);
 
-unsigned int bolos_ux_sskr_hex_check(const unsigned char *sskr_shares_hex,
+unsigned int bolos_ux_sskr_hex_check(unsigned char *sskr_shares_hex,
                                      unsigned int sskr_shares_hex_length,
                                      unsigned int sskr_share_count);
 

@@ -134,8 +134,8 @@ bool bip39_mnemonic_from_sskr_shares(unsigned char* seed) {
     mnemonic.length = BIP39_MNEMONIC_MAX_LENGTH;
 
     bolos_ux_sskr_to_seed_convert(
-        (const unsigned char*)sskr_shares_get(), sskr_shares_length_get(),
-        sskr_sharecount_get(), (const unsigned char*)bip39_mnemonic_get(),
+        (unsigned char*)sskr_shares_get(), sskr_shares_length_get(),
+        sskr_sharecount_get(), (unsigned char*)bip39_mnemonic_get(),
         &mnemonic.length, seed);
 
     if (mnemonic.length > 0) {
