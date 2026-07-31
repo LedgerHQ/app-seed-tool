@@ -153,12 +153,16 @@ static int16_t sskr_deserialize_shard(const uint8_t* source,
     }
     shard->member_index = source[4] & 0xf;
     shard->value_len = source_len - SSKR_METADATA_LENGTH_BYTES;
-    memcpy(shard->value, source + SSKR_METADATA_LENGTH_BYTES, shard->value_len);
 
+    // source_len is supplied by the caller and shard->value is a fixed-size
+    // field, so this check has to happen before the copy it governs, not
+    // after it.
     int16_t error = sskr_check_secret_length(shard->value_len);
     if (error) {
         return error;
     }
+
+    memcpy(shard->value, source + SSKR_METADATA_LENGTH_BYTES, shard->value_len);
     return shard->value_len;
 }
 
