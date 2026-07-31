@@ -136,6 +136,18 @@ int16_t sss_split_secret(uint8_t threshold, uint8_t share_count,
         for (uint8_t i = threshold - 2; i < share_count;
              ++i, share += secret_length) {
             if (interpolate(n, x, secret_length, y, i, share) != CX_OK) {
+                // Same failure, same cleanup as sss_recover_secret() does.
+                // The caller's buffer already holds real shares here: the
+                // loop above wrote threshold - 2 of them, and interpolate()
+                // wrote whole shares of its own before the one that failed.
+                // Erase share_count * secret_length -- the capacity sss.h
+                // requires of that buffer, and exactly what the success path
+                // writes -- and no more.
+                memzero(result, (size_t)share_count * secret_length);
+                memzero(digest, sizeof(digest));
+                memzero(x, sizeof(x));
+                memzero(y, sizeof(y));
+
                 return SSS_ERROR_INTERPOLATION_FAILURE;
             }
         }

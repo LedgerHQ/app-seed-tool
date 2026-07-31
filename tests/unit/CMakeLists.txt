@@ -213,6 +213,14 @@ target_compile_options(test_sss_recover_erase_length PRIVATE -fsanitize=address 
 target_link_options(test_sss_recover_erase_length PRIVATE -fsanitize=address)
 target_link_libraries(test_sss_recover_erase_length PUBLIC cmocka gcov testutils)
 
+# The twin of the above, on the splitting side. No AddressSanitizer here: the
+# assertion is a canary field placed immediately after the caller's buffer, and
+# ASan would add nothing -- memzero() resolves to explicit_bzero(), which this
+# toolchain's ASan does not intercept (the reason the recovery-side test needs
+# a canary too). Linking libsss is therefore enough.
+add_executable(test_sss_split_erase_on_failure tests/sss_split_erase_on_failure.c)
+target_link_libraries(test_sss_split_erase_on_failure PUBLIC cmocka gcov testutils sss)
+
 add_executable(test_sss_validate_parameters tests/sss_validate_parameters.c)
 target_link_libraries(test_sss_validate_parameters PUBLIC cmocka gcov testutils sss)
 
@@ -287,6 +295,18 @@ target_link_libraries(test_sskr_count_shards_invariants PUBLIC cmocka gcov sskr 
 
 add_executable(test_sskr_generate_erase_on_split_failure tests/sskr_generate_erase_on_split_failure.c)
 target_link_libraries(test_sskr_generate_erase_on_split_failure PUBLIC cmocka gcov sskr sss testutils)
+
+# Built with AddressSanitizer: without the bound under test, the overflow of
+# group_shares happens inside sss_split_secret()/interpolate() through plain
+# loads and stores, which ASan does instrument -- so it is the assertion for
+# the case that matters. sskr.c, sss.c and interpolate.c are compiled directly
+# into this target rather than linked from libsskr/libsss so their stack
+# frames are instrumented too, the same way test_sskr_combine_bounds does it.
+add_executable(test_sskr_bound_group_count ./tests/sskr_bound_group_count.c ../../src/common/sskr/sskr.c ../../src/common/sskr/sss/sss.c ../../src/common/sskr/sss/interpolate.c)
+target_include_directories(test_sskr_bound_group_count PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common/sskr ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common/sskr/sss)
+target_compile_options(test_sskr_bound_group_count PRIVATE -fsanitize=address -fno-omit-frame-pointer)
+target_link_options(test_sskr_bound_group_count PRIVATE -fsanitize=address)
+target_link_libraries(test_sskr_bound_group_count PUBLIC cmocka gcov testutils)
 
 # Built with AddressSanitizer: this one is about what the code writes, not
 # what it returns, so the sanitizer is the assertion.
