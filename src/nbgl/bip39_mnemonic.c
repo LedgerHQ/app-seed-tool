@@ -131,12 +131,21 @@ bool bip39_mnemonic_check(bool* match) {
 }
 
 bool bip39_mnemonic_from_sskr_shares(unsigned char* seed) {
-    mnemonic.length = BIP39_MNEMONIC_MAX_LENGTH;
+    // mnemonic.length is a size_t, like every other field of this struct,
+    // while every length in the common bolos_ux_* API is an unsigned int.
+    // They are the same type on the 32-bit ARM targets, which is why handing
+    // &mnemonic.length straight to an unsigned int * parameter went unnoticed;
+    // on a 64-bit host it gives the callee the address of an 8-byte object it
+    // only writes 4 bytes of. Convert at the boundary rather than move either
+    // convention.
+    unsigned int words_buffer_length = BIP39_MNEMONIC_MAX_LENGTH;
 
     bolos_ux_sskr_to_seed_convert(
         (unsigned char*)sskr_shares_get(), sskr_shares_length_get(),
         sskr_sharecount_get(), (unsigned char*)bip39_mnemonic_get(),
-        &mnemonic.length, seed);
+        &words_buffer_length, seed);
+
+    mnemonic.length = words_buffer_length;
 
     if (mnemonic.length > 0) {
         PRINTF("BIP39 mnemonic: %zu characters\n", mnemonic.length);

@@ -344,20 +344,6 @@ target_link_libraries(test_sskr_entry_bounds PUBLIC cmocka gcov sskr sss testuti
 add_executable(test_bip39_entry_bounds ./tests/bip39_entry_bounds.c ../../src/common/bip39/seed_rom_variables.c ../../src/common/bip39/seed_bip39.c ../../src/common/sskr/seed_rom_variables.c ../../src/common/sskr/seed_sskr.c ../../src/nbgl/bip39_mnemonic.c ../../src/nbgl/sskr_shares.c)
 target_compile_definitions(test_bip39_entry_bounds PRIVATE SCREEN_SIZE_WALLET)
 target_include_directories(test_bip39_entry_bounds PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common ${CMAKE_CURRENT_SOURCE_DIR}/../../src)
-# Expected, harmless compiler warning from this target only, in the same spirit
-# as the -Wunused-label note further down: bip39_mnemonic_from_sskr_shares()
-# hands &mnemonic.length (size_t *) to bolos_ux_sskr_to_seed_convert(), which
-# takes unsigned int *. Those are the same type on every device this app is
-# built for (32-bit ARM, ILP32) and a different one on a 64-bit test host, where
-# GCC 14 makes the mismatch a hard error by default. Downgraded back to a
-# warning rather than silenced, so a genuine one in this target would still be
-# visible, and rather than changing the signature in src/, which is correct for
-# the targets that matter:
-#   src/nbgl/bip39_mnemonic.c:139:9: warning: passing argument 5 of
-#     'bolos_ux_sskr_to_seed_convert' from incompatible pointer type
-#     [-Wincompatible-pointer-types]
-# The function itself is never called from this test.
-target_compile_options(test_bip39_entry_bounds PRIVATE -Wno-error=incompatible-pointer-types)
 target_link_libraries(test_bip39_entry_bounds PUBLIC cmocka gcov sskr sss testutils)
 
 add_executable(test_sskr_byteword_sentinel ./tests/sskr_byteword_sentinel.c ../../src/common/bip39/seed_rom_variables.c ../../src/common/bip39/seed_bip39.c ../../src/common/sskr/seed_rom_variables.c ../../src/common/sskr/seed_sskr.c ../../src/nbgl/sskr_shares.c)
