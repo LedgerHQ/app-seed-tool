@@ -19,6 +19,7 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "./bip85_internal.h"
 #include "./common_bip85.h"
 #include "./seed_rom_variables.h"
 #include "constants.h"
