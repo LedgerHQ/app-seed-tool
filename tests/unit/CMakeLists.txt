@@ -213,6 +213,14 @@ target_compile_options(test_sss_recover_erase_length PRIVATE -fsanitize=address 
 target_link_options(test_sss_recover_erase_length PRIVATE -fsanitize=address)
 target_link_libraries(test_sss_recover_erase_length PUBLIC cmocka gcov testutils)
 
+# The twin of the above, on the splitting side. No AddressSanitizer here: the
+# assertion is a canary field placed immediately after the caller's buffer, and
+# ASan would add nothing -- memzero() resolves to explicit_bzero(), which this
+# toolchain's ASan does not intercept (the reason the recovery-side test needs
+# a canary too). Linking libsss is therefore enough.
+add_executable(test_sss_split_erase_on_failure tests/sss_split_erase_on_failure.c)
+target_link_libraries(test_sss_split_erase_on_failure PUBLIC cmocka gcov testutils sss)
+
 add_executable(test_sss_validate_parameters tests/sss_validate_parameters.c)
 target_link_libraries(test_sss_validate_parameters PUBLIC cmocka gcov testutils sss)
 
