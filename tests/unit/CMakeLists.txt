@@ -638,6 +638,32 @@ add_executable(test_bip85_derivation_path tests/bip85_derivation_path.c ../../sr
 target_include_directories(test_bip85_derivation_path PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src)
 target_link_libraries(test_bip85_derivation_path PUBLIC cmocka gcov testutils)
 
+# The property targets below sweep invariants over randomly drawn inputs, rather
+# than checking a particular case the way the rest of the suite does. They share
+# tests/unit/lib/testprng.h, a seeded generator kept header-only on purpose:
+# adding it to the `testutils` library would relink every pre-existing target
+# for the benefit of these. The suite's own cx_rng_no_throw() is neither used
+# nor modified by them -- it writes 0, 1, 2, ... and restarts on every call,
+# which is exactly what the frozen-vector tests need and exactly what would make
+# a property test meaningless.
+add_executable(test_sskr_properties tests/sskr_properties.c)
+# Same reason as test_sskr_interop_bc128 above: this file passes its own
+# generator rather than cx_rng, so it never references a testutils symbol
+# directly and the linker's default --as-needed drops libtestutils.so before it
+# can satisfy libsss.so's undefined cx_bn_*/cx_hmac_sha256 references.
+target_link_options(test_sskr_properties PRIVATE -Wl,--no-as-needed)
+target_link_libraries(test_sskr_properties PUBLIC cmocka gcov testutils sskr sss)
+
+# Goes through bolos_ux_bip39_to_sskr_convert() and bolos_ux_sskr_hex_check(),
+# so it needs the same set of sources as the other seed_sskr.c tests.
+add_executable(test_sskr_wire_properties ./tests/sskr_wire_properties.c ../../src/common/bip39/seed_rom_variables.c ../../src/common/bip39/seed_bip39.c ../../src/common/sskr/seed_rom_variables.c ../../src/common/sskr/seed_sskr.c)
+target_include_directories(test_sskr_wire_properties PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common)
+target_link_libraries(test_sskr_wire_properties PUBLIC cmocka gcov sskr sss testutils)
+
+add_executable(test_bip39_properties ./tests/bip39_properties.c ../../src/common/bip39/seed_rom_variables.c ../../src/common/bip39/seed_bip39.c)
+target_include_directories(test_bip39_properties PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common)
+target_link_libraries(test_bip39_properties PUBLIC cmocka gcov testutils)
+
 # Register every executable this file builds, instead of repeating their names
 # in a list kept by hand. A name missing from such a list costs nothing
 # visible: the target still compiles, still passes when run directly, and the
