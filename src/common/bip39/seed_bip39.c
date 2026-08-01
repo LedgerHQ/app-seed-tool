@@ -168,7 +168,11 @@ unsigned int bolos_ux_bip39_mnemonic_encode(const uint8_t* seed,
         }
         word_len =
             BIP39_WORDLIST_OFFSETS[idx + 1] - BIP39_WORDLIST_OFFSETS[idx];
-        if ((offset + word_len) > out_len) {
+        // every word but the last is followed by a separator, so its byte has
+        // to be claimed together with the word: bounding the word alone lets
+        // offset reach out_len and puts the separator at out[out_len]
+        uint8_t separator_len = (i < (seed_len * 3 / 4) - 1) ? 1 : 0;
+        if ((offset + word_len + separator_len) > out_len) {
             memzero(bits, sizeof(bits));
             return 0;
         }
@@ -179,7 +183,7 @@ unsigned int bolos_ux_bip39_mnemonic_encode(const uint8_t* seed,
             memzero(bits, sizeof(bits));
             return 0;
         }
-        if (i < (seed_len * 3 / 4) - 1) {
+        if (separator_len) {
             out[offset++] = ' ';
         }
     }
