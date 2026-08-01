@@ -23,6 +23,7 @@
 #include "../common.h"
 #include "./common_sskr.h"
 #include "./seed_rom_variables.h"
+#include "./seed_sskr_internal.h"
 #include "./sskr.h"
 
 // Return the CRC-32 checksum of the input buffer in network byte order (big
@@ -43,18 +44,34 @@
     (SSKR_MAX_GROUP_COUNT * SSS_MAX_SHARE_COUNT * \
      (SSKR_MAX_STRENGTH_BYTES + SSKR_METADATA_LENGTH_BYTES))
 
+// See seed_sskr_internal.h. Both entry points below need this, and used to do
+// it inline with two different index expressions -- the same array read two
+// ways. One expression per descriptor layout is the point of this function;
+// having it take the destination's capacity rather than assume
+// SSKR_MAX_GROUP_COUNT is what lets a test reach a group past the first.
+bool bolos_ux_sskr_groups_from_descriptor(const unsigned int* group_descriptor,
+                                          uint8_t groups_len,
+                                          sskr_group_descriptor_t* groups,
+                                          size_t groups_capacity) {
+    if ((size_t)groups_len > groups_capacity) {
+        return false;
+    }
+
+    for (uint8_t i = 0; i < groups_len; i++) {
+        groups[i].threshold = (uint8_t)group_descriptor[i * 2];
+        groups[i].count = (uint8_t)group_descriptor[i * 2 + 1];
+    }
+
+    return true;
+}
+
 int16_t bolos_ux_sskr_size_get(uint8_t bip39_type, uint8_t groups_threshold,
                                unsigned int* group_descriptor,
                                uint8_t groups_len, uint8_t* share_len) {
-    if (groups_len > SSKR_MAX_GROUP_COUNT) {
-        return SSKR_ERROR_INVALID_GROUP_LENGTH;
-    }
     sskr_group_descriptor_t groups[SSKR_MAX_GROUP_COUNT];
-    for (uint8_t i = 0; i < groups_len; i++) {
-        groups[i].threshold =
-            *(group_descriptor + i * sizeof(*(group_descriptor)) / groups_len);
-        groups[i].count = *(group_descriptor + 1 +
-                            i * sizeof(*(group_descriptor)) / groups_len);
+    if (!bolos_ux_sskr_groups_from_descriptor(group_descriptor, groups_len,
+                                              groups, SSKR_MAX_GROUP_COUNT)) {
+        return SSKR_ERROR_INVALID_GROUP_LENGTH;
     }
 
     int16_t share_count_expected =
@@ -140,7 +157,9 @@ unsigned int bolos_ux_sskr_generate(uint8_t groups_threshold,
                                     unsigned int share_buffer_len,
                                     uint8_t share_len_expected,
                                     int16_t share_count_expected) {
-    if (groups_len > SSKR_MAX_GROUP_COUNT) {
+    sskr_group_descriptor_t groups[SSKR_MAX_GROUP_COUNT];
+    if (!bolos_ux_sskr_groups_from_descriptor(group_descriptor, groups_len,
+                                              groups, SSKR_MAX_GROUP_COUNT)) {
         return 0;
     }
     // share_buffer_len is a write length, not just a capacity hint: the
@@ -149,12 +168,6 @@ unsigned int bolos_ux_sskr_generate(uint8_t groups_threshold,
     // longer rather than write past the end of one.
     if (share_buffer_len > SSKR_MAX_SHARE_BUFFER_LENGTH) {
         return 0;
-    }
-    sskr_group_descriptor_t groups[SSKR_MAX_GROUP_COUNT];
-
-    for (uint8_t i = 0; i < (uint8_t)groups_len; i++) {
-        groups[i].threshold = *(group_descriptor + i * 2);
-        groups[i].count = *(group_descriptor + 1 + i * 2);
     }
 
     if (!(SSKR_MIN_STRENGTH_BYTES <= seed_len &&
