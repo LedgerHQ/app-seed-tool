@@ -19,6 +19,10 @@
 #include <os_io_seproxyhal.h>
 
 #include "constants.h"
+// For app_ticker_event_callback()'s declaration: defining it below without one
+// would leave nothing to check the definition against, since the SDK calls it
+// through its own declaration.
+#include "io.h"
 #include "ui.h"
 
 #ifdef TARGET_NANOS
@@ -90,6 +94,41 @@ UX_STEP_NOCB_POSTINIT(processing_step, pb,
 UX_FLOW(processing_flow, &processing_step);
 
 void screen_processing_init(void) { ux_flow_init(0, processing_flow, NULL); }
+
+// Runs whatever the entry screens deferred once the "Processing" screen above
+// is up. Nano S is the only target that defers: comparing an entered phrase
+// against the device seed, and generating SSKR shares, both block for seconds,
+// and the other BAGL targets simply call them inline (see
+// nanox_enter_phrase.c) because their screens are driven differently. Here the
+// work has to wait until the screen the user is looking at has been painted,
+// or they would stare at the previous one throughout.
+//
+// The ticker is the hook the SDK offers an application for this
+// (app_ticker_event_callback() is WEAK in lib_standard_app/io.c, called on
+// SEPROXYHAL_TAG_TICKER_EVENT before UX_TICKER_EVENT). The event this used to
+// hang off, SEPROXYHAL_TAG_DISPLAY_PROCESSED_EVENT, is handled inside the
+// SDK's io_event() with no callback of its own, and taking it back would mean
+// the application re-implementing that whole function.
+//
+// `processing` is cleared before the work runs, not after: these calls block
+// for long enough that further ticker events are queued behind them, and a
+// second pass would compare the phrase, or generate the shares, twice.
+void app_ticker_event_callback(void) {
+    const uint8_t deferred = G_bolos_ux_context.processing;
+
+    G_bolos_ux_context.processing = PROCESSING_COMPLETE;
+
+    switch (deferred) {
+        case PROCESSING_COMPARE_RECOVERY_PHRASE:
+            compare_recovery_phrase_and_display_result();
+            break;
+        case PROCESSING_GENERATE_SSKR:
+            generate_sskr();
+            break;
+        default:
+            break;
+    }
+}
 
 unsigned int screen_onboarding_restore_word_select_button(
     unsigned int button_mask, unsigned int button_mask_counter);
