@@ -356,6 +356,20 @@ target_compile_options(test_sskr_generate_seed_len_bounds PRIVATE -fsanitize=add
 target_link_options(test_sskr_generate_seed_len_bounds PRIVATE -fsanitize=address)
 target_link_libraries(test_sskr_generate_seed_len_bounds PUBLIC cmocka gcov testutils sskr sss)
 
+# The group-descriptor expansion both of the above and bolos_ux_sskr_size_get()
+# share, on group counts above the one SSKR_MAX_GROUP_COUNT allows their own
+# fixed-size arrays -- which is why the function under test takes the
+# destination's capacity from its caller, and why this target can reach a case
+# neither entry point could. Same source list and same sanitizer setup as
+# test_sskr_generate_bound_groups above, for the same reason: the capacity bound
+# is about a write, so seed_sskr.c is compiled in rather than linked so its
+# frames are instrumented.
+add_executable(test_sskr_group_descriptor ./tests/sskr_group_descriptor.c ../../src/common/bip39/seed_rom_variables.c ../../src/common/bip39/seed_bip39.c ../../src/common/sskr/seed_rom_variables.c ../../src/common/sskr/seed_sskr.c)
+target_include_directories(test_sskr_group_descriptor PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common/sskr/sss)
+target_compile_options(test_sskr_group_descriptor PRIVATE -fsanitize=address -fno-omit-frame-pointer)
+target_link_options(test_sskr_group_descriptor PRIVATE -fsanitize=address)
+target_link_libraries(test_sskr_group_descriptor PUBLIC cmocka gcov testutils sskr sss)
+
 # Blockchain Commons 128-bit vector, raw Shamir math level (no CBOR/CRC).
 add_executable(test_sskr_interop_bc128 tests/sskr_interop_bc128.c)
 target_link_libraries(test_sskr_interop_bc128 PUBLIC cmocka gcov testutils sskr sss)
