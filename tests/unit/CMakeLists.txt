@@ -660,6 +660,10 @@ add_executable(test_sskr_wire_properties ./tests/sskr_wire_properties.c ../../sr
 target_include_directories(test_sskr_wire_properties PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common)
 target_link_libraries(test_sskr_wire_properties PUBLIC cmocka gcov sskr sss testutils)
 
+add_executable(test_bip39_properties ./tests/bip39_properties.c ../../src/common/bip39/seed_rom_variables.c ../../src/common/bip39/seed_bip39.c)
+target_include_directories(test_bip39_properties PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common)
+target_link_libraries(test_bip39_properties PUBLIC cmocka gcov testutils)
+
 # Register every executable this file builds, instead of repeating their names
 # in a list kept by hand. A name missing from such a list costs nothing
 # visible: the target still compiles, still passes when run directly, and the
