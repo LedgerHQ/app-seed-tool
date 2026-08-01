@@ -44,6 +44,15 @@
  *                              - Other negative values may be returned by the `random_generator`
  *                                function.
  */
+// Upstream bc-sskr defines this in sss.c without declaring it anywhere. It is
+// declared here rather than in sss.c so that file stays diffable against
+// upstream: the only change on this side of the port is these four lines.
+uint8_t *sss_create_digest(const uint8_t *random_data,
+                           uint32_t rdlen,
+                           const uint8_t *shared_secret,
+                           uint32_t sslen,
+                           uint8_t *result);
+
 int16_t sss_split_secret(uint8_t threshold,
                          uint8_t share_count,
                          const uint8_t *secret,

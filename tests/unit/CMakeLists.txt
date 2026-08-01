@@ -31,25 +31,33 @@ set(CMAKE_C_STANDARD_REQUIRED True)
 # problem, a function with external linkage and no prototype at all, where
 # there is nothing for the compiler to compare a definition against.
 #
-# It is not at zero. Measured over a full build of this directory and
-# deduplicated by (file, function), it reports 21 as of this commit, 7 of them
-# in src/: one each in bip39/seed_bip39.c, common_seed.c, bip85/base64.c,
-# bip85/base85.c, sskr/sss/sss.c, nbgl/bip39_mnemonic.c and
-# nbgl/sskr_shares.c. It was 23 and 9 immediately before, the two extra being
-# bolos_ux_sskr_size_get() and bolos_ux_sskr_generate() in sskr/seed_sskr.c;
-# they now come from sskr/seed_sskr_internal.h, as the seventeen this comment
-# once listed in bip85/seed_bip85.c come from bip85/bip85_internal.h. That is
-# the pattern the rest should follow.
+# src/ is at zero, and the block below keeps it there. Measured over a full
+# build of this directory and deduplicated by (file, function), the flag
+# reported 23 two commits ago and 21 as of this one; every one of the
+# remaining 21 is in tests/, and none in src/.
 #
-# Making the remainder static is not the automatic answer: four of the seven
-# are reached by declarations written by hand in tests/unit/tests/
-# (compare_recovery_phrase_finish, base64_encode_64bytes,
-# base85_encode_64bytes, bip39_mnemonic_shrink), sss.c is kept diffable
-# against upstream bc-sskr, and
-# bolos_ux_bip39_mnemonic_to_seed_hash_length128() exists precisely to keep
-# the pbkdf2 frame off its caller's stack, which static would let the
-# compiler undo. They are left as warnings deliberately; the point of the
-# flag is that a *new* one shows up.
+# Getting there was not a matter of making anything static -- the flag asks
+# for a prototype, not for internal linkage, and every one of these functions
+# has a reason to keep external linkage. Each declaration went into the header
+# its own directory already had, which the defining file already included:
+#
+#   base64_encode_64bytes, base85_encode_64bytes  bip85/bip85_internal.h
+#   bolos_ux_bip39_..._hash_length128             bip39/common_bip39.h
+#   compare_recovery_phrase_finish                common.h
+#   sss_create_digest                             sskr/sss/sss.h
+#   bip39_mnemonic_shrink, sskr_shares_shrink     nbgl/*.h
+#
+# Five hand-written declarations went away with them -- three in tests, and
+# two in src/common/bip85/seed_bip85.c, which declared the two encoders with
+# `extern` for its own use. Those two were the point: a caller in the
+# application, a definition in another file, and nothing comparing them.
+#
+# tests/ is deliberately not held to this. Several test files define stubs
+# with external linkage that stand in for functions the target does not link
+# (bip39_mnemonic_get(), compare_recovery_phrase() and friends), and
+# testutils.c defines os_secure_memcmp() the same way. Giving those prototypes
+# would mean a header per set of stubs for no gain: nothing calls them across
+# translation units.
 #
 # -Wstrict-prototypes is already clean everywhere and is here as a ratchet.
 #
@@ -60,6 +68,21 @@ set(CMAKE_C_STANDARD_REQUIRED True)
 # overridden here, so they would not break that build -- they would just bury
 # the app's own diagnostics.
 set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -Wall -Wmissing-prototypes -Wstrict-prototypes -pedantic -g -O0 --coverage")
+
+# Hold src/ at zero, rather than trusting the comment above to be re-read.
+# Promoting -Wmissing-prototypes to an error globally is not an option: the
+# tests deliberately define stubs with external linkage, and the SDK sources
+# pulled into some targets add their own. Scoping the error to the application
+# sources is what turns "the point of the flag is that a *new* one shows up"
+# into something the build enforces.
+#
+# The glob is read at build time, not just at configure time, so a new file
+# under src/ is covered without anyone remembering this block exists -- the
+# same reason the ctest registration at the end of this file reads the targets
+# rather than a list kept by hand.
+file(GLOB_RECURSE APP_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/../../src/*.c)
+set_source_files_properties(${APP_SOURCES} DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+                            PROPERTIES COMPILE_OPTIONS "-Werror=missing-prototypes")
 
 set(GCC_COVERAGE_LINK_FLAGS "--coverage -lgcov")
 set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${GCC_COVERAGE_LINK_FLAGS}")
@@ -521,6 +544,7 @@ target_include_directories(test_words PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../s
 target_link_libraries(test_words PUBLIC cmocka gcov testutils sskr sss)
 
 add_executable(test_base64 tests/base64.c ../../src/common/bip85/seed_rom_variables.c ../../src/common/bip85/base64.c)
+target_include_directories(test_base64 PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common)
 target_link_libraries(test_base64 PUBLIC cmocka gcov)
 
 # Built with UndefinedBehaviorSanitizer, in abort mode: base85_encode_64bytes()
@@ -528,6 +552,7 @@ target_link_libraries(test_base64 PUBLIC cmocka gcov)
 # its top bit set. Nothing about the result is visibly wrong, so a value
 # assertion cannot see it -- the sanitizer is the assertion.
 add_executable(test_base85 tests/base85.c ../../src/common/bip85/seed_rom_variables.c ../../src/common/bip85/base85.c)
+target_include_directories(test_base85 PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common)
 target_compile_options(test_base85 PRIVATE -fsanitize=undefined -fno-sanitize-recover=all)
 target_link_options(test_base85 PRIVATE -fsanitize=undefined)
 target_link_libraries(test_base85 PUBLIC cmocka gcov)

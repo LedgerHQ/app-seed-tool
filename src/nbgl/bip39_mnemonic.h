@@ -84,4 +84,13 @@ char *bip39_mnemonic_get(void);
  */
 size_t bip39_mnemonic_length_get(void);
 
+/*
+ * Drops the last `size` bytes of the mnemonic and erases everything from the
+ * new end to the end of the buffer, returning the new length. A `size` of 0, or
+ * one larger than the current length, drops everything. word_remove() is its
+ * only caller in the application; it is declared here so that the compiler
+ * checks that caller, the definition and the unit suite against one another.
+ */
+size_t bip39_mnemonic_shrink(const size_t size);
+
 #endif  // SCREEN_SIZE_WALLET

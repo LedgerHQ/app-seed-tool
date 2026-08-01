@@ -17,6 +17,14 @@
 
 #pragma once
 
+// Hashes an over-long mnemonic down to 64 bytes in its own frame, so that the
+// pbkdf2 call in bolos_ux_bip39_mnemonic_to_seed() does not carry this one's
+// locals. Kept out of line and with external linkage for that reason -- static
+// would let the compiler undo it -- which is an argument against `static`, not
+// against a prototype.
+unsigned int bolos_ux_bip39_mnemonic_to_seed_hash_length128(unsigned char *mnemonic,
+                                                            unsigned int mnemonic_length);
+
 // BIP39 helpers
 #include "./seed_rom_variables.h"
 
