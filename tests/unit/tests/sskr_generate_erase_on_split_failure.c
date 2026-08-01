@@ -9,7 +9,13 @@
  *         return split_error;
  *     }
  *     ...
- *     if (error) { memzero(output, buffer_size); return 0; }
+ *     if (error) { memzero(output, buffer_size); *shard_len = 0;
+ *                  return error; }
+ *
+ * Both tests below also pin the code that comes back out, which is the
+ * point of reaching this cleanup through two genuinely different failures:
+ * the two triggers are told apart by SSS_ERROR_INTERPOLATION_FAILURE versus
+ * SSS_ERROR_INVALID_THRESHOLD.
  *
  * test_sskr_generate_split_error.c already covers this for a
  * SSS_ERROR_TOO_MANY_SHARES failure (member-level split, an oversized
@@ -62,7 +68,7 @@ static void test_generate_erases_output_on_member_level_interpolation_failure(
     const uint8_t master_secret[SECRET_LEN] = {0};
     const sskr_group_descriptor_t groups[] = {{.threshold = 2, .count = 2}};
     uint8_t share_buffer[BUFFER_LEN];
-    uint8_t share_len;
+    uint8_t share_len = 0xFF;
 
     memset(share_buffer, 0xFF, sizeof(share_buffer));
 
@@ -72,7 +78,8 @@ static void test_generate_erases_output_on_member_level_interpolation_failure(
                                           SECRET_LEN, &share_len, share_buffer,
                                           sizeof(share_buffer), cx_rng);
 
-    assert_int_equal(result, 0);
+    assert_int_equal(result, SSS_ERROR_INTERPOLATION_FAILURE);
+    assert_int_equal(share_len, 0);
 
     uint8_t expected[BUFFER_LEN];
     memset(expected, 0x00, sizeof(expected));
@@ -86,7 +93,7 @@ static void test_generate_erases_output_on_group_level_split_failure(
     const uint8_t master_secret[SECRET_LEN] = {0};
     const sskr_group_descriptor_t groups[] = {{.threshold = 1, .count = 1}};
     uint8_t share_buffer[BUFFER_LEN];
-    uint8_t share_len;
+    uint8_t share_len = 0xFF;
 
     memset(share_buffer, 0xFF, sizeof(share_buffer));
 
@@ -94,7 +101,8 @@ static void test_generate_erases_output_on_group_level_split_failure(
                                           SECRET_LEN, &share_len, share_buffer,
                                           sizeof(share_buffer), cx_rng);
 
-    assert_int_equal(result, 0);
+    assert_int_equal(result, SSS_ERROR_INVALID_THRESHOLD);
+    assert_int_equal(share_len, 0);
 
     uint8_t expected[BUFFER_LEN];
     memset(expected, 0x00, sizeof(expected));

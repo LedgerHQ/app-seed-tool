@@ -296,6 +296,9 @@ target_link_libraries(test_sskr_count_shards_invariants PUBLIC cmocka gcov sskr 
 add_executable(test_sskr_generate_erase_on_split_failure tests/sskr_generate_erase_on_split_failure.c)
 target_link_libraries(test_sskr_generate_erase_on_split_failure PUBLIC cmocka gcov sskr sss testutils)
 
+add_executable(test_sskr_generate_error_contract tests/sskr_generate_error_contract.c)
+target_link_libraries(test_sskr_generate_error_contract PUBLIC cmocka gcov sskr sss testutils)
+
 # Built with AddressSanitizer: without the bound under test, the overflow of
 # group_shares happens inside sss_split_secret()/interpolate() through plain
 # loads and stores, which ASan does instrument -- so it is the assertion for

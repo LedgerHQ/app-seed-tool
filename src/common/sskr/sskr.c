@@ -348,6 +348,13 @@ int16_t sskr_generate_shards(uint8_t group_threshold,
                              uint8_t* output, uint16_t buffer_size,
                              unsigned char* (*random_generator)(uint8_t*,
                                                                 size_t)) {
+    // shard_len is an output parameter, and the function has several early
+    // rejections that never reach the assignment at the bottom. Define it
+    // once, here, so that no failure path can hand back the value the caller
+    // happened to leave in it; the success path overwrites it with the real
+    // shard length.
+    *shard_len = 0;
+
     int16_t error = sskr_check_secret_length(master_secret_len);
     if (error) {
         return error;
@@ -398,7 +405,12 @@ int16_t sskr_generate_shards(uint8_t group_threshold,
     memzero(shards, sizeof(shards));
     if (error) {
         memzero(output, buffer_size);
-        return 0;
+        // sskr.h promises a negative error code on failure. Returning 0 here
+        // reported every late failure as "no shards generated", made it
+        // indistinguishable from every other one, and matched no documented
+        // code; propagate the one that says what actually went wrong, the
+        // way the early rejections above already do.
+        return error;
     }
 
     *shard_len = byte_count;
