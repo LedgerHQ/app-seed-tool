@@ -3,6 +3,7 @@
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "bip39/common_bip39.h"
@@ -281,6 +282,150 @@ static void test_bip39_encode_insufficient_buffer(void** state) {
     assert_int_equal(result, 0);
 }
 
+// The same guard as the test above, seen one byte further along. It bounds
+// the word about to be copied, but not the separator that follows it:
+//
+//     if ((offset + word_len) > out_len) {  // equality accepted
+//         ...
+//     }
+//     memcpy(out + offset, ..., word_len);
+//     offset += word_len;                   // offset == out_len now possible
+//     if (offset > out_len) {               // so this can never fire
+//         ...
+//     }
+//     if (i < (seed_len * 3 / 4) - 1) {
+//         out[offset++] = ' ';              // writes out[out_len]
+//     }
+//
+// When a capacity lands exactly on a word boundary and words still remain,
+// the first guard accepts the word, `offset` becomes exactly out_len, the
+// second guard cannot fire, and the separator goes one byte past the end.
+//
+// The return value does not tell the two behaviours apart. A separator is
+// only written when a word follows, and after the overrun `offset` is
+// out_len + 1, so that next word never fits and encode() returns 0 either
+// way -- as it already did. The observable is the write itself, so each
+// capacity is tried twice: once into a buffer followed by sentinel bytes,
+// which holds with or without a sanitizer, and once into a heap block sized
+// exactly to the capacity, which AddressSanitizer redzones (this target is
+// built with it, see the CMake comment).
+//
+// Not reachable from the application. Both callers pass a fixed capacity --
+// BIP39_MNEMONIC_MAX_LENGTH = 24 * (8 + 1) = 216 in src/nbgl/bip39_mnemonic.c,
+// and the caller-owned words_buffer handed to src/common/sskr/seed_sskr.c,
+// 257 on the BAGL side -- while the longest possible mnemonic is
+// 24 * 8 + 23 = 215 characters, so `offset` never reaches out_len there.
+// bolos_ux_bip39_mnemonic_encode() is declared in bip39/common_bip39.h and
+// takes out_len from whoever calls it, which is what the bound is for.
+
+// Entropy 00 01 .. 0f -- the vector used by the test above -- encodes to the
+// 74-character
+//
+//     abandon amount liar amount expire adjust cage candy arch gather
+//     drum buyer
+//
+// whose word lengths are 7 6 4 6 6 6 4 5 4 6 4 5. Counting the separators,
+// `offset` sits at each of the values below right after copying a word that
+// still has successors: these are exactly the capacities that trip the
+// guard. 74, the offset after the last word, is not among them -- no
+// separator follows it.
+#define ENCODE_ENTROPY_MNEMONIC_LENGTH (74)
+#define ENCODE_SENTINEL_BYTE (0xa5)
+#define ENCODE_SENTINEL_LENGTH (16)
+
+static const uint8_t encode_entropy[16] = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05,
+                                           0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b,
+                                           0x0c, 0x0d, 0x0e, 0x0f};
+
+static const char encode_entropy_mnemonic[] =
+    "abandon amount liar amount expire adjust cage candy arch gather drum "
+    "buyer";
+
+static const size_t encode_word_boundaries[] = {7,  14, 19, 26, 33, 40,
+                                                45, 51, 56, 63, 68};
+
+static void test_bip39_encode_separator_stays_in_bounds(void** state) {
+    (void)state;
+
+    for (size_t k = 0;
+         k < sizeof(encode_word_boundaries) / sizeof(encode_word_boundaries[0]);
+         k++) {
+        const size_t capacity = encode_word_boundaries[k];
+        unsigned char
+            block[ENCODE_ENTROPY_MNEMONIC_LENGTH + ENCODE_SENTINEL_LENGTH];
+
+        memset(block, ENCODE_SENTINEL_BYTE, sizeof(block));
+
+        // none of these capacities can hold the whole mnemonic, so a clean
+        // failure is the only correct answer -- a non-zero return here would
+        // be a truncated mnemonic reported as a success, which is worse than
+        // the overrun being fixed
+        assert_int_equal(
+            bolos_ux_bip39_mnemonic_encode(
+                encode_entropy, sizeof(encode_entropy), block, capacity),
+            0);
+
+        // nothing at or past out[out_len] may have been touched
+        for (size_t i = capacity; i < sizeof(block); i++) {
+            assert_int_equal(block[i], ENCODE_SENTINEL_BYTE);
+        }
+    }
+}
+
+// Same capacities, destination alone in a heap block of exactly that size, so
+// the byte past the end belongs to AddressSanitizer's redzone rather than to
+// the sentinel above.
+static void test_bip39_encode_separator_stays_in_bounds_heap(void** state) {
+    (void)state;
+
+    for (size_t k = 0;
+         k < sizeof(encode_word_boundaries) / sizeof(encode_word_boundaries[0]);
+         k++) {
+        const size_t capacity = encode_word_boundaries[k];
+        unsigned char* out = malloc(capacity);
+
+        assert_non_null(out);
+        assert_int_equal(
+            bolos_ux_bip39_mnemonic_encode(
+                encode_entropy, sizeof(encode_entropy), out, capacity),
+            0);
+        free(out);
+    }
+}
+
+// The bound must not be tightened past what the mnemonic actually needs: a
+// capacity of exactly its length still has to encode, and return that length.
+// One byte less is the last failing capacity, and it must fail cleanly rather
+// than return a truncated phrase.
+static void test_bip39_encode_exact_capacity_succeeds(void** state) {
+    (void)state;
+    unsigned char
+        block[ENCODE_ENTROPY_MNEMONIC_LENGTH + ENCODE_SENTINEL_LENGTH];
+
+    memset(block, ENCODE_SENTINEL_BYTE, sizeof(block));
+
+    assert_int_equal(
+        bolos_ux_bip39_mnemonic_encode(encode_entropy, sizeof(encode_entropy),
+                                       block, ENCODE_ENTROPY_MNEMONIC_LENGTH),
+        ENCODE_ENTROPY_MNEMONIC_LENGTH);
+    assert_memory_equal(block, encode_entropy_mnemonic,
+                        ENCODE_ENTROPY_MNEMONIC_LENGTH);
+    for (size_t i = ENCODE_ENTROPY_MNEMONIC_LENGTH; i < sizeof(block); i++) {
+        assert_int_equal(block[i], ENCODE_SENTINEL_BYTE);
+    }
+
+    memset(block, ENCODE_SENTINEL_BYTE, sizeof(block));
+
+    assert_int_equal(bolos_ux_bip39_mnemonic_encode(
+                         encode_entropy, sizeof(encode_entropy), block,
+                         ENCODE_ENTROPY_MNEMONIC_LENGTH - 1),
+                     0);
+    for (size_t i = ENCODE_ENTROPY_MNEMONIC_LENGTH - 1; i < sizeof(block);
+         i++) {
+        assert_int_equal(block[i], ENCODE_SENTINEL_BYTE);
+    }
+}
+
 // bolos_ux_bip39_mnemonic_encode() rejects seed_len before touching `out` if
 // it fails any of three conditions: not a multiple of 4, below 16, or above
 // 32. Only the valid lengths (16/24/32) are exercised elsewhere (the
@@ -375,6 +520,9 @@ int main(void) {
         cmocka_unit_test(test_bip39_decode_checksum_mask_covers_fourth_bit),
         cmocka_unit_test(test_bip39_decode_wrong_length),
         cmocka_unit_test(test_bip39_encode_insufficient_buffer),
+        cmocka_unit_test(test_bip39_encode_separator_stays_in_bounds),
+        cmocka_unit_test(test_bip39_encode_separator_stays_in_bounds_heap),
+        cmocka_unit_test(test_bip39_encode_exact_capacity_succeeds),
         cmocka_unit_test(test_bip39_encode_rejects_invalid_seed_len),
         cmocka_unit_test(test_bip39_roundtrip_12_words),
         cmocka_unit_test(test_bip39_roundtrip_18_words),
