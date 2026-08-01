@@ -93,13 +93,22 @@ unsigned int bolos_ux_bip39_mnemonic_decode(const unsigned char* mnemonic,
         }
         current_word_size++;
         for (k = 0; k < BIP39_WORDLIST_OFFSETS_LENGTH - 1; k++) {
-            if ((os_secure_memcmp(
+            // The lengths have to agree before the bytes are compared. The
+            // comparison reads current_word_size bytes from the entry, and
+            // os_secure_memcmp() is constant time, so it reads all of them
+            // whatever the entry actually holds: on the last entry ("zoo", 3
+            // bytes, at offset 11065 of an 11068-byte array) an 8-character
+            // word read 5 bytes past the end. && short-circuits, so testing
+            // the length first keeps the read inside the entry. A word still
+            // matches only when both length and content agree, so no result
+            // changes.
+            if (((unsigned int)(BIP39_WORDLIST_OFFSETS[k + 1] -
+                                BIP39_WORDLIST_OFFSETS[k]) ==
+                 current_word_size) &&
+                (os_secure_memcmp(
                      current_word,
                      (void*)(BIP39_WORDLIST + BIP39_WORDLIST_OFFSETS[k]),
-                     current_word_size) == 0) &&
-                ((unsigned int)(BIP39_WORDLIST_OFFSETS[k + 1] -
-                                BIP39_WORDLIST_OFFSETS[k]) ==
-                 current_word_size)) {
+                     current_word_size) == 0)) {
                 for (ki = 0; ki < 11; ki++) {
                     if (k & (1 << (10 - ki))) {
                         bits[bi / 8] |= 1 << (7 - (bi % 8));
