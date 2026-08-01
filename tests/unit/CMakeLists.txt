@@ -511,6 +511,48 @@ add_executable(test_gf2_8_mul_nanos tests/gf2_8_mul.c ../../src/common/sskr/sss/
 target_include_directories(test_gf2_8_mul_nanos PUBLIC ${SSS_NANOS_INCLUDES})
 target_compile_definitions(test_gf2_8_mul_nanos PRIVATE TARGET_NANOS)
 target_link_libraries(test_gf2_8_mul_nanos PUBLIC cmocka gcov testutils)
+
+# The primitive underneath all of the above, on the one input the rest of this
+# directory never asks it about: zero.
+#
+# cx_mpi_cnt_bits() (lib/bolos/cx_mpi.c) is a host stub, and for a zero bignum
+# BN_bn2bin() writes nothing into its 2048-byte scratch buffer and returns 0 --
+# so the walk that follows read the buffer uninitialised and, the byte counter
+# being unsigned, ran off its end. Only the TARGET_NANOS build of
+# cx_bn_gf2_n_mul() ever reaches it, which is why the four targets above and
+# nothing else were affected.
+#
+# Both targets are built with AddressSanitizer: the value the stub returns is
+# only half of what is being held here, the other half being that producing it
+# reads nothing it should not, and that half has no observable form without a
+# sanitiser. Which is precisely how this survived every unsanitised run.
+#
+# The pair is the same one-file-two-targets shape as test_gf2_8_mul above, and
+# for the same reason: the multiplication by zero has to hold for both
+# implementations of cx_bn_gf2_n_mul(), not just the one that goes near the
+# stub.
+#
+#  - test_cx_bn_cnt_bits compiles lib/bolos/ into the target, so the stub's own
+#    stack frame is instrumented in every configuration this suite is built in,
+#    rather than only in the sanitised entry of the matrix workflow where the
+#    flags also reach libtestutils.so.
+#  - test_cx_bn_cnt_bits_nanos cannot do the same: cx_bn.c and the TARGET_NANOS
+#    part of interpolate.c both define cx_bn_gf2_n_mul(), and having the second
+#    one on the call path is the whole point of the target. It links lib/bolos/
+#    from libtestutils.so like the four targets above, and what it pins is the
+#    returned value -- zero times anything is zero -- which a wrong bit count
+#    breaks on its own, with no sanitiser needed.
+add_executable(test_cx_bn_cnt_bits tests/cx_bn_cnt_bits.c ${BOLOS_SOURCES})
+target_compile_options(test_cx_bn_cnt_bits PRIVATE -fsanitize=address -fno-omit-frame-pointer)
+target_link_options(test_cx_bn_cnt_bits PRIVATE -fsanitize=address)
+target_link_libraries(test_cx_bn_cnt_bits PUBLIC cmocka gcov testutils)
+
+add_executable(test_cx_bn_cnt_bits_nanos tests/cx_bn_cnt_bits.c ../../src/common/sskr/sss/interpolate.c)
+target_include_directories(test_cx_bn_cnt_bits_nanos PUBLIC ${SSS_NANOS_INCLUDES})
+target_compile_definitions(test_cx_bn_cnt_bits_nanos PRIVATE TARGET_NANOS)
+target_compile_options(test_cx_bn_cnt_bits_nanos PRIVATE -fsanitize=address -fno-omit-frame-pointer)
+target_link_options(test_cx_bn_cnt_bits_nanos PRIVATE -fsanitize=address)
+target_link_libraries(test_cx_bn_cnt_bits_nanos PUBLIC cmocka gcov testutils)
 # ---------------------------------------------------------------------------
 
 # Built with AddressSanitizer. Both buffer guards this file covers --
