@@ -549,6 +549,16 @@ target_compile_definitions(test_bip39_entry_bounds PRIVATE SCREEN_SIZE_WALLET)
 target_include_directories(test_bip39_entry_bounds PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common ${CMAKE_CURRENT_SOURCE_DIR}/../../src)
 target_link_libraries(test_bip39_entry_bounds PUBLIC cmocka gcov sskr sss testutils)
 
+# Same set of sources as test_sskr_entry_bounds above -- the entry buffer and
+# the two conversion helpers it needs to link -- for the other half of that
+# buffer's life: sskr_shares_word_remove() and the reach of the erasure it
+# triggers. Kept in its own target rather than appended to the bounds test so
+# that a failure names which of the two it is.
+add_executable(test_sskr_entry_lifecycle ./tests/sskr_entry_lifecycle.c ../../src/common/bip39/seed_rom_variables.c ../../src/common/bip39/seed_bip39.c ../../src/common/sskr/seed_rom_variables.c ../../src/common/sskr/seed_sskr.c ../../src/nbgl/sskr_shares.c)
+target_compile_definitions(test_sskr_entry_lifecycle PRIVATE SCREEN_SIZE_WALLET)
+target_include_directories(test_sskr_entry_lifecycle PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common ${CMAKE_CURRENT_SOURCE_DIR}/../../src)
+target_link_libraries(test_sskr_entry_lifecycle PUBLIC cmocka gcov sskr sss testutils)
+
 add_executable(test_sskr_byteword_sentinel ./tests/sskr_byteword_sentinel.c ../../src/common/bip39/seed_rom_variables.c ../../src/common/bip39/seed_bip39.c ../../src/common/sskr/seed_rom_variables.c ../../src/common/sskr/seed_sskr.c ../../src/nbgl/sskr_shares.c)
 target_compile_definitions(test_sskr_byteword_sentinel PRIVATE SCREEN_SIZE_WALLET)
 target_include_directories(test_sskr_byteword_sentinel PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common ${CMAKE_CURRENT_SOURCE_DIR}/../../src)
