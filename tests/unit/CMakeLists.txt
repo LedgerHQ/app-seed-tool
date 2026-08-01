@@ -372,6 +372,82 @@ add_executable(test_sskr_combine_invariants ./tests/sskr_combine_invariants.c ..
 target_include_directories(test_sskr_combine_invariants PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common)
 target_link_libraries(test_sskr_combine_invariants PUBLIC cmocka gcov sskr sss testutils)
 
+# ---------------------------------------------------------------------------
+# The same Shamir tests, replayed against the TARGET_NANOS build of the GF(2^8)
+# arithmetic.
+#
+# interpolate.c carries two different implementations of the field
+# multiplication every share is built from. Under
+# `#if defined(TARGET_NANOS) && !defined API_LEVEL` it defines its own
+# cx_bn_gf2_n_mul() -- a shift-and-XOR loop written by hand on top of
+# elementary BN primitives; everywhere else the SDK's cx_bn_gf2_n_mul() is
+# called instead. Only the second one was ever built here, so the one that
+# ships on Nano S ran nowhere but on the device: had the two disagreed on a
+# single input, shares produced on a Nano S would not have recombined
+# anywhere else, silently.
+#
+# Nothing in src/ changes for this. The nine BN primitives the local
+# implementation uses (cx_bn_alloc, cx_bn_cnt_bits, cx_bn_copy, cx_bn_destroy,
+# cx_bn_nbytes, cx_bn_set_u32, cx_bn_shl, cx_bn_tst_bit, cx_bn_xor) are all
+# already provided by lib/bolos/cx_bn.c, and API_LEVEL is defined nowhere in
+# this repository, so defining TARGET_NANOS is all it takes to select the
+# variant on host. The definition compiled into each target below takes
+# precedence over the one libtestutils.so exports, which is what puts the
+# local implementation on the call path.
+#
+# Two consequences drive the shape of these targets:
+#
+#  - the sources have to be compiled into the target rather than linked from
+#    the shared `sss`/`sskr` libraries, which are built without the flag;
+#  - SSS_MAX_SHARE_COUNT is 10 under TARGET_NANOS and 16 otherwise
+#    (sss-constants.h), so the flag has to reach *every* translation unit of a
+#    target, test file included. A target mixing the two would size arrays
+#    differently on the two sides of a call -- a defect built by the test
+#    setup rather than found by it. target_compile_definitions() below applies
+#    to all of a target's sources, which is exactly what is wanted here.
+#
+# Only tests that actually interpolate are replayed; the four below cover
+# splitting and recovery, 128- and 256-bit secrets, thresholds of 2 and 3, and
+# use at most 5 shares, so none of them needs more than the 10 shares this
+# configuration allows. Tests that only exercise input guards would run the
+# same code either way and are left out.
+set(SSS_NANOS_SOURCES ../../src/common/sskr/sss/sss.c ../../src/common/sskr/sss/interpolate.c)
+set(SSKR_NANOS_SOURCES ../../src/common/sskr/sskr.c ${SSS_NANOS_SOURCES})
+set(SSS_NANOS_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common/sskr/sss)
+set(SSKR_NANOS_INCLUDES ${SSS_NANOS_INCLUDES} ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common/sskr)
+
+# Blockchain Commons vectors at raw Shamir math level, the ideal oracle here:
+# they compare against values published outside this repository, so they hold
+# the variant against the specification rather than against the other
+# implementation.
+add_executable(test_sss_nanos tests/sss.c ${SSS_NANOS_SOURCES})
+target_include_directories(test_sss_nanos PUBLIC ${SSS_NANOS_INCLUDES})
+target_compile_definitions(test_sss_nanos PRIVATE TARGET_NANOS)
+target_link_libraries(test_sss_nanos PUBLIC cmocka gcov testutils)
+
+# Unlike its counterpart above, this one needs no -Wl,--no-as-needed: sskr.c
+# and sss.c are compiled into the target, so their references to cx_bn_*/
+# cx_hmac_sha256 are the executable's own undefined symbols and libtestutils.so
+# is kept for them.
+add_executable(test_sskr_interop_bc128_nanos tests/sskr_interop_bc128.c ${SSKR_NANOS_SOURCES})
+target_include_directories(test_sskr_interop_bc128_nanos PUBLIC ${SSKR_NANOS_INCLUDES})
+target_compile_definitions(test_sskr_interop_bc128_nanos PRIVATE TARGET_NANOS)
+target_link_libraries(test_sskr_interop_bc128_nanos PUBLIC cmocka gcov testutils)
+
+# Generation and recombination of the 256-bit vector, 2-of-3.
+add_executable(test_sskr_nanos tests/sskr.c ${SSKR_NANOS_SOURCES})
+target_include_directories(test_sskr_nanos PUBLIC ${SSKR_NANOS_INCLUDES})
+target_compile_definitions(test_sskr_nanos PRIVATE TARGET_NANOS)
+target_link_libraries(test_sskr_nanos PUBLIC cmocka gcov testutils)
+
+# 3-of-5: the only case that makes the interpolation loop run over more than
+# two shares, and the only one that exercises a threshold above 2.
+add_executable(test_sskr_threshold_three_roundtrip_nanos tests/sskr_threshold_three_roundtrip.c ${SSKR_NANOS_SOURCES})
+target_include_directories(test_sskr_threshold_three_roundtrip_nanos PUBLIC ${SSKR_NANOS_INCLUDES})
+target_compile_definitions(test_sskr_threshold_three_roundtrip_nanos PRIVATE TARGET_NANOS)
+target_link_libraries(test_sskr_threshold_three_roundtrip_nanos PUBLIC cmocka gcov testutils)
+# ---------------------------------------------------------------------------
+
 # Built with AddressSanitizer. Both buffer guards this file covers --
 # the "word too long for current_word[]" bail-out in decode() and the
 # "output buffer too small" bail-out in encode() -- are guards whose whole
