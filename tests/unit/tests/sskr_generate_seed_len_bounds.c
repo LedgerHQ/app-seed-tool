@@ -53,6 +53,7 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "sskr/seed_sskr_internal.h"
 #include "sskr/sskr-constants.h"
 #include "testutils.h"
 
@@ -67,16 +68,6 @@
 #define SEED_BUFFER_LENGTH (SSKR_MAX_STRENGTH_BYTES + 2)
 
 #define SENTINEL 0xa5
-
-/* bolos_ux_sskr_generate() is a public entry point (external linkage) but is
- * only ever called from within seed_sskr.c itself, so it is not declared in
- * common_sskr.h. */
-extern unsigned int bolos_ux_sskr_generate(
-    uint8_t groups_threshold, unsigned int* group_descriptor,
-    uint8_t groups_len, unsigned char* seed, unsigned int seed_len,
-    uint8_t* share_len, unsigned char* share_buffer,
-    unsigned int share_buffer_len, uint8_t share_len_expected,
-    int16_t share_count_expected);
 
 /*
  * Call bolos_ux_sskr_generate() varying nothing but seed_len. Everything

@@ -31,16 +31,21 @@ set(CMAKE_C_STANDARD_REQUIRED True)
 # problem, a function with external linkage and no prototype at all, where
 # there is nothing for the compiler to compare a definition against.
 #
-# It is not at zero. As of this commit it reports 25 functions, 9 of them in
-# src/: 2 in sskr/seed_sskr.c, and one each in bip39/seed_bip39.c,
-# common_seed.c, bip85/base64.c, bip85/base85.c, sskr/sss/sss.c,
-# nbgl/bip39_mnemonic.c and nbgl/sskr_shares.c. The seventeen this comment
-# used to list in bip85/seed_bip85.c are gone: they now come from
-# bip85/bip85_internal.h, which is the pattern the rest should follow.
+# It is not at zero. Measured over a full build of this directory and
+# deduplicated by (file, function), it reports 21 as of this commit, 7 of them
+# in src/: one each in bip39/seed_bip39.c, common_seed.c, bip85/base64.c,
+# bip85/base85.c, sskr/sss/sss.c, nbgl/bip39_mnemonic.c and
+# nbgl/sskr_shares.c. It was 23 and 9 immediately before, the two extra being
+# bolos_ux_sskr_size_get() and bolos_ux_sskr_generate() in sskr/seed_sskr.c;
+# they now come from sskr/seed_sskr_internal.h, as the seventeen this comment
+# once listed in bip85/seed_bip85.c come from bip85/bip85_internal.h. That is
+# the pattern the rest should follow.
 #
-# Making the remainder static is not the automatic answer: six of the nine
-# are reached by extern declarations in tests/unit/tests/, sss.c is kept
-# diffable against upstream bc-sskr, and
+# Making the remainder static is not the automatic answer: four of the seven
+# are reached by declarations written by hand in tests/unit/tests/
+# (compare_recovery_phrase_finish, base64_encode_64bytes,
+# base85_encode_64bytes, bip39_mnemonic_shrink), sss.c is kept diffable
+# against upstream bc-sskr, and
 # bolos_ux_bip39_mnemonic_to_seed_hash_length128() exists precisely to keep
 # the pbkdf2 frame off its caller's stack, which static would let the
 # compiler undo. They are left as warnings deliberately; the point of the

@@ -63,6 +63,7 @@
 #include "bip39/common_bip39.h"
 #include "constants.h"
 #include "sskr/common_sskr.h"
+#include "sskr/seed_sskr_internal.h"
 #include "sskr/sskr-constants.h"
 #include "testutils.h"
 
@@ -89,21 +90,6 @@ static const unsigned char bip39_mnemonic[] =
 /* ...and as space-separated ByteWords: 4 letters per byte plus a
  * separator, minus the trailing separator of the last word. */
 #define BYTEWORDS_SHARE_24_LENGTH (SERIALIZED_SHARE_24_LENGTH * 5 - 1)
-
-/* bolos_ux_sskr_size_get() and bolos_ux_sskr_generate() are public entry
- * points (external linkage) but only ever called from within seed_sskr.c
- * itself, so neither is declared in common_sskr.h. */
-extern int16_t bolos_ux_sskr_size_get(uint8_t bip39_type,
-                                      uint8_t groups_threshold,
-                                      unsigned int* group_descriptor,
-                                      uint8_t groups_len, uint8_t* share_len);
-
-extern unsigned int bolos_ux_sskr_generate(
-    uint8_t groups_threshold, unsigned int* group_descriptor,
-    uint8_t groups_len, unsigned char* seed, unsigned int seed_len,
-    uint8_t* share_len, unsigned char* share_buffer,
-    unsigned int share_buffer_len, uint8_t share_len_expected,
-    int16_t share_count_expected);
 
 /*
  * Drive bolos_ux_bip39_to_sskr_convert() end to end with the given

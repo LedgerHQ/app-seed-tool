@@ -20,8 +20,14 @@
 // Internals of seed_sskr.c: helpers that no other file in src/ calls, but that
 // keep external linkage so the unit suite can reach them. Same pattern, and for
 // the same reason, as bip85/bip85_internal.h: the single place they are
-// declared, included by seed_sskr.c so the compiler checks the definition, and
+// declared, included by seed_sskr.c so the compiler checks the definitions, and
 // by the tests so it checks their use.
+//
+// Before this header, the two entry points below were declared by hand, with
+// `extern`, in each of the three test files that needed them, and nothing
+// checked those declarations against the definitions: no translation unit saw
+// both. They happened to agree, which is not the same as being kept in
+// agreement.
 //
 // Nothing here is part of the application's SSKR interface. That is
 // common_sskr.h, and it is what callers outside this directory should use.
@@ -48,3 +54,33 @@ bool bolos_ux_sskr_groups_from_descriptor(const unsigned int *group_descriptor,
                                           uint8_t groups_len,
                                           sskr_group_descriptor_t *groups,
                                           size_t groups_capacity);
+
+// The two SSKR generation entry points. Both are reached only from
+// bolos_ux_bip39_to_sskr_convert() in the same file, which is why neither is in
+// common_sskr.h; the unit suite calls them directly.
+//
+// bolos_ux_sskr_size_get() returns the number of shares the descriptor calls
+// for, or one of sskr_count_shards()'s negative error codes, and writes the
+// serialized length of one share to *share_len. bolos_ux_sskr_generate()
+// returns the number of shares written to share_buffer, or 0 on any failure,
+// having first erased the whole of share_buffer -- so share_buffer_len is a
+// write length and not merely a capacity. The share_len_expected and
+// share_count_expected it is given are the figures bolos_ux_sskr_size_get()
+// produced for the same descriptor, and it refuses to report success unless
+// what it generated matches them.
+int16_t bolos_ux_sskr_size_get(uint8_t bip39_type,
+                               uint8_t groups_threshold,
+                               unsigned int *group_descriptor,
+                               uint8_t groups_len,
+                               uint8_t *share_len);
+
+unsigned int bolos_ux_sskr_generate(uint8_t groups_threshold,
+                                    unsigned int *group_descriptor,
+                                    uint8_t groups_len,
+                                    unsigned char *seed,
+                                    unsigned int seed_len,
+                                    uint8_t *share_len,
+                                    unsigned char *share_buffer,
+                                    unsigned int share_buffer_len,
+                                    uint8_t share_len_expected,
+                                    int16_t share_count_expected);

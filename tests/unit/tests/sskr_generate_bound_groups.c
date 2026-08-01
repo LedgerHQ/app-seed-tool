@@ -43,25 +43,11 @@
 #include <string.h>
 
 #include "constants.h"
+#include "sskr/seed_sskr_internal.h"
 #include "sskr/sskr-constants.h"
 #include "testutils.h"
 
 #define SECRET_LEN (SSKR_MIN_STRENGTH_BYTES)
-
-/* bolos_ux_sskr_generate() and bolos_ux_sskr_size_get() are public entry
- * points (external linkage) but only ever called from within seed_sskr.c
- * itself, so neither is declared in common_sskr.h. */
-extern int16_t bolos_ux_sskr_size_get(uint8_t bip39_type,
-                                      uint8_t groups_threshold,
-                                      unsigned int* group_descriptor,
-                                      uint8_t groups_len, uint8_t* share_len);
-
-extern unsigned int bolos_ux_sskr_generate(
-    uint8_t groups_threshold, unsigned int* group_descriptor,
-    uint8_t groups_len, unsigned char* seed, unsigned int seed_len,
-    uint8_t* share_len, unsigned char* share_buffer,
-    unsigned int share_buffer_len, uint8_t share_len_expected,
-    int16_t share_count_expected);
 
 /*
  * One more group than `groups[SSKR_MAX_GROUP_COUNT]` (and hence
