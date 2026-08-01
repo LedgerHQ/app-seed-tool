@@ -577,6 +577,14 @@ target_compile_definitions(test_sskr_cbor_additional_info PRIVATE SCREEN_SIZE_WA
 target_include_directories(test_sskr_cbor_additional_info PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common ${CMAKE_CURRENT_SOURCE_DIR}/../../src)
 target_link_libraries(test_sskr_cbor_additional_info PUBLIC cmocka gcov sskr sss testutils)
 
+# The header arithmetic on its own. It holds no state and reaches into no UI
+# storage, so unlike every target above it needs nothing but its own source --
+# and unlike every target above, what it covers is the code all three entry
+# paths run, not the one path a host build can link.
+add_executable(test_sskr_entry_header ./tests/sskr_entry_header.c ../../src/common/sskr/sskr_entry_header.c)
+target_include_directories(test_sskr_entry_header PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common)
+target_link_libraries(test_sskr_entry_header PUBLIC cmocka gcov testutils)
+
 add_executable(test_words ./tests/words.c ../../src/common/bip39/seed_rom_variables.c ../../src/common/bip39/seed_bip39.c ../../src/common/sskr/seed_rom_variables.c ../../src/common/sskr/seed_sskr.c)
 target_include_directories(test_words PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common)
 target_link_libraries(test_words PUBLIC cmocka gcov testutils sskr sss)
