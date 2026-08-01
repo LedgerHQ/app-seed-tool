@@ -117,6 +117,66 @@ static void test_bip39_decode_bad_checksum(void** state) {
     assert_int_equal(result, 0);
 }
 
+// The vector above swaps in "abandon", which is index 0 and so changes the
+// entropy bits as well as the checksum bits. It therefore says nothing about
+// how *many* checksum bits decode() actually compares. A 12-word phrase
+// carries a 4-bit checksum, which is why decode() masks with 0xF0 for n == 12;
+// narrowing that mask to 0xE0 would compare only three of the four and admit
+// any phrase whose fourth checksum bit is wrong. Nothing held that width: with
+// mask = 0xE0 the whole suite stayed green. This vector pins it.
+//
+// Derivation, starting from the 16-byte entropy already used below by
+// test_bip39_roundtrip_12_words:
+//
+//   entropy    62 50 b6 8d af 74 6d 12 a2 4d 58 b4 78 7a 71 4b
+//   SHA-256    3313908a3667d9ad2f7f6bd844ab737430b84651f0bd70ebd6646a7d0564c379
+//   SHA-256[0] 0x33 = 0011 0011, so the four checksum bits are 0011
+//
+// The checksum occupies the last 4 of the 132 bits, i.e. the low nibble of
+// the twelfth word's 11-bit index. "nose" is index 1203 = 100 1011 0011,
+// low nibble 0011 -- the correct checksum. Clearing its last bit gives index
+// 1202 = 100 1011 0010 = "north": the same 128 entropy bits, and a checksum
+// of 0010, wrong in the fourth bit and only there.
+//
+// What decode() then compares, with buffer[0] = SHA-256[0] = 0x33 and
+// bits[16] = 0x20 (the "north" nibble, left-aligned):
+//
+//   0x33 & 0xF0 = 0x30 != 0x20 = bits[16] & 0xF0  -> rejected, as it must be
+//   0x33 & 0xE0 = 0x20 == 0x20 = bits[16] & 0xE0  -> accepted, the weakening
+//
+// Checked independently against SHA-256 and the BIP-39 English wordlist: the
+// two phrases decode to byte-identical entropy and differ in that one
+// checksum bit alone. The valid phrase is asserted here too, so a failure
+// cannot be blamed on something unrelated to the mask.
+static const unsigned char bip39_valid_12_word_mnemonic[] =
+    "girl mad pet galaxy egg matter matrix prison refuse sense ordinary "
+    "nose";
+
+static const unsigned char bip39_fourth_checksum_bit_mnemonic[] =
+    "girl mad pet galaxy egg matter matrix prison refuse sense ordinary "
+    "north";
+
+static void test_bip39_decode_checksum_mask_covers_fourth_bit(void** state) {
+    (void)state;
+    static const uint8_t entropy[16] = {0x62, 0x50, 0xb6, 0x8d, 0xaf, 0x74,
+                                        0x6d, 0x12, 0xa2, 0x4d, 0x58, 0xb4,
+                                        0x78, 0x7a, 0x71, 0x4b};
+    unsigned char bits[32 + 1];
+
+    assert_int_equal(
+        bolos_ux_bip39_mnemonic_decode(bip39_valid_12_word_mnemonic,
+                                       sizeof(bip39_valid_12_word_mnemonic) - 1,
+                                       bits, sizeof(bits)),
+        1);
+    assert_memory_equal(bits, entropy, sizeof(entropy));
+
+    assert_int_equal(
+        bolos_ux_bip39_mnemonic_decode(
+            bip39_fourth_checksum_bit_mnemonic,
+            sizeof(bip39_fourth_checksum_bit_mnemonic) - 1, bits, sizeof(bits)),
+        0);
+}
+
 // Same phrase as above, but the last word is replaced with a 17-character
 // string. bolos_ux_bip39_mnemonic_decode() accumulates each word into a
 // local `unsigned char current_word[10]` and bails out as soon as a word
@@ -312,6 +372,7 @@ int main(void) {
         cmocka_unit_test(test_bip39_decode_word_too_long_for_buffer),
         cmocka_unit_test(test_bip39_decode_unknown_word),
         cmocka_unit_test(test_bip39_decode_bad_checksum),
+        cmocka_unit_test(test_bip39_decode_checksum_mask_covers_fourth_bit),
         cmocka_unit_test(test_bip39_decode_wrong_length),
         cmocka_unit_test(test_bip39_encode_insufficient_buffer),
         cmocka_unit_test(test_bip39_encode_rejects_invalid_seed_len),
