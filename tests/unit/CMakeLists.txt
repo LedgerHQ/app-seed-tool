@@ -654,6 +654,12 @@ add_executable(test_sskr_properties tests/sskr_properties.c)
 target_link_options(test_sskr_properties PRIVATE -Wl,--no-as-needed)
 target_link_libraries(test_sskr_properties PUBLIC cmocka gcov testutils sskr sss)
 
+# Goes through bolos_ux_bip39_to_sskr_convert() and bolos_ux_sskr_hex_check(),
+# so it needs the same set of sources as the other seed_sskr.c tests.
+add_executable(test_sskr_wire_properties ./tests/sskr_wire_properties.c ../../src/common/bip39/seed_rom_variables.c ../../src/common/bip39/seed_bip39.c ../../src/common/sskr/seed_rom_variables.c ../../src/common/sskr/seed_sskr.c)
+target_include_directories(test_sskr_wire_properties PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common)
+target_link_libraries(test_sskr_wire_properties PUBLIC cmocka gcov sskr sss testutils)
+
 # Register every executable this file builds, instead of repeating their names
 # in a list kept by hand. A name missing from such a list costs nothing
 # visible: the target still compiles, still passes when run directly, and the
