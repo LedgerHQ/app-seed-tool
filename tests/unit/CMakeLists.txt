@@ -532,7 +532,7 @@ add_executable(test_roundtrip ./tests/roundtrip.c ../../src/common/bip39/seed_ro
 target_include_directories(test_roundtrip PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common)
 target_link_libraries(test_roundtrip PUBLIC cmocka gcov testutils sskr sss)
 
-add_executable(test_sskr_entry_bounds ./tests/sskr_entry_bounds.c ../../src/common/bip39/seed_rom_variables.c ../../src/common/bip39/seed_bip39.c ../../src/common/sskr/seed_rom_variables.c ../../src/common/sskr/seed_sskr.c ../../src/nbgl/sskr_shares.c)
+add_executable(test_sskr_entry_bounds ./tests/sskr_entry_bounds.c ../../src/common/bip39/seed_rom_variables.c ../../src/common/bip39/seed_bip39.c ../../src/common/sskr/seed_rom_variables.c ../../src/common/sskr/seed_sskr.c ../../src/nbgl/sskr_shares.c ../../src/common/sskr/sskr_entry_header.c)
 target_compile_definitions(test_sskr_entry_bounds PRIVATE SCREEN_SIZE_WALLET)
 target_include_directories(test_sskr_entry_bounds PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common ${CMAKE_CURRENT_SOURCE_DIR}/../../src)
 target_link_libraries(test_sskr_entry_bounds PUBLIC cmocka gcov sskr sss testutils)
@@ -544,7 +544,7 @@ target_link_libraries(test_sskr_entry_bounds PUBLIC cmocka gcov sskr sss testuti
 # it, and the two files reference each other's accessors; the only symbol left
 # unresolved after that is compare_recovery_phrase(), which the test file stubs
 # out rather than dragging common_seed.c and the BIP32 syscall in behind it.
-add_executable(test_bip39_entry_bounds ./tests/bip39_entry_bounds.c ../../src/common/bip39/seed_rom_variables.c ../../src/common/bip39/seed_bip39.c ../../src/common/sskr/seed_rom_variables.c ../../src/common/sskr/seed_sskr.c ../../src/nbgl/bip39_mnemonic.c ../../src/nbgl/sskr_shares.c)
+add_executable(test_bip39_entry_bounds ./tests/bip39_entry_bounds.c ../../src/common/bip39/seed_rom_variables.c ../../src/common/bip39/seed_bip39.c ../../src/common/sskr/seed_rom_variables.c ../../src/common/sskr/seed_sskr.c ../../src/nbgl/bip39_mnemonic.c ../../src/nbgl/sskr_shares.c ../../src/common/sskr/sskr_entry_header.c)
 target_compile_definitions(test_bip39_entry_bounds PRIVATE SCREEN_SIZE_WALLET)
 target_include_directories(test_bip39_entry_bounds PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common ${CMAKE_CURRENT_SOURCE_DIR}/../../src)
 target_link_libraries(test_bip39_entry_bounds PUBLIC cmocka gcov sskr sss testutils)
@@ -554,7 +554,7 @@ target_link_libraries(test_bip39_entry_bounds PUBLIC cmocka gcov sskr sss testut
 # buffer's life: sskr_shares_word_remove() and the reach of the erasure it
 # triggers. Kept in its own target rather than appended to the bounds test so
 # that a failure names which of the two it is.
-add_executable(test_sskr_entry_lifecycle ./tests/sskr_entry_lifecycle.c ../../src/common/bip39/seed_rom_variables.c ../../src/common/bip39/seed_bip39.c ../../src/common/sskr/seed_rom_variables.c ../../src/common/sskr/seed_sskr.c ../../src/nbgl/sskr_shares.c)
+add_executable(test_sskr_entry_lifecycle ./tests/sskr_entry_lifecycle.c ../../src/common/bip39/seed_rom_variables.c ../../src/common/bip39/seed_bip39.c ../../src/common/sskr/seed_rom_variables.c ../../src/common/sskr/seed_sskr.c ../../src/nbgl/sskr_shares.c ../../src/common/sskr/sskr_entry_header.c)
 target_compile_definitions(test_sskr_entry_lifecycle PRIVATE SCREEN_SIZE_WALLET)
 target_include_directories(test_sskr_entry_lifecycle PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common ${CMAKE_CURRENT_SOURCE_DIR}/../../src)
 target_link_libraries(test_sskr_entry_lifecycle PUBLIC cmocka gcov sskr sss testutils)
@@ -562,17 +562,17 @@ target_link_libraries(test_sskr_entry_lifecycle PUBLIC cmocka gcov sskr sss test
 # Same sources as test_sskr_entry_bounds above, for the one part of the entry
 # state machine that only shows up when a secret takes more than one share:
 # sskr_shares_complete_check() reopening entry for the next share.
-add_executable(test_sskr_multi_share_entry ./tests/sskr_multi_share_entry.c ../../src/common/bip39/seed_rom_variables.c ../../src/common/bip39/seed_bip39.c ../../src/common/sskr/seed_rom_variables.c ../../src/common/sskr/seed_sskr.c ../../src/nbgl/sskr_shares.c)
+add_executable(test_sskr_multi_share_entry ./tests/sskr_multi_share_entry.c ../../src/common/bip39/seed_rom_variables.c ../../src/common/bip39/seed_bip39.c ../../src/common/sskr/seed_rom_variables.c ../../src/common/sskr/seed_sskr.c ../../src/nbgl/sskr_shares.c ../../src/common/sskr/sskr_entry_header.c)
 target_compile_definitions(test_sskr_multi_share_entry PRIVATE SCREEN_SIZE_WALLET)
 target_include_directories(test_sskr_multi_share_entry PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common ${CMAKE_CURRENT_SOURCE_DIR}/../../src)
 target_link_libraries(test_sskr_multi_share_entry PUBLIC cmocka gcov sskr sss testutils)
 
-add_executable(test_sskr_byteword_sentinel ./tests/sskr_byteword_sentinel.c ../../src/common/bip39/seed_rom_variables.c ../../src/common/bip39/seed_bip39.c ../../src/common/sskr/seed_rom_variables.c ../../src/common/sskr/seed_sskr.c ../../src/nbgl/sskr_shares.c)
+add_executable(test_sskr_byteword_sentinel ./tests/sskr_byteword_sentinel.c ../../src/common/bip39/seed_rom_variables.c ../../src/common/bip39/seed_bip39.c ../../src/common/sskr/seed_rom_variables.c ../../src/common/sskr/seed_sskr.c ../../src/nbgl/sskr_shares.c ../../src/common/sskr/sskr_entry_header.c)
 target_compile_definitions(test_sskr_byteword_sentinel PRIVATE SCREEN_SIZE_WALLET)
 target_include_directories(test_sskr_byteword_sentinel PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common ${CMAKE_CURRENT_SOURCE_DIR}/../../src)
 target_link_libraries(test_sskr_byteword_sentinel PUBLIC cmocka gcov sskr sss testutils)
 
-add_executable(test_sskr_cbor_additional_info ./tests/sskr_cbor_additional_info.c ../../src/common/bip39/seed_rom_variables.c ../../src/common/bip39/seed_bip39.c ../../src/common/sskr/seed_rom_variables.c ../../src/common/sskr/seed_sskr.c ../../src/nbgl/sskr_shares.c)
+add_executable(test_sskr_cbor_additional_info ./tests/sskr_cbor_additional_info.c ../../src/common/bip39/seed_rom_variables.c ../../src/common/bip39/seed_bip39.c ../../src/common/sskr/seed_rom_variables.c ../../src/common/sskr/seed_sskr.c ../../src/nbgl/sskr_shares.c ../../src/common/sskr/sskr_entry_header.c)
 target_compile_definitions(test_sskr_cbor_additional_info PRIVATE SCREEN_SIZE_WALLET)
 target_include_directories(test_sskr_cbor_additional_info PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common ${CMAKE_CURRENT_SOURCE_DIR}/../../src)
 target_link_libraries(test_sskr_cbor_additional_info PUBLIC cmocka gcov sskr sss testutils)

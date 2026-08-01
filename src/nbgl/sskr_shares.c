@@ -90,58 +90,10 @@ size_t sskr_shares_word_add(const char* const byteword) {
         return sskr_shares_current_word_number_get();
     }
     shares.buffer[shares.length] = (char)value;
-    switch (sskr_shares_current_word_number_get()) {
-        // 4th byte of CBOR header contains number of data bytes to follow
-        case 3:
-            if ((shares.buffer[shares.length] & 0x1F) <= 24) {
-                // SSKR bytes = 4 bytes CBOR + n bytes share + 4 bytes CRC
-                // checksum. This is only a literal length for 0-23; 24 (one
-                // length byte follows) is corrected below once that byte is
-                // read.
-                shares.final_size = 4 + (shares.buffer[shares.length] & 0x1F) +
-                                    sizeof(uint32_t);
-            } else {
-                // 25-31 are reserved CBOR additional-info values (two/four/
-                // eight-byte length, reserved, or indefinite length) with no
-                // literal length of their own -- there is nothing valid to
-                // compute here. Force the same maximum bound used below for
-                // an out-of-range declared length, so entry can still
-                // complete and bolos_ux_sskr_hex_check() rejects it, instead
-                // of treating the reserved value as if it encoded a
-                // 25-to-31-byte payload.
-                shares.final_size = SSKR_SHARE_MAX_WIRE_LENGTH;
-            }
-            break;
-        case 4:
-            if ((shares.buffer[3] & 0x1F) == 24) {
-                // Read the declared length as the unsigned wire byte it is:
-                // `char` is signed on the host that builds the unit tests and
-                // unsigned on the device.
-                shares.final_size = 4 + 1 +
-                                    (uint8_t)shares.buffer[shares.length] +
-                                    sizeof(uint32_t);
-                // A serialized shard is SSKR_METADATA_LENGTH_BYTES plus a
-                // value of at most SSKR_MAX_STRENGTH_BYTES, so no share can be
-                // longer than this on the wire.
-                if (shares.final_size > SSKR_SHARE_MAX_WIRE_LENGTH) {
-                    shares.final_size = SSKR_SHARE_MAX_WIRE_LENGTH;
-                }
-            }
-            PRINTF("SSKR final number of words in this share: %d\n",
-                   shares.final_size);
-            break;
-        // 8th byte of SSKR phrase contains member-threshold
-        case 7:
-            if ((shares.buffer[3] & 0x1F) < 24) {
-                shares.count = (shares.buffer[shares.length] & 0x0F) + 1;
-            }
-            break;
-        case 8:
-            if ((shares.buffer[3] & 0x1F) == 24) {
-                shares.count = (shares.buffer[shares.length] & 0x0F) + 1;
-            }
-            break;
-    }
+    bolos_ux_sskr_entry_header_update((const uint8_t*)shares.buffer,
+                                      shares.length,
+                                      sskr_shares_current_word_number_get(),
+                                      &shares.final_size, &shares.count);
     shares.length++;
     shares.current_word_index++;
 

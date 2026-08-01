@@ -27,6 +27,42 @@
 // and the CRC32. Nothing longer can be a share, whatever its header declares.
 #define SSKR_SHARE_MAX_WIRE_LENGTH (5 + SSKR_METADATA_LENGTH_BYTES + SSKR_MAX_STRENGTH_BYTES + 4)
 
+// Read what the CBOR header of a share being entered says about that share,
+// one entered byte at a time.
+//
+// The UI layers append one byte per ByteWord to a buffer and, at four fixed
+// positions in the share, take the expected total length and the share count
+// out of the bytes just entered. This is that arithmetic, in one place: the
+// three entry paths (nbgl/sskr_shares.c, bagl/nanox_enter_phrase.c and
+// bagl/nanos_enter_phrase.c) all called it, in three copies of the same
+// switch, none of which a unit test could reach except the first.
+//
+// `buffer` holds the bytes entered since the buffer was last reset, `index` is
+// the position of the byte this ByteWord just wrote, and `word_number` is how
+// many words of the *current* share had already been entered before it -- so 3
+// for the fourth byte of the share, which is where the byte-string header
+// sits. The two are only equal while the first share is being entered: for
+// later shares `word_number` restarts at 0 and `index` keeps counting, which
+// is also why the byte-string header this reads at `buffer[3]` is the one of
+// the *first* share entered. Every share in a set has the same shape, so the
+// two agree; this preserves what the three copies did rather than changing it.
+//
+// The bytes are read through a `const uint8_t *` because the callers hold them
+// in a `char` buffer, and `char` is signed on the host that builds the unit
+// tests and unsigned on the device.
+//
+// `*final_size` and `*count` are left as they are wherever the entered header
+// says nothing about them: at any `word_number` other than the four below, and
+// at the positions whose form of length is not the one the header declared.
+// Callers rely on that -- reserved additional-info values deliberately leave
+// the share count at whatever it was, which is what makes the completed share
+// fail bolos_ux_sskr_hex_check().
+void bolos_ux_sskr_entry_header_update(const uint8_t *buffer,
+                                       size_t index,
+                                       size_t word_number,
+                                       size_t *final_size,
+                                       uint8_t *count);
+
 // Encode SSKR ByteWord as hex. Returns false, without writing to *value, if
 // the ByteWord is not in the wordlist.
 bool bolos_ux_sskr_byteword_to_hex(const unsigned char *byteword, uint8_t *value);
