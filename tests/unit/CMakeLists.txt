@@ -559,6 +559,14 @@ target_compile_definitions(test_sskr_entry_lifecycle PRIVATE SCREEN_SIZE_WALLET)
 target_include_directories(test_sskr_entry_lifecycle PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common ${CMAKE_CURRENT_SOURCE_DIR}/../../src)
 target_link_libraries(test_sskr_entry_lifecycle PUBLIC cmocka gcov sskr sss testutils)
 
+# Same sources as test_sskr_entry_bounds above, for the one part of the entry
+# state machine that only shows up when a secret takes more than one share:
+# sskr_shares_complete_check() reopening entry for the next share.
+add_executable(test_sskr_multi_share_entry ./tests/sskr_multi_share_entry.c ../../src/common/bip39/seed_rom_variables.c ../../src/common/bip39/seed_bip39.c ../../src/common/sskr/seed_rom_variables.c ../../src/common/sskr/seed_sskr.c ../../src/nbgl/sskr_shares.c)
+target_compile_definitions(test_sskr_multi_share_entry PRIVATE SCREEN_SIZE_WALLET)
+target_include_directories(test_sskr_multi_share_entry PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common ${CMAKE_CURRENT_SOURCE_DIR}/../../src)
+target_link_libraries(test_sskr_multi_share_entry PUBLIC cmocka gcov sskr sss testutils)
+
 add_executable(test_sskr_byteword_sentinel ./tests/sskr_byteword_sentinel.c ../../src/common/bip39/seed_rom_variables.c ../../src/common/bip39/seed_bip39.c ../../src/common/sskr/seed_rom_variables.c ../../src/common/sskr/seed_sskr.c ../../src/nbgl/sskr_shares.c)
 target_compile_definitions(test_sskr_byteword_sentinel PRIVATE SCREEN_SIZE_WALLET)
 target_include_directories(test_sskr_byteword_sentinel PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common ${CMAKE_CURRENT_SOURCE_DIR}/../../src)
