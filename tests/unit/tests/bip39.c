@@ -231,6 +231,79 @@ static void test_bip39_decode_unknown_word(void** state) {
     assert_int_equal(result, 0);
 }
 
+// Decodes the 12-word phrase above with its last word replaced, and asserts
+// the phrase is rejected. The word count is what it has to be for the lookup
+// to be reached at all, so the replacement has to keep it at 12.
+static void assert_last_word_rejected(const char* last_word) {
+    static const char prefix[] =
+        "girl mad pet galaxy egg matter matrix prison refuse sense ordinary ";
+    const size_t prefix_len = sizeof(prefix) - 1;
+    const size_t word_len = strlen(last_word);
+    unsigned char mnemonic[sizeof(prefix) + 16];
+    unsigned char bits[32 + 1];
+
+    assert_true(prefix_len + word_len <= sizeof(mnemonic));
+    memcpy(mnemonic, prefix, prefix_len);
+    memcpy(mnemonic + prefix_len, last_word, word_len);
+
+    unsigned int result = bolos_ux_bip39_mnemonic_decode(
+        mnemonic, (unsigned int)(prefix_len + word_len), bits, sizeof(bits));
+
+    assert_int_equal(result, 0);
+}
+
+// BIP39_WORDLIST stores the 2048 entries back to back with no separator and
+// BIP39_WORDLIST_OFFSETS says where each one starts: 11068 bytes in all, the
+// last entry ("zoo") at offset 11065 for 3 bytes. The lookup in
+// bolos_ux_bip39_mnemonic_decode() compares current_word_size bytes -- the
+// length of the *typed* word, not of the entry -- so a word longer than the
+// entry it is held against reads past that entry, and past the array itself
+// on the last ones. os_secure_memcmp() is constant time and never short
+// circuits, so it reads every one of those bytes rather than stopping at the
+// first difference.
+//
+// It takes two things at once to get there: a word absent from the list, so
+// that the scan is not stopped early by the break on a match, and a word
+// longer than 3 characters, so that the read runs off the end once the scan
+// reaches "zoo". A word that is in the list can do neither -- it stops the
+// scan at its own index, and no entry extends past the end of the array.
+//
+// The lengths below cover the whole range that can reach the lookup: 4 is
+// the shortest that reads past "zoo" (by 1 byte), 10 is the longest the
+// current_word[10] buffer accepts, and reads 7 bytes past the end of the
+// array -- the worst case. Under the sanitizer this target is built with,
+// each of those reads is a failure; without one they land in whatever the
+// linker put after the array, and the phrase is rejected all the same, so
+// the assertion holds in both builds and only the sanitizer tells them
+// apart.
+static void test_bip39_decode_word_longer_than_last_wordlist_entry(
+    void** state) {
+    (void)state;
+    static const char* const absent_words[] = {
+        "zzzz",     "zzzzz",     "zzzzzz",    "zzzzzzz",
+        "zzzzzzzz", "zzzzzzzzz", "zzzzzzzzzz"};
+
+    for (size_t i = 0; i < sizeof(absent_words) / sizeof(absent_words[0]);
+         i++) {
+        assert_last_word_rejected(absent_words[i]);
+    }
+}
+
+// The counterpart of the case above: words that are exactly as long as the
+// last entry of the wordlist and still absent from it. They reach the last
+// entry like the ones above but read nothing past it, so the length check
+// lets the comparison through and the comparison alone has to reject them.
+// Without this, a length check that rejected everything -- or a comparison
+// that no longer ran -- would look just as green as a correct one.
+static void test_bip39_decode_three_letter_word_absent_from_wordlist(
+    void** state) {
+    (void)state;
+
+    assert_last_word_rejected("zzz");
+    assert_last_word_rejected("aaa");
+    assert_last_word_rejected("qqq");
+}
+
 // bolos_ux_bip39_mnemonic_decode() rejects a phrase purely on word count
 // before looking at word content, so the content here does not matter --
 // only the number of space-separated words.
@@ -509,6 +582,25 @@ static void test_bip39_roundtrip_24_words(void** state) {
                   "volcano");
 }
 
+// Non-regression for the order the lookup evaluates its two conditions in:
+// the entries of the wordlist are still found, whatever their length and
+// wherever they sit. "abandon" is entry 0 and "zoo" entry 2047, the last one
+// -- looking "zoo" up walks the scan all the way to the entry the overread
+// was about -- and between them the phrase covers every length the list
+// holds, 3 to 8 characters. The checksum is what makes it a valid phrase, so
+// the roundtrip only passes if all twelve words are matched at their own
+// index.
+static void test_bip39_roundtrip_wordlist_bounds(void** state) {
+    (void)state;
+    static const uint8_t entropy[16] = {0x00, 0x1f, 0xff, 0xff, 0x00, 0x7f,
+                                        0xf5, 0xfe, 0x00, 0x17, 0xfc, 0xff,
+                                        0xbf, 0xec, 0x04, 0x00};
+
+    run_roundtrip(entropy, sizeof(entropy),
+                  "abandon zoo zone abstract young yellow able zebra zero "
+                  "youth absurd achieve");
+}
+
 int main(void) {
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(test_bip39),
@@ -516,6 +608,10 @@ int main(void) {
         cmocka_unit_test(test_bip39_seed_length_boundary),
         cmocka_unit_test(test_bip39_decode_word_too_long_for_buffer),
         cmocka_unit_test(test_bip39_decode_unknown_word),
+        cmocka_unit_test(
+            test_bip39_decode_word_longer_than_last_wordlist_entry),
+        cmocka_unit_test(
+            test_bip39_decode_three_letter_word_absent_from_wordlist),
         cmocka_unit_test(test_bip39_decode_bad_checksum),
         cmocka_unit_test(test_bip39_decode_checksum_mask_covers_fourth_bit),
         cmocka_unit_test(test_bip39_decode_wrong_length),
@@ -527,6 +623,7 @@ int main(void) {
         cmocka_unit_test(test_bip39_roundtrip_12_words),
         cmocka_unit_test(test_bip39_roundtrip_18_words),
         cmocka_unit_test(test_bip39_roundtrip_24_words),
+        cmocka_unit_test(test_bip39_roundtrip_wordlist_bounds),
     };
     return cmocka_run_group_tests(tests, NULL, NULL);
 }
