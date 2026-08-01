@@ -491,6 +491,26 @@ add_executable(test_sskr_threshold_three_roundtrip_nanos tests/sskr_threshold_th
 target_include_directories(test_sskr_threshold_three_roundtrip_nanos PUBLIC ${SSKR_NANOS_INCLUDES})
 target_compile_definitions(test_sskr_threshold_three_roundtrip_nanos PRIVATE TARGET_NANOS)
 target_link_libraries(test_sskr_threshold_three_roundtrip_nanos PUBLIC cmocka gcov testutils)
+
+# The two implementations of the field multiplication itself, each held to the
+# same reference over all 65536 pairs the field has. The four targets above
+# reach the Nano S variant only through the Blockchain Commons vectors, which
+# exercise a few hundred products; a disagreement on any other pair would make
+# shares generated on a Nano S unrecombinable elsewhere and show up nowhere.
+#
+# The pair below is the whole point: one file, two targets. test_gf2_8_mul
+# links the harness's OpenSSL-backed cx_bn_gf2_n_mul() and needs no source of
+# its own; test_gf2_8_mul_nanos compiles interpolate.c in with TARGET_NANOS so
+# its hand-written definition takes precedence over the one libtestutils.so
+# exports, the same mechanism the four targets above rely on. sss.c is not
+# needed by either: nothing here interpolates, it multiplies.
+add_executable(test_gf2_8_mul tests/gf2_8_mul.c)
+target_link_libraries(test_gf2_8_mul PUBLIC cmocka gcov testutils)
+
+add_executable(test_gf2_8_mul_nanos tests/gf2_8_mul.c ../../src/common/sskr/sss/interpolate.c)
+target_include_directories(test_gf2_8_mul_nanos PUBLIC ${SSS_NANOS_INCLUDES})
+target_compile_definitions(test_gf2_8_mul_nanos PRIVATE TARGET_NANOS)
+target_link_libraries(test_gf2_8_mul_nanos PUBLIC cmocka gcov testutils)
 # ---------------------------------------------------------------------------
 
 # Built with AddressSanitizer. Both buffer guards this file covers --
