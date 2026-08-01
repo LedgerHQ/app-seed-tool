@@ -17,17 +17,18 @@
 
 #pragma once
 
-// Internals of seed_bip85.c: helpers that no other file in src/ calls, but
-// that keep external linkage so the unit suite can reach them. That intent is
-// already written on bip85_dice_bits_per_roll() -- "with external linkage,
-// purely so it can be linked into a unit test" -- so making them static is
-// not the answer; giving them a prototype is.
+// Internals of this directory: helpers that the application reaches only from
+// within it, but that keep external linkage so the unit suite can reach them
+// too. That intent is already written on bip85_dice_bits_per_roll() -- "with
+// external linkage, purely so it can be linked into a unit test" -- so making
+// them static is not the answer; giving them a prototype is.
 //
 // Before this header, each of them was declared by hand, with `extern`, in
 // whichever test file needed it, and nothing checked those declarations
 // against the definitions: no translation unit saw both. This header is the
-// single place they are declared, included by seed_bip85.c so the compiler
-// checks the definitions, and by the tests so it checks their use.
+// single place they are declared, included by the file that defines them so
+// the compiler checks the definitions, and by the tests so it checks their
+// use.
 //
 // Nothing here is part of the application's BIP-85 interface. That is
 // common_bip85.h, and it is what callers outside this directory should use.
@@ -76,3 +77,10 @@ int32_t bip85_dice_roll(uint32_t *out,
                         uint32_t sides,
                         uint32_t rolls,
                         const uint8_t seed[BIP85_ENTROPY_LENGTH]);
+
+// The password encoders, defined in base64.c and base85.c. Each consumes
+// exactly 64 bytes from `src` and writes BASE64_ENCODE_LENGTH /
+// BASE85_ENCODE_LENGTH characters to `dst`, unterminated, returning that count.
+// bip85_finalize_pwd() above is what truncates and terminates the result.
+uint8_t base64_encode_64bytes(const uint8_t *src, char *dst);
+uint8_t base85_encode_64bytes(const uint8_t *src, char *dst);
