@@ -13,13 +13,12 @@
  * (verified: SIGSEGV, cmocka reports it as a failed test).
  *
  * sskr_generate_shards() -- the public entry point this test calls, since
- * sskr_generate_shards_internal() is static -- collapses any error surfacing
- * from the internal call into a plain 0 rather than propagating the SSS_*
- * code (`if (error) { memzero(output, buffer_size); return 0; }`). That
- * collapse is pre-existing and out of scope here (nothing about this fix
- * changes it, only which failures reach it); this test asserts the 0 that
- * contract already promises, and that output was actually cleared rather
- * than left holding shards built from whatever was on the stack.
+ * sskr_generate_shards_internal() is static -- propagates the SSS_* code
+ * surfacing from the internal call, so what this test asserts is the
+ * SSS_ERROR_TOO_MANY_SHARES the failed split produced, that shard_len was
+ * zeroed rather than left as the caller wrote it, and that output was
+ * actually cleared rather than left holding shards built from whatever was
+ * on the stack.
  *
  * Not reachable from the UI today (the menu options that set group/member
  * counts cannot exceed the arrays either), but a public library entry point,
@@ -58,7 +57,7 @@ static void test_generate_reports_the_split_error_instead_of_succeeding(void **s
         (SECRET_LEN + SSKR_METADATA_LENGTH_BYTES) * (SHARDS_CAPACITY + 1);
     uint8_t share_buffer[share_buffer_len];
     uint8_t expected_buffer[share_buffer_len];
-    uint8_t share_len;
+    uint8_t share_len = 0xFF;
 
     memset(share_buffer, 0xFF, share_buffer_len);
     memset(expected_buffer, 0, share_buffer_len);
@@ -67,7 +66,8 @@ static void test_generate_reports_the_split_error_instead_of_succeeding(void **s
                                           SECRET_LEN, &share_len, share_buffer,
                                           share_buffer_len, cx_rng);
 
-    assert_int_equal(result, 0);
+    assert_int_equal(result, SSS_ERROR_TOO_MANY_SHARES);
+    assert_int_equal(share_len, 0);
     assert_memory_equal(share_buffer, expected_buffer, share_buffer_len);
 }
 

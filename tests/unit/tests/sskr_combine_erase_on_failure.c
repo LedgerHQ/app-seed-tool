@@ -3,7 +3,7 @@
  * sskr_combine_shards_internal() (src/common/sskr/sskr.c).
  *
  * The generation side already gets this right: sskr_generate_shards() does
- * `memzero(output, buffer_size); return 0;` before returning on any error.
+ * `memzero(output, buffer_size);` before returning on any error.
  * The combination side's internal function cleans up its own working
  * buffers (group_shares/gx/gy/groups) on every failure, but never the
  * caller's `buffer` -- the very thing a failed combine is supposed to leave
