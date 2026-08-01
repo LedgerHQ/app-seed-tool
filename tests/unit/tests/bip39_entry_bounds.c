@@ -56,13 +56,6 @@ bool compare_recovery_phrase(bool* reconstructed) {
     fail_msg("not on the entry path");
 }
 
-/*
- * bip39_mnemonic_shrink() is external but not declared in bip39_mnemonic.h --
- * word_remove() is its only caller today. Declared here rather than added to
- * the header, which would mean touching src/ for a test's sake.
- */
-size_t bip39_mnemonic_shrink(const size_t size);
-
 #define BIP39_WORDLIST_SIZE (BIP39_WORDLIST_OFFSETS_LENGTH - 1)
 
 /*

@@ -504,9 +504,6 @@ bool bip85_dice_rolls_valid(uint32_t rolls) {
 #include "common.h"
 #include "constants.h"
 
-extern uint8_t base64_encode_64bytes(const uint8_t* src, char* dst);
-extern uint8_t base85_encode_64bytes(const uint8_t* src, char* dst);
-
 /**
  * @brief Generates BIP85 entropy from a device's seed using a specified BIP32
  * path.

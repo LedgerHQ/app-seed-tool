@@ -4,7 +4,7 @@
 #include <setjmp.h>
 #include <cmocka.h>
 
-extern uint8_t base64_encode_64bytes(const uint8_t* src, char* dst);
+#include "bip85/bip85_internal.h"
 
 const uint8_t base64_input[] = {
     0x74, 0xa2, 0xe8, 0x7a, 0x9b, 0xa0, 0xcd, 0xd5, 

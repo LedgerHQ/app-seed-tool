@@ -17,9 +17,7 @@
 #include <stdint.h>
 #include <string.h>
 
-extern bool compare_recovery_phrase_finish(cx_err_t derivation_status,
-                                           uint8_t buffer[64],
-                                           uint8_t buffer_device[64]);
+#include "common.h"
 
 static void assert_all_zero(const uint8_t* data, size_t len) {
     for (size_t i = 0; i < len; i++) {

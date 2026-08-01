@@ -36,3 +36,15 @@
  * one. It is always true for the BIP39 tool, which has nothing to reconstruct.
  */
 bool compare_recovery_phrase(bool *reconstructed);
+
+/*
+ * The tail of compare_recovery_phrase(): everything that happens once
+ * os_derive_bip32_no_throw() has returned. Split out because that syscall is
+ * not available on host while the comparison and the two erasures around it are
+ * pure logic. Not for callers outside common_seed.c -- it is here so that the
+ * file that defines it, and the unit suite that drives it, are checked against
+ * one declaration.
+ */
+bool compare_recovery_phrase_finish(cx_err_t derivation_status,
+                                    uint8_t buffer[64],
+                                    uint8_t buffer_device[64]);

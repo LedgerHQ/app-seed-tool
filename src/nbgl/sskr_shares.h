@@ -100,4 +100,12 @@ char *sskr_shares_get(void);
  */
 size_t sskr_shares_length_get(void);
 
+/*
+ * The twin of bip39_mnemonic_shrink(), for the shares buffer: drops the last
+ * `size` bytes, erases everything from the new end to the end of the buffer,
+ * and returns the new length. A `size` of 0, or one larger than the current
+ * length, drops everything.
+ */
+size_t sskr_shares_shrink(const size_t size);
+
 #endif  // SCREEN_SIZE_WALLET

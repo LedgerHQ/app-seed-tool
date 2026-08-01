@@ -122,10 +122,59 @@ static void test_entry_counter_never_folds_back(void **state)
     }
 }
 
+/* Nothing from `from` to the end of the shares buffer may survive a shrink. */
+static void assert_erased_from(size_t from) {
+    const char* buffer = sskr_shares_get();
+
+    for (size_t i = from; i < SSKR_SHARES_MAX_LENGTH; i++) {
+        assert_int_equal(buffer[i], 0);
+    }
+}
+
+/*
+ * sskr_shares_shrink() is the exact twin of bip39_mnemonic_shrink(), which
+ * bip39_entry_bounds.c already covers with these three cases; the shares half
+ * had none. It is what erases entered data when the user backs out of a word,
+ * so each of the three ways of asking for it -- part of the buffer, all of it
+ * via a size of 0, all of it via an over-large size -- has to leave the tail
+ * zeroed and the length consistent with what was kept.
+ *
+ * Unlike the BIP39 buffer, which holds the words as text, this one holds one
+ * decoded byte per ByteWord, so a word is one byte here and there is no
+ * separator.
+ */
+static void test_shrink_erases_what_it_drops(void** state) {
+    (void)state;
+
+    /* Partial removal: the tail goes, the head stays. */
+    sskr_shares_reset();
+    sskr_shares_word_add(word_for(0x11));
+    sskr_shares_word_add(word_for(0x42));
+    assert_int_equal(sskr_shares_length_get(), 2);
+
+    assert_int_equal(sskr_shares_shrink(1), 1);
+    assert_int_equal(sskr_shares_length_get(), 1);
+    assert_int_equal((uint8_t)sskr_shares_get()[0], 0x11);
+    assert_erased_from(1);
+
+    /* size == 0: erase all. */
+    assert_int_equal(sskr_shares_shrink(0), 0);
+    assert_int_equal(sskr_shares_length_get(), 0);
+    assert_erased_from(0);
+
+    /* size > length: erase all, without wrapping the length around. */
+    sskr_shares_reset();
+    sskr_shares_word_add(word_for(0x42));
+    assert_int_equal(sskr_shares_shrink(sskr_shares_length_get() + 1), 0);
+    assert_int_equal(sskr_shares_length_get(), 0);
+    assert_erased_from(0);
+}
+
 int main(void)
 {
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(test_entry_counter_never_folds_back),
+        cmocka_unit_test(test_shrink_erases_what_it_drops),
     };
     return cmocka_run_group_tests(tests, NULL, NULL);
 }

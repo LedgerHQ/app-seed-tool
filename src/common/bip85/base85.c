@@ -17,6 +17,7 @@
 
 #include <os.h>
 
+#include "./bip85_internal.h"
 #include "./seed_rom_variables.h"
 
 /**
