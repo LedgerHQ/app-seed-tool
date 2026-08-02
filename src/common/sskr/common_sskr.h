@@ -63,6 +63,29 @@ void bolos_ux_sskr_entry_header_update(const uint8_t *buffer,
                                        size_t *final_size,
                                        uint8_t *count);
 
+// Locate one share inside the buffer a generated set is concatenated into.
+//
+// bolos_ux_bip39_to_sskr_convert() writes the whole set into a single buffer,
+// back to back and with no separator, and reports how many shares it holds.
+// Paging through them is therefore a division, and both display paths --
+// bagl/ux_sskr.c walking the set one screen at a time, nbgl/ui.c handing one
+// share per generic-review page -- carried a copy of it.
+//
+// `share_index` is zero-based. On success `*offset` is where that share
+// starts in the buffer and `*length` is how long one share is; on failure
+// neither is written.
+//
+// Returning false rather than dividing is what holds the one thing this
+// arithmetic can get wrong: `share_count` reaching it as 0. The BAGL path
+// kept that out with a `1 <= index <= share_count` guard which cannot pass
+// when the count is 0; the NBGL path had no guard of its own and relied on
+// the review never being opened on an empty set.
+bool bolos_ux_sskr_share_slice(size_t buffer_length,
+                               uint8_t share_count,
+                               uint8_t share_index,
+                               size_t *offset,
+                               size_t *length);
+
 // Encode SSKR ByteWord as hex. Returns false, without writing to *value, if
 // the ByteWord is not in the wordlist.
 bool bolos_ux_sskr_byteword_to_hex(const unsigned char *byteword, uint8_t *value);

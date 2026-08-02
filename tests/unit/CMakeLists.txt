@@ -871,6 +871,41 @@ target_compile_definitions(test_bip39_keyboard_candidates_stax PRIVATE HAVE_NBGL
 target_include_directories(test_bip39_keyboard_candidates_stax PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common)
 target_link_libraries(test_bip39_keyboard_candidates_stax PUBLIC cmocka gcov testutils)
 
+# ---------------------------------------------------------------------------
+# The SSKR share display and the two SSKR menus of the BAGL stack.
+#
+# Both pieces come out of src/bagl/ux_sskr.c, which is compiled into no target
+# here and so is absent from the coverage report rather than sitting in it at
+# 0 %. Speculos dropped Nano S, so a unit test is the only thing that will
+# ever run that stack's arithmetic; Nano S+ and Nano X share the file and are
+# emulated, but only through a UX_FLOW.
+#
+# Each of the two is built twice, with and without TARGET_NANOS, for the same
+# reason the Shamir targets above are: what is not compiled is neither covered
+# nor uncovered. The share-count table has 7 entries under TARGET_NANOS and 16
+# otherwise, and SSS_MAX_SHARE_COUNT is 10 and 16 -- the relation between them
+# is the point of test_sskr_ux_menu, and it is a different relation in each of
+# the two configurations. target_compile_definitions() applies to every source
+# of a target, so the test file and the file under test always agree.
+add_executable(test_sskr_share_slice ./tests/sskr_share_slice.c ../../src/common/sskr/sskr_share_slice.c)
+target_include_directories(test_sskr_share_slice PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common/sskr/sss)
+target_link_libraries(test_sskr_share_slice PUBLIC cmocka gcov testutils)
+
+add_executable(test_sskr_share_slice_nanos ./tests/sskr_share_slice.c ../../src/common/sskr/sskr_share_slice.c)
+target_include_directories(test_sskr_share_slice_nanos PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common/sskr/sss)
+target_compile_definitions(test_sskr_share_slice_nanos PRIVATE TARGET_NANOS)
+target_link_libraries(test_sskr_share_slice_nanos PUBLIC cmocka gcov testutils)
+
+add_executable(test_sskr_ux_menu ./tests/sskr_ux_menu.c ../../src/bagl/ux_sskr_menu.c)
+target_include_directories(test_sskr_ux_menu PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common/sskr/sss)
+target_link_libraries(test_sskr_ux_menu PUBLIC cmocka gcov testutils)
+
+add_executable(test_sskr_ux_menu_nanos ./tests/sskr_ux_menu.c ../../src/bagl/ux_sskr_menu.c)
+target_include_directories(test_sskr_ux_menu_nanos PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common/sskr/sss)
+target_compile_definitions(test_sskr_ux_menu_nanos PRIVATE TARGET_NANOS)
+target_link_libraries(test_sskr_ux_menu_nanos PUBLIC cmocka gcov testutils)
+# ---------------------------------------------------------------------------
+
 # Register every executable this file builds, instead of repeating their names
 # in a list kept by hand. A name missing from such a list costs nothing
 # visible: the target still compiles, still passes when run directly, and the
