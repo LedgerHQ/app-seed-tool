@@ -10,9 +10,6 @@ on:
     tags:
       - '**'
   pull_request:
-    paths-ignore:
-      - '.github/workflows/*.yml'
-      - 'tests/*'
 
 jobs:
   job_lint:
@@ -20,20 +17,9 @@ jobs:
     uses: LedgerHQ/ledger-app-workflows/.github/workflows/reusable_lint.yml@v1
     with:
       source: 'src'
-      extensions: 'h,c'
-      version: 11
 
   misspell:
     name: Check misspellings
-    runs-on: ubuntu-latest
-    steps:
-    - name: Clone
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-    - name: Check misspellings
-      uses: codespell-project/actions-codespell@v2
-      with:
-        builtin: clear,rare
-        check_filenames: true
-        ignore_words_list: ontop
+    uses: LedgerHQ/ledger-app-workflows/.github/workflows/reusable_spell_check.yml@v1
+    with:
+      ignore_words_list: ontop
