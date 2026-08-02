@@ -413,20 +413,39 @@ unsigned int bip85_path_dice(unsigned int* path, uint32_t sides, uint32_t rolls,
 }
 
 /**
- * @brief Reports whether `words` is a mnemonic length the BIP39 application
- * accepts.
+ * @brief Reports whether `words` is a mnemonic length this application offers.
  *
- * @details The `LEDGER_ASSERT` that enforces this still terminates the
- * process on a violation exactly as before; only the condition moved here, so
- * that both sides of each bound can be checked by a unit test.
+ * @details Deliberately narrower than BIP-85. The specification's Words Table
+ * defines five lengths -- 12, 15, 18, 21 and 24 words, for 128, 160, 192, 224
+ * and 256 bits of entropy -- and the truncation this file applies
+ * (`bip85_bip39_entropy_len()` below) is correct for all five. This
+ * application exposes only three: `src/nbgl/ui.c` sets the mnemonic size to
+ * `BIP39_MNEMONIC_SIZE_12`, `_18` or `_24` and nothing else, and that is the
+ * only source of `words`.
+ *
+ * The narrower condition is the point. This backs a `LEDGER_ASSERT` in
+ * `bolos_ux_bip85_bip39()`, whose job is to stop a programming error before a
+ * secret is derived, and nothing downstream would catch one:
+ * `bolos_ux_bip39_mnemonic_encode()` accepts any entropy length that is a
+ * multiple of 4 from 16 to 32 bytes, so the 20 or 28 bytes a 15 or 21 would
+ * produce still yield a perfectly valid mnemonic -- of a length the rest of
+ * the application never asked for.
+ *
+ * Do not widen this back to the Words Table without also exposing 15 and 21
+ * in the UI: the divergence is intentional.
+ *
+ * The `LEDGER_ASSERT` that enforces this still terminates the process on a
+ * violation exactly as before; the condition lives here so that both sides of
+ * it can be checked by a unit test.
  *
  * @param[in] words Number of mnemonic words requested.
  *
- * @return `true` if the value is in range.
+ * @return `true` if this application offers that length.
  */
 bool bip85_bip39_words_valid(uint8_t words) {
-    return (words >= BIP39_MNEMONIC_SIZE_12) && (words % 3 == 0) &&
-           (words <= BIP39_MNEMONIC_SIZE_24);
+    return (words == BIP39_MNEMONIC_SIZE_12) ||
+           (words == BIP39_MNEMONIC_SIZE_18) ||
+           (words == BIP39_MNEMONIC_SIZE_24);
 }
 
 /**

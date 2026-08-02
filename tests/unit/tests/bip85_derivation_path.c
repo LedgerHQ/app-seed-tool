@@ -129,7 +129,11 @@ static void test_path_bip39(void** state) {
     // values guard the position of the parameter in the path, not a feature.
     check_bip39(0, 12, 0);
     check_bip39(0, 24, 0);
-    // The full set of mnemonic lengths the application accepts.
+    // 15 and 21 are BIP-85 Words Table lengths this application does not
+    // offer -- test_bip39_words_valid() below expects them to be refused.
+    // They belong here all the same: a path builder must place whatever value
+    // it is handed at the right component, and that is all these check. They
+    // say nothing about which lengths are supported.
     check_bip39(0, 15, 1);
     check_bip39(0, 18, 2);
     check_bip39(0, 21, 3);
@@ -335,26 +339,37 @@ static void test_purpose_is_common_to_all_paths(void** state) {
 // as literals rather than recomputed from the same expression.
 // ---------------------------------------------------------------------------
 
+// This guard is deliberately narrower than BIP-85: the Words Table defines
+// five lengths (12, 15, 18, 21, 24) and this application offers three --
+// src/nbgl/ui.c sets the mnemonic size to BIP39_MNEMONIC_SIZE_12, _18 or _24
+// and nothing else, and that is the only source of `words`. It backs a
+// LEDGER_ASSERT meant to stop a programming error before a secret is derived,
+// and nothing downstream would stop one: bolos_ux_bip39_mnemonic_encode()
+// accepts any entropy length that is a multiple of 4 from 16 to 32 bytes, so
+// the 20 or 28 bytes a 15 or 21 would produce still yield a valid mnemonic.
+// 15 and 21 are therefore expected to be refused here.
 static void test_bip39_words_valid(void** state) {
     (void)state;
-    // Accepted: 12, 15, 18, 21, 24.
+    // Accepted: the three lengths the application offers.
     assert_true(bip85_bip39_words_valid(12));
-    assert_true(bip85_bip39_words_valid(15));
     assert_true(bip85_bip39_words_valid(18));
-    assert_true(bip85_bip39_words_valid(21));
     assert_true(bip85_bip39_words_valid(24));
 
-    // Below the lower bound, including multiples of 3.
+    // Defined by BIP-85's Words Table, not offered by this application.
+    assert_false(bip85_bip39_words_valid(15));
+    assert_false(bip85_bip39_words_valid(21));
+
+    // Below 12, including a multiple of 3 and the value just under.
     assert_false(bip85_bip39_words_valid(0));
     assert_false(bip85_bip39_words_valid(9));
     assert_false(bip85_bip39_words_valid(11));
 
-    // In range but not a multiple of 3.
+    // Between the accepted lengths.
     assert_false(bip85_bip39_words_valid(13));
     assert_false(bip85_bip39_words_valid(14));
     assert_false(bip85_bip39_words_valid(23));
 
-    // Above the upper bound, including a multiple of 3.
+    // Above 24, including a multiple of 3 and the value just over.
     assert_false(bip85_bip39_words_valid(25));
     assert_false(bip85_bip39_words_valid(27));
     assert_false(bip85_bip39_words_valid(255));
