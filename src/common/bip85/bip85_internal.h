@@ -63,6 +63,7 @@ bool bip85_dice_sides_valid(uint32_t sides);
 bool bip85_dice_rolls_valid(uint32_t rolls);
 
 // Entropy and output shaping.
+uint8_t bip85_bip39_entropy_len(uint8_t words);
 bool bip85_entropy_from_key(const uint8_t key[32], uint8_t *out, size_t out_len);
 bool bolos_ux_bip85_drng_with_seed(uint8_t *seed,
                                    size_t seed_length,

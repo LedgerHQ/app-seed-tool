@@ -360,6 +360,32 @@ static void test_bip39_words_valid(void** state) {
     assert_false(bip85_bip39_words_valid(255));
 }
 
+// ---------------------------------------------------------------------------
+// BIP39 truncation length
+//
+// bip85_bip39_entropy_len() decides how much of the 64-byte BIP85 output the
+// BIP39 application keeps. Until it was extracted it lived inside
+// bolos_ux_bip85_bip39(), below the HAVE_NBGL guard, so no test target
+// compiled it -- and tests/bip85_bip39_entropy.c does not reach it either:
+// that file supplies the length itself, from its own table.
+//
+// Expected values are read off BIP-85's Words Table, as the bit counts it
+// prints divided by 8, rather than recomputed with the expression under
+// test -- which would only check the formula against a copy of itself.
+//
+// Only the three lengths this application offers are pinned. The formula is
+// generic and the table has five entries, but src/nbgl/ui.c only ever sets
+// BIP39_MNEMONIC_SIZE_12, _18 or _24, and asserting 15 or 21 here would
+// suggest a support that does not exist.
+// ---------------------------------------------------------------------------
+
+static void test_bip39_entropy_len(void** state) {
+    (void)state;
+    assert_int_equal(bip85_bip39_entropy_len(12), 128 / 8);
+    assert_int_equal(bip85_bip39_entropy_len(18), 192 / 8);
+    assert_int_equal(bip85_bip39_entropy_len(24), 256 / 8);
+}
+
 static void test_hex_num_bytes_valid(void** state) {
     (void)state;
     assert_false(bip85_hex_num_bytes_valid(0));
@@ -427,6 +453,7 @@ int main(void) {
         cmocka_unit_test(test_hardening_survives_large_parameters),
         cmocka_unit_test(test_purpose_is_common_to_all_paths),
         cmocka_unit_test(test_bip39_words_valid),
+        cmocka_unit_test(test_bip39_entropy_len),
         cmocka_unit_test(test_hex_num_bytes_valid),
         cmocka_unit_test(test_pwd_base64_len_valid),
         cmocka_unit_test(test_pwd_base85_len_valid),

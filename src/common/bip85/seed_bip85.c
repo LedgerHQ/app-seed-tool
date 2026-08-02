@@ -430,6 +430,28 @@ bool bip85_bip39_words_valid(uint8_t words) {
 }
 
 /**
+ * @brief Returns the number of entropy bytes a `words`-word BIP39 mnemonic is
+ * built from, i.e. how much of the 64-byte BIP85 output the BIP39 application
+ * keeps.
+ *
+ * @details BIP-85's Words Table pairs each mnemonic length with an entropy
+ * size -- 12 words / 128 bits, 15 / 160, 18 / 192, 21 / 224, 24 / 256 -- which
+ * is `words * 4 / 3` bytes throughout. That expression used to be spelled out
+ * three times inside `bolos_ux_bip85_bip39()`, below the `HAVE_NBGL` guard,
+ * where no test target compiles it. Here it has external linkage and sits
+ * outside the guard, for the same reason `bip85_dice_bits_per_roll()` above
+ * does: so a unit test can hold it against the table.
+ *
+ * @param[in] words Number of mnemonic words. `bip85_bip39_words_valid()`
+ * above says which values reach this.
+ *
+ * @return The entropy length, in bytes.
+ */
+uint8_t bip85_bip39_entropy_len(uint8_t words) {
+    return (uint8_t)(words * 4 / 3);
+}
+
+/**
  * @brief Reports whether `num_bytes` is an output length the HEX application
  * accepts. See `bip85_bip39_words_valid()` for why this is a separate
  * function.
@@ -590,11 +612,13 @@ uint8_t bolos_ux_bip85_bip39(uint8_t* hex_out, uint8_t language, uint8_t words,
         LEDGER_ASSERT(false, "BIP85 entropy failed");
     }
 
-    memcpy(hex_out, buffer, words * 4 / 3);
+    uint8_t entropy_len = bip85_bip39_entropy_len(words);
+
+    memcpy(hex_out, buffer, entropy_len);
     memzero(buffer, BIP85_ENTROPY_LENGTH);
 
-    PRINTF("BIP85 BIP39 hex output: %u bytes\n", words * 4 / 3);
-    return words * 4 / 3;
+    PRINTF("BIP85 BIP39 hex output: %u bytes\n", entropy_len);
+    return entropy_len;
 }
 
 void bolos_ux_bip85_hex(uint8_t* hex_out, uint8_t num_bytes,
