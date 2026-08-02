@@ -116,7 +116,7 @@ flowchart LR
 ```
 > [!TIP]
 > Demo videos of some of the menu flows on different hardware devices are available [here](demos/README.md).
-> 
+>
 > Alternatively, animations of some of the menu flows on different hardware devices are available [here](tests/functional/screenshots/README.md).
 
 ## Check BIP-39

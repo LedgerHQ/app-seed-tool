@@ -26,7 +26,7 @@ def all_eink_bip85_bip39(backend, device):
     genericbuttons.choose(3)
     backend.wait_for_text_on_screen("Which BIP85", 5)
     genericbuttons.choose(1)
-    backend.wait_for_text_on_screen("Length of BIP39", 5)  
+    backend.wait_for_text_on_screen("Length of BIP39", 5)
     genericbuttons.choose(1)
     backend.wait_for_text_on_screen("Enter index", 5)
     keypad.write("0")
