@@ -857,6 +857,20 @@ target_compile_definitions(test_sskr_keyboard_candidates_stax PRIVATE HAVE_NBGL 
 target_include_directories(test_sskr_keyboard_candidates_stax PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common)
 target_link_libraries(test_sskr_keyboard_candidates_stax PUBLIC cmocka gcov sskr sss testutils)
 
+# The BIP-39 half of the same gap, on the same pattern as the SSKR pair above:
+# the two functions are structurally identical, and only the wordlist they walk
+# differs. Unlike SSKR, this one needs neither sskr nor sss -- seed_bip39.c and
+# its wordlist are the whole dependency, as they already are for test_bip39.
+add_executable(test_bip39_keyboard_candidates ./tests/bip39_keyboard_candidates.c ../../src/common/bip39/seed_rom_variables.c ../../src/common/bip39/seed_bip39.c)
+target_compile_definitions(test_bip39_keyboard_candidates PRIVATE HAVE_NBGL TARGET_FLEX)
+target_include_directories(test_bip39_keyboard_candidates PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common)
+target_link_libraries(test_bip39_keyboard_candidates PUBLIC cmocka gcov testutils)
+
+add_executable(test_bip39_keyboard_candidates_stax ./tests/bip39_keyboard_candidates.c ../../src/common/bip39/seed_rom_variables.c ../../src/common/bip39/seed_bip39.c)
+target_compile_definitions(test_bip39_keyboard_candidates_stax PRIVATE HAVE_NBGL TARGET_STAX)
+target_include_directories(test_bip39_keyboard_candidates_stax PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common)
+target_link_libraries(test_bip39_keyboard_candidates_stax PUBLIC cmocka gcov testutils)
+
 # Register every executable this file builds, instead of repeating their names
 # in a list kept by hand. A name missing from such a list costs nothing
 # visible: the target still compiles, still passes when run directly, and the
