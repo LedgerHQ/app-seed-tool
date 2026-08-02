@@ -21,7 +21,7 @@ void cx_rng_no_throw(uint8_t *buffer, size_t len)
 {
     for (size_t i = 0; i < len; i++) {
        buffer[i] = (uint8_t) i;
-    } 
+    }
 }
 
 // Fake secure memory comparison used only for testing
