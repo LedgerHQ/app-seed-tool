@@ -493,6 +493,11 @@ bool bip85_hex_num_bytes_valid(uint8_t num_bytes) {
  * @return `true` if the value is in range.
  */
 bool bip85_pwd_base64_len_valid(uint8_t pwd_len) {
+    // `BASE64_ENCODE_LENGTH - 2` is 86, the upper bound BIP-85 states:
+    // Base64-encoding 64 bytes yields 88 characters, of which the last two
+    // are `=` padding and carry nothing. `bip85_pwd_base85_len_valid()` below
+    // needs no such correction -- Base85 has no padding, so all 80 of its
+    // characters are usable.
     return (pwd_len >= 20) && (pwd_len <= BASE64_ENCODE_LENGTH - 2);
 }
 
@@ -518,6 +523,14 @@ bool bip85_pwd_base85_len_valid(uint8_t pwd_len) {
  * @return `true` if the value is in range.
  */
 bool bip85_dice_sides_valid(uint32_t sides) {
+    // BIP-85 writes `2 <= sides <= 2^32 - 1`, but its own derivation path
+    // makes the top half of that range unrepresentable: every component is
+    // hardened, `0x80000000 | sides`, which leaves 31 usable bits. A `sides`
+    // of 2^31 would derive from the same path as a `sides` of 0. Allowing the
+    // upper half would mean two different parameters deriving the same secret.
+    // The bound below is therefore intentional: the inconsistency is in the
+    // specification, not here. Same reasoning for `bip85_dice_rolls_valid()`
+    // below.
     return (sides >= 2) && (sides <= (UINT32_MAX >> 1));
 }
 
@@ -566,6 +579,11 @@ bool bolos_ux_bip85_entropy(uint8_t* entropy, const unsigned int* path,
     if (os_derive_bip32_no_throw(CX_CURVE_256K1, path, path_len, entropy,
                                  entropy + 32) != CX_OK) {
         PRINTF("An error occurred while generating BIP85 entropy\n");
+        // All five callers do wipe `entropy` before their LEDGER_ASSERT, so
+        // nothing leaks today. Wiped here as well because the syscall may
+        // have written part of the buffer before failing, and the function
+        // that owns the secret should be the one that clears it.
+        memzero(entropy, BIP85_ENTROPY_LENGTH);
         return 0;
     }
     PRINTF("Root key from device: 32 bytes\n");
