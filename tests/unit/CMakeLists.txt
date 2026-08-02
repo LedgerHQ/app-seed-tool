@@ -818,6 +818,59 @@ add_executable(test_sskr_cbor_length_header ./tests/sskr_cbor_length_header.c ..
 target_include_directories(test_sskr_cbor_length_header PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common)
 target_link_libraries(test_sskr_cbor_length_header PUBLIC cmocka gcov sskr sss testutils)
 
+# The targets below are the first in this suite to define HAVE_NBGL.
+#
+# The keyboard suggestions of both entry paths -- bolos_ux_*_fill_with_candidates()
+# and bolos_ux_*_get_keyboard_mask(), at the end of seed_sskr.c and seed_bip39.c
+# -- live behind `#if defined(HAVE_NBGL)`, and until these targets existed the
+# preprocessor removed them from every build the suite made. That is a harder
+# gap to notice than an untested function: lines the preprocessor removes are
+# neither covered nor uncovered in coverage.info, so lcov reported 96.2% for
+# seed_sskr.c over lines 52-486 of a 542-line file, and 95.8% for seed_bip39.c
+# over lines 26-319 of a 376-line file, with nothing marked missing. Comparing
+# the extent of the DA: entries against the length of the file is what shows it.
+# (The same is still true of src/common/bip85/seed_bip85.c, noted above: every
+# function in its HAVE_NBGL block reaches os_derive_bip32_no_throw() through
+# bolos_ux_bip85_entropy(), a BOLOS syscall with no host equivalent, so that one
+# is out of reach for a different reason and stays where it is.)
+#
+# What blocked it was one line: both guarded blocks open with
+# `#include <nbgl_layout.h>`, an SDK header the harness does not have. The only
+# symbol they take from it is NB_MAX_SUGGESTION_BUTTONS, so lib/nbgl_layout.h
+# supplies that and nothing else, on the model of the empty lib/glyphs.h and
+# lib/bolos_target.h.
+#
+# That constant is target-dependent in the SDK -- 12 on Stax, 8 on Flex and
+# Apex -- and it is the cap fill_with_candidates() applies with MIN() before
+# writing into buffers the caller sized from the same constant. Since it decides
+# what the cap test is testing, each of the two files is built twice, once per
+# live value, rather than a value being picked. TARGET_STAX and TARGET_FLEX are
+# read by lib/nbgl_layout.h only; neither seed_sskr.c nor seed_bip39.c nor the
+# wordlists mention any TARGET_* macro.
+add_executable(test_sskr_keyboard_candidates ./tests/sskr_keyboard_candidates.c ../../src/common/bip39/seed_rom_variables.c ../../src/common/bip39/seed_bip39.c ../../src/common/sskr/seed_rom_variables.c ../../src/common/sskr/seed_sskr.c)
+target_compile_definitions(test_sskr_keyboard_candidates PRIVATE HAVE_NBGL TARGET_FLEX)
+target_include_directories(test_sskr_keyboard_candidates PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common)
+target_link_libraries(test_sskr_keyboard_candidates PUBLIC cmocka gcov sskr sss testutils)
+
+add_executable(test_sskr_keyboard_candidates_stax ./tests/sskr_keyboard_candidates.c ../../src/common/bip39/seed_rom_variables.c ../../src/common/bip39/seed_bip39.c ../../src/common/sskr/seed_rom_variables.c ../../src/common/sskr/seed_sskr.c)
+target_compile_definitions(test_sskr_keyboard_candidates_stax PRIVATE HAVE_NBGL TARGET_STAX)
+target_include_directories(test_sskr_keyboard_candidates_stax PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common)
+target_link_libraries(test_sskr_keyboard_candidates_stax PUBLIC cmocka gcov sskr sss testutils)
+
+# The BIP-39 half of the same gap, on the same pattern as the SSKR pair above:
+# the two functions are structurally identical, and only the wordlist they walk
+# differs. Unlike SSKR, this one needs neither sskr nor sss -- seed_bip39.c and
+# its wordlist are the whole dependency, as they already are for test_bip39.
+add_executable(test_bip39_keyboard_candidates ./tests/bip39_keyboard_candidates.c ../../src/common/bip39/seed_rom_variables.c ../../src/common/bip39/seed_bip39.c)
+target_compile_definitions(test_bip39_keyboard_candidates PRIVATE HAVE_NBGL TARGET_FLEX)
+target_include_directories(test_bip39_keyboard_candidates PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common)
+target_link_libraries(test_bip39_keyboard_candidates PUBLIC cmocka gcov testutils)
+
+add_executable(test_bip39_keyboard_candidates_stax ./tests/bip39_keyboard_candidates.c ../../src/common/bip39/seed_rom_variables.c ../../src/common/bip39/seed_bip39.c)
+target_compile_definitions(test_bip39_keyboard_candidates_stax PRIVATE HAVE_NBGL TARGET_STAX)
+target_include_directories(test_bip39_keyboard_candidates_stax PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common)
+target_link_libraries(test_bip39_keyboard_candidates_stax PUBLIC cmocka gcov testutils)
+
 # Register every executable this file builds, instead of repeating their names
 # in a list kept by hand. A name missing from such a list costs nothing
 # visible: the target still compiles, still passes when run directly, and the
