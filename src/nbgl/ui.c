@@ -644,12 +644,22 @@ static void review_sskr_shares_contentGetter(uint8_t index,
                                          : sizeof(headerText) - 2] = '\0';
     pairs[0].item = PIC(headerText);
 
-    strncpy(reviewText,
-            sskr_shares_get() +
-                (index * sskr_shares_length_get() / sskr_sharecount_get()),
-            sskr_shares_length_get() / sskr_sharecount_get());
+    size_t offset;
+    size_t length;
+    if (!bolos_ux_sskr_share_slice(sskr_shares_length_get(),
+                                   sskr_sharecount_get(), index, &offset,
+                                   &length)) {
+        // Unreachable while nbContents is the share count and that count is
+        // non-zero: nbgl_useCaseGenericReview() never asks for a page past
+        // it. Kept because the division below is the one this file cannot
+        // recover from.
+        offset = 0;
+        length = 0;
+    }
+
+    strncpy(reviewText, sskr_shares_get() + offset, length);
     // Ensure null termination
-    reviewText[sskr_shares_length_get() / sskr_sharecount_get()] = '\0';
+    reviewText[length] = '\0';
     pairs[0].value = PIC(reviewText);
 }
 

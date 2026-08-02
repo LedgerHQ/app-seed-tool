@@ -17,24 +17,27 @@
 
 #include <os_io_seproxyhal.h>
 
+#include "common/sskr/common_sskr.h"
 #include "constants.h"
 #include "ui.h"
 
 #if defined(HAVE_BAGL)
 
+#include "./ux_sskr_menu.h"
+
 bool get_next_data(bool share_step) {
+    size_t offset;
+    size_t length;
+
     if (G_bolos_ux_context.sskr_share_index >= 1 &&
-        G_bolos_ux_context.sskr_share_index <=
-            G_bolos_ux_context.sskr_share_count) {
+        bolos_ux_sskr_share_slice(G_bolos_ux_context.sskr_words_buffer_length,
+                                  G_bolos_ux_context.sskr_share_count,
+                                  G_bolos_ux_context.sskr_share_index - 1,
+                                  &offset, &length)) {
         SPRINTF(G_bolos_ux_context.string_buffer, "SSKR Share #%d",
                 G_bolos_ux_context.sskr_share_index);
         memcpy(G_bolos_ux_context.words_buffer,
-               G_bolos_ux_context.sskr_words_buffer +
-                   (G_bolos_ux_context.sskr_share_index - 1) *
-                       G_bolos_ux_context.sskr_words_buffer_length /
-                       G_bolos_ux_context.sskr_share_count,
-               G_bolos_ux_context.sskr_words_buffer_length /
-                   G_bolos_ux_context.sskr_share_count);
+               G_bolos_ux_context.sskr_words_buffer + offset, length);
 
         G_bolos_ux_context.sskr_share_index += share_step ? 1 : -1;
         return true;
@@ -168,19 +171,12 @@ UX_STEP_NOCB(ux_threshold_warn_step_2, pbb,
 UX_FLOW(ux_threshold_warn_flow, &ux_threshold_warn_step_1,
         &ux_threshold_warn_step_2, &step_sskr_clean_exit);
 
-const char* const sskr_descriptor_values[] = {"1",  "2",  "3",  "4",  "5",
-                                              "6",  "7",
-#ifndef TARGET_NANOS
-                                              "8",  "9",  "10", "11", "12",
-                                              "13", "14", "15", "16"
-#endif
-};
-
 const char* sskr_threshold_getter(unsigned int idx) {
-    if (idx < G_bolos_ux_context.sskr_group_descriptor[0][1]) {
-        return sskr_descriptor_values[idx];
-    }
-    return NULL;
+    // Bounded by the share count the user just chose, which is what keeps a
+    // threshold from ever exceeding the number of shares it would be taken
+    // out of.
+    return sskr_descriptor_label(
+        idx, G_bolos_ux_context.sskr_group_descriptor[0][1]);
 }
 
 void sskr_threshold_selector(unsigned int idx) {
@@ -209,10 +205,7 @@ UX_FLOW(ux_threshold_flow, &ux_threshold_instruction_step,
         &ux_threshold_menu_step);
 
 const char* sskr_shares_number_getter(unsigned int idx) {
-    if (idx < ARRAYLEN(sskr_descriptor_values)) {
-        return sskr_descriptor_values[idx];
-    }
-    return NULL;
+    return sskr_descriptor_label(idx, sskr_descriptor_count());
 }
 
 void sskr_shares_number_selector(unsigned int idx) {
