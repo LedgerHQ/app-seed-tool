@@ -17,9 +17,9 @@
  * Blockchain Commons' published sskr-test-vector.md cannot be used directly
  * at this layer: it uses the now-superseded CBOR tag 309 (0xD90135), while
  * the current spec (bcr-2020-011-sskr.md) and this port both use 40309
- * (0xD99D75) -- see SECURITY-AUDIT.md / the note added to
- * sskr-test-vector.md for the discovery. Hence the manual wrap instead of
- * reusing that document's own wire bytes.
+ * (0xD99D75). Hence the manual wrap instead of reusing that document's own
+ * wire bytes. Its shards are used unchanged one layer down, in
+ * sskr_interop_bc128.c, where no CBOR tag is involved.
  *
  * The round trip (bc-sskr generate -> manual CBOR/ByteWords wrap -> decoded
  * back with bc-sskr) was verified before writing this test. Expected
