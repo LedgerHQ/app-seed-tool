@@ -1,0 +1,55 @@
+---
+# Local counterpart of the CI checks. To install:
+#
+#   pip install pre-commit
+#   pre-commit install
+#
+# The hooks are deliberately scoped to what CI already enforces, so that a
+# clean `pre-commit run --all-files` and a green CI mean the same thing.
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      # tests/deprecated/ is a frozen harness kept for reference; leave its
+      # recordings and fixtures byte-for-byte as they were captured.
+      - id: trailing-whitespace
+        exclude: '^tests/deprecated/'
+      - id: end-of-file-fixer
+        exclude: '^tests/deprecated/'
+      - id: mixed-line-ending
+      - id: check-merge-conflict
+      - id: check-case-conflict
+      - id: check-added-large-files
+        # demos/ holds screen recordings and tests/functional/screenshots/
+        # holds the documentation captures, including .apng animations; both
+        # are meant to carry files above the default 500 kB limit.
+        exclude: '^(demos|tests/functional/screenshots)/'
+
+  # Same action, same settings as the Check misspellings CI job, which calls
+  # reusable_spell_check.yml: builtin dictionaries clear and rare, filenames
+  # checked, "ontop" ignored.
+  - repo: https://github.com/codespell-project/codespell
+    rev: v2.4.3
+    hooks:
+      - id: codespell
+        args: [--builtin, 'clear,rare', --check-filenames, --ignore-words-list, ontop]
+
+  # v21.1.8 is the clang-format shipped in ghcr.io/ledgerhq/ledger-app-builder,
+  # which is the container the Lint check job runs in. Keep the two in step.
+  - repo: https://github.com/pre-commit/mirrors-clang-format
+    rev: v21.1.8
+    hooks:
+      - id: clang-format
+        types_or: [c]
+        # Same scope as the Lint check job, which passes `source: 'src'` to
+        # reusable_lint.yml. tests/unit/ carries vendored SDK stand-ins in a
+        # different style; reformatting them is a separate decision.
+        files: '^src/'
+
+  - repo: https://github.com/Mateusz-Grzelinski/actionlint-py
+    rev: v1.7.12.24
+    hooks:
+      - id: actionlint
+        types_or: [yaml]
+        args: [-shellcheck=, -pyflakes=]
