@@ -1,35 +1,83 @@
 /*
- * The shard-length bound in bolos_ux_sskr_combine(), on both sides of both of
- * its edges, built with AddressSanitizer.
+ * The behaviour of bolos_ux_sskr_combine() at both edges of the shard length
+ * it reads out of the entered data, on both CBOR header forms.
  *
- * The function reads the length of each serialized shard straight out of the
- * CBOR header of the entered data:
+ * The function takes that length straight from the header:
  *
  *     uint8_t sskr_share_len = sskr_shares_hex[3] & 0x1F;
  *     if (sskr_share_len > 23) sskr_share_len = sskr_shares_hex[4];   // 0..255
  *
  * A serialized shard is SSKR_METADATA_LENGTH_BYTES plus a 16..32 byte value,
- * so anything outside 21..37 is not a shard. What makes the bound load-bearing
- * rather than tidy is what sits downstream: sskr_deserialize_shard() does
+ * so anything outside 21..37 is not a shard, and the wrapper refuses it
+ * (seed_sskr.c) before passing anything downstream.
  *
- *     shard->value_len = source_len - SSKR_METADATA_LENGTH_BYTES;
- *     memcpy(shard->value, source + 5, shard->value_len);
+ * What this header used to say, and why it is wrong
+ * -------------------------------------------------
  *
- * and only then validates the length -- the copy has already happened, reading
- * source_len bytes out of a share buffer that is nowhere near that long and
- * writing them into a fixed 32-byte field. Reordering that is a change to
- * sskr.c, which is kept diffable against upstream bc-sskr; the bound in this
- * wrapper is what keeps the reordering from being urgent, because here the
- * length comes from data typed on the device rather than from a library user.
+ * It described sskr_deserialize_shard() as copying first and validating
+ * afterwards, and presented the wrapper's bound as the only thing standing
+ * between a typed-in length and a 33-byte memcpy into a 32-byte field. That
+ * was true when this file was written. It is not true now: sskr.c validates
+ * value_len before the copy it governs, and says so in its own comment. The
+ * reordering landed after this file, and nothing flagged that the reasoning
+ * here had expired.
  *
- * That makes this test a memory-safety test, so it asserts on the sanitizer as
- * much as on the return value. The return value alone cannot hold this bound:
- * an out-of-range length also fails validation further down, so combine()
- * answers 0 either way and the assertion passes on unbounded code. Deleting
- * the bound and running the suite is how that was established, and it is why
- * the over-long cases below hand combine() a buffer sized to the share it
- * actually contains -- which is what the entry screens do -- instead of one
- * padded out to the declared length.
+ * The consequence is not small. The two over-long cases below were written as
+ * memory-safety cases and are no longer discriminating: with the copy now
+ * behind the check, deleting the wrapper's bound produces no out-of-bounds
+ * access and no change in any return value.
+ *
+ * The wrapper's bound is now redundant, and that is checkable
+ * -----------------------------------------------------------
+ *
+ * Enumerating both rejection sets over the whole 0..255 domain of
+ * sskr_share_len (it is a uint8_t read from the header, so that is all of it):
+ *
+ *   - the wrapper accepts exactly 21..37, i.e. 17 values;
+ *   - downstream, sskr_deserialize_shard() refuses source_len < 21 outright,
+ *     then hands source_len - 5 to sskr_check_secret_length(), which refuses
+ *     < 16, > 32 and odd. Since 5 is odd, "odd value_len" means "even
+ *     sskr_share_len". Downstream therefore accepts only the 9 odd values
+ *     21, 23, 25, 27, 29, 31, 33, 35, 37.
+ *
+ * Everything the wrapper refuses is refused downstream as well, so its
+ * rejected set is a strict subset -- it additionally lets through the eight
+ * even lengths 22..36, which downstream then rejects. No return value can
+ * separate the two: both paths end in bolos_ux_sskr_combine() answering 0. And
+ * since the reordering, neither can a sanitizer: the five header bytes read
+ * before validation stay inside the caller's buffer. The bound cannot be held
+ * alone by any test, and this file does not pretend to.
+ *
+ * Which guard holds memory safety, measured
+ * -----------------------------------------
+ *
+ * Removing each of the two guards, separately and together, and running the
+ * whole suite:
+ *
+ *   wrapper bound     sskr.c check     result
+ *   (seed_sskr.c)     before memcpy
+ *   -------------     --------------   --------------------------------------
+ *   present           present          70/70 green (the current tree)
+ *   REMOVED           present          70/70 green -- nothing goes red
+ *   present           REMOVED          red: test_sskr_deserialize_shard_bounds
+ *   REMOVED           REMOVED          red: test_sskr_share_len AND
+ *                                      test_sskr_deserialize_shard_bounds,
+ *                                      stack-buffer-overflow in memcpy (a
+ *                                      33-byte read past the source buffer and
+ *                                      a 33-byte write past shard->value)
+ *
+ * So memory safety is held, but by sskr.c's own check, and the test that holds
+ * it is test_sskr_deserialize_shard_bounds -- not this file.
+ *
+ * What this file is still for
+ * ---------------------------
+ *
+ * The behaviour of the entry point at the two exact bounds: 21 and 37 accepted
+ * and reconstructing the right secret, anything outside refused, across both
+ * the short-form CBOR header (length in the low five bits of byte 3) and the
+ * long form (0x58 plus a separate length byte). That is worth keeping whatever
+ * happens to the wrapper's bound, because it is a statement about the entry
+ * point rather than about which internal guard enforces it.
  */
 
 #include <cmocka.h>
@@ -133,10 +181,11 @@ static void test_combine_rejects_shard_length_below_minimum(void** state) {
      * 20-byte shard leaves a 15-byte value, under the 16-byte minimum. */
     wire[3] = 0x40 | (SHORT_SHARD_LEN - 1);
 
-    /* This edge documents the bound rather than holding it: too short is also
-     * refused by sskr_deserialize_shard()'s own first check, so this case
-     * still passes with the bound deleted. The two above the maximum are the
-     * ones that hold it, and they are the dangerous side. */
+    /* Like the two over-long cases, this one documents the entry point's
+     * answer rather than holding the wrapper's bound: too short is refused by
+     * sskr_deserialize_shard()'s own first check too, so it still passes with
+     * the bound deleted. See the header for why that is now true on both
+     * sides. */
     assert_int_equal(bolos_ux_sskr_combine(wire, sizeof(wire), 1, output), 0);
 }
 
@@ -151,9 +200,11 @@ static void test_combine_rejects_shard_length_above_maximum(void** state) {
 
     memcpy(wire, k_max_len_shares, sizeof(wire));
 
-    /* One above the maximum, in the long-form length byte. Without the bound
-     * the copy reads 33 bytes from 10 bytes in, one past the end of wire[],
-     * and writes them into a 32-byte field. */
+    /* One above the maximum, in the long-form length byte. The buffer holds
+     * exactly the share, not the declared length, so this is the shape the
+     * entry screens actually produce. sskr_check_secret_length() would refuse
+     * 33 anyway, before the copy; what is asserted here is the answer, not
+     * which of the two guards produced it. */
     wire[4] = LONG_SHARD_LEN + 1;
 
     assert_int_equal(bolos_ux_sskr_combine(wire, sizeof(wire), 1, output), 0);
@@ -170,9 +221,9 @@ static void test_combine_rejects_overlong_shard_length(void** state) {
     memcpy(wire, k_max_len_shares, sizeof(wire));
     wire[4] = OVERLONG_SHARD_LEN;
 
-    /* Must be refused before any copy. Without the bound,
-     * sskr_deserialize_shard() reads 195 bytes starting 10 bytes into a
-     * 42-byte buffer and writes them into a 32-byte field. */
+    /* A length that is not merely one too many must be refused just the same,
+     * and before any copy. Both guards refuse it independently; removing
+     * either one on its own leaves this assertion passing. */
     assert_int_equal(bolos_ux_sskr_combine(wire, sizeof(wire), 1, output), 0);
 }
 

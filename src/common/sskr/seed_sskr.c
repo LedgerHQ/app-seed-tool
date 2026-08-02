@@ -104,6 +104,14 @@ unsigned int bolos_ux_sskr_combine(unsigned char* sskr_shares_hex,
     // SSKR_METADATA_LENGTH_BYTES plus a SSKR_MIN_STRENGTH_BYTES..
     // SSKR_MAX_STRENGTH_BYTES value, so refuse anything else here, before
     // sskr_deserialize_shard() copies it into its fixed-size value field.
+    //
+    // Redundant since sskr_deserialize_shard() started validating value_len
+    // ahead of that copy: everything refused here is refused there too, and
+    // there strictly more (odd value_len). Kept deliberately as defence in
+    // depth -- this bounds data typed on the device before it crosses into
+    // sskr.c, which is kept diffable against upstream bc-sskr. Because it is
+    // redundant, no test can hold it on its own; see
+    // tests/unit/tests/sskr_share_len.c for the enumeration.
     if (sskr_share_len < SSKR_MIN_SERIALIZED_LENGTH_BYTES ||
         sskr_share_len > SSKR_METADATA_LENGTH_BYTES + SSKR_MAX_STRENGTH_BYTES) {
         memzero(sskr_shares_hex, sskr_shares_hex_length);

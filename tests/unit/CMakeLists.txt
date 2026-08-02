@@ -417,6 +417,12 @@ add_executable(test_sskr_combine_invariants ./tests/sskr_combine_invariants.c ..
 target_include_directories(test_sskr_combine_invariants PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common)
 target_link_libraries(test_sskr_combine_invariants PUBLIC cmocka gcov sskr sss testutils)
 
+# The duplicate member index guard, asserted on the error code itself rather
+# than on the 0 the wrapper reports for every failure alike.
+add_executable(test_sskr_duplicate_member_index ./tests/sskr_duplicate_member_index.c ../../src/common/bip39/seed_rom_variables.c ../../src/common/bip39/seed_bip39.c ../../src/common/sskr/seed_rom_variables.c ../../src/common/sskr/seed_sskr.c)
+target_include_directories(test_sskr_duplicate_member_index PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common)
+target_link_libraries(test_sskr_duplicate_member_index PUBLIC cmocka gcov sskr sss testutils)
+
 # The ByteWords table itself, against BCR-2020-012. Data, not behaviour: the
 # only source besides the test is seed_rom_variables.c, and nothing that reads
 # the table is linked in, so a failure here can only be the table.
