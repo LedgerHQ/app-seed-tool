@@ -423,6 +423,13 @@ add_executable(test_sskr_duplicate_member_index ./tests/sskr_duplicate_member_in
 target_include_directories(test_sskr_duplicate_member_index PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common)
 target_link_libraries(test_sskr_duplicate_member_index PUBLIC cmocka gcov sskr sss testutils)
 
+# The ByteWords table itself, against BCR-2020-012. Data, not behaviour: the
+# only source besides the test is seed_rom_variables.c, and nothing that reads
+# the table is linked in, so a failure here can only be the table.
+add_executable(test_sskr_bytewords_table ./tests/sskr_bytewords_table.c ../../src/common/sskr/seed_rom_variables.c)
+target_include_directories(test_sskr_bytewords_table PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common)
+target_link_libraries(test_sskr_bytewords_table PUBLIC cmocka gcov testutils)
+
 # ---------------------------------------------------------------------------
 # The same Shamir tests, replayed against the TARGET_NANOS build of the GF(2^8)
 # arithmetic.
