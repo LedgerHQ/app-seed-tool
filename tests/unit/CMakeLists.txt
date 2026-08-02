@@ -812,6 +812,12 @@ target_compile_options(test_sskr_multi_group_refusal PRIVATE -fsanitize=address 
 target_link_options(test_sskr_multi_group_refusal PRIVATE -fsanitize=address)
 target_link_libraries(test_sskr_multi_group_refusal PUBLIC cmocka gcov testutils)
 
+# Goes through bolos_ux_bip39_to_sskr_convert(), so it needs the same set of
+# sources as the other seed_sskr.c tests.
+add_executable(test_sskr_cbor_length_header ./tests/sskr_cbor_length_header.c ../../src/common/bip39/seed_rom_variables.c ../../src/common/bip39/seed_bip39.c ../../src/common/sskr/seed_rom_variables.c ../../src/common/sskr/seed_sskr.c)
+target_include_directories(test_sskr_cbor_length_header PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common)
+target_link_libraries(test_sskr_cbor_length_header PUBLIC cmocka gcov sskr sss testutils)
+
 # Register every executable this file builds, instead of repeating their names
 # in a list kept by hand. A name missing from such a list costs nothing
 # visible: the target still compiles, still passes when run directly, and the
