@@ -18,6 +18,13 @@
 ifeq ($(BOLOS_SDK),)
 $(error Environment variable BOLOS_SDK is not set)
 endif
+
+# Per-function stack canary (-fstack-protector-strong). Must be set before
+# Makefile.defines is included: that file guards itself against a second
+# inclusion, so a later assignment would never be read. Ignored by the nanos
+# SDK, which has no stack protector support.
+ENABLE_STACK_PROTECTOR = 1
+
 include $(BOLOS_SDK)/Makefile.defines
 
 all: default
