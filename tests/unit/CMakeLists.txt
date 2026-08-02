@@ -799,6 +799,19 @@ add_executable(test_bip39_properties ./tests/bip39_properties.c ../../src/common
 target_include_directories(test_bip39_properties PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common)
 target_link_libraries(test_bip39_properties PUBLIC cmocka gcov testutils)
 
+# Built with AddressSanitizer, and with sskr.c (plus sss.c/interpolate.c)
+# compiled into the test itself rather than linked from libsskr/libsss: the
+# refusals this file is about are what keep sskr_combine_shards_internal()
+# inside its own one-element groups[]/gx[]/gy[] arrays, so ASan has to
+# instrument those frames rather than only this file's. Same arrangement as
+# test_sskr_bound_group_count above. seed_sskr.c comes along for
+# bolos_ux_sskr_hex_check(), the entry point the user reaches first.
+add_executable(test_sskr_multi_group_refusal ./tests/sskr_multi_group_refusal.c ../../src/common/sskr/sskr.c ../../src/common/sskr/sss/sss.c ../../src/common/sskr/sss/interpolate.c ../../src/common/bip39/seed_rom_variables.c ../../src/common/bip39/seed_bip39.c ../../src/common/sskr/seed_rom_variables.c ../../src/common/sskr/seed_sskr.c)
+target_include_directories(test_sskr_multi_group_refusal PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common/sskr ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common/sskr/sss)
+target_compile_options(test_sskr_multi_group_refusal PRIVATE -fsanitize=address -fno-omit-frame-pointer)
+target_link_options(test_sskr_multi_group_refusal PRIVATE -fsanitize=address)
+target_link_libraries(test_sskr_multi_group_refusal PUBLIC cmocka gcov testutils)
+
 # Register every executable this file builds, instead of repeating their names
 # in a list kept by hand. A name missing from such a list costs nothing
 # visible: the target still compiles, still passes when run directly, and the
