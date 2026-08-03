@@ -129,7 +129,11 @@ static void test_path_bip39(void** state) {
     // values guard the position of the parameter in the path, not a feature.
     check_bip39(0, 12, 0);
     check_bip39(0, 24, 0);
-    // The full set of mnemonic lengths the application accepts.
+    // 15 and 21 are BIP-85 Words Table lengths this application does not
+    // offer -- test_bip39_words_valid() below expects them to be refused.
+    // They belong here all the same: a path builder must place whatever value
+    // it is handed at the right component, and that is all these check. They
+    // say nothing about which lengths are supported.
     check_bip39(0, 15, 1);
     check_bip39(0, 18, 2);
     check_bip39(0, 21, 3);
@@ -335,29 +339,66 @@ static void test_purpose_is_common_to_all_paths(void** state) {
 // as literals rather than recomputed from the same expression.
 // ---------------------------------------------------------------------------
 
+// This guard is deliberately narrower than BIP-85: the Words Table defines
+// five lengths (12, 15, 18, 21, 24) and this application offers three --
+// src/nbgl/ui.c sets the mnemonic size to BIP39_MNEMONIC_SIZE_12, _18 or _24
+// and nothing else, and that is the only source of `words`. It backs a
+// LEDGER_ASSERT meant to stop a programming error before a secret is derived,
+// and nothing downstream would stop one: bolos_ux_bip39_mnemonic_encode()
+// accepts any entropy length that is a multiple of 4 from 16 to 32 bytes, so
+// the 20 or 28 bytes a 15 or 21 would produce still yield a valid mnemonic.
+// 15 and 21 are therefore expected to be refused here.
 static void test_bip39_words_valid(void** state) {
     (void)state;
-    // Accepted: 12, 15, 18, 21, 24.
+    // Accepted: the three lengths the application offers.
     assert_true(bip85_bip39_words_valid(12));
-    assert_true(bip85_bip39_words_valid(15));
     assert_true(bip85_bip39_words_valid(18));
-    assert_true(bip85_bip39_words_valid(21));
     assert_true(bip85_bip39_words_valid(24));
 
-    // Below the lower bound, including multiples of 3.
+    // Defined by BIP-85's Words Table, not offered by this application.
+    assert_false(bip85_bip39_words_valid(15));
+    assert_false(bip85_bip39_words_valid(21));
+
+    // Below 12, including a multiple of 3 and the value just under.
     assert_false(bip85_bip39_words_valid(0));
     assert_false(bip85_bip39_words_valid(9));
     assert_false(bip85_bip39_words_valid(11));
 
-    // In range but not a multiple of 3.
+    // Between the accepted lengths.
     assert_false(bip85_bip39_words_valid(13));
     assert_false(bip85_bip39_words_valid(14));
     assert_false(bip85_bip39_words_valid(23));
 
-    // Above the upper bound, including a multiple of 3.
+    // Above 24, including a multiple of 3 and the value just over.
     assert_false(bip85_bip39_words_valid(25));
     assert_false(bip85_bip39_words_valid(27));
     assert_false(bip85_bip39_words_valid(255));
+}
+
+// ---------------------------------------------------------------------------
+// BIP39 truncation length
+//
+// bip85_bip39_entropy_len() decides how much of the 64-byte BIP85 output the
+// BIP39 application keeps. Until it was extracted it lived inside
+// bolos_ux_bip85_bip39(), below the HAVE_NBGL guard, so no test target
+// compiled it -- and tests/bip85_bip39_entropy.c does not reach it either:
+// that file supplies the length itself, from its own table.
+//
+// Expected values are read off BIP-85's Words Table, as the bit counts it
+// prints divided by 8, rather than recomputed with the expression under
+// test -- which would only check the formula against a copy of itself.
+//
+// Only the three lengths this application offers are pinned. The formula is
+// generic and the table has five entries, but src/nbgl/ui.c only ever sets
+// BIP39_MNEMONIC_SIZE_12, _18 or _24, and asserting 15 or 21 here would
+// suggest a support that does not exist.
+// ---------------------------------------------------------------------------
+
+static void test_bip39_entropy_len(void** state) {
+    (void)state;
+    assert_int_equal(bip85_bip39_entropy_len(12), 128 / 8);
+    assert_int_equal(bip85_bip39_entropy_len(18), 192 / 8);
+    assert_int_equal(bip85_bip39_entropy_len(24), 256 / 8);
 }
 
 static void test_hex_num_bytes_valid(void** state) {
@@ -427,6 +468,7 @@ int main(void) {
         cmocka_unit_test(test_hardening_survives_large_parameters),
         cmocka_unit_test(test_purpose_is_common_to_all_paths),
         cmocka_unit_test(test_bip39_words_valid),
+        cmocka_unit_test(test_bip39_entropy_len),
         cmocka_unit_test(test_hex_num_bytes_valid),
         cmocka_unit_test(test_pwd_base64_len_valid),
         cmocka_unit_test(test_pwd_base85_len_valid),

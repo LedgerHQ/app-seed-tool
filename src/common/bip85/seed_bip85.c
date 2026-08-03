@@ -413,20 +413,61 @@ unsigned int bip85_path_dice(unsigned int* path, uint32_t sides, uint32_t rolls,
 }
 
 /**
- * @brief Reports whether `words` is a mnemonic length the BIP39 application
- * accepts.
+ * @brief Reports whether `words` is a mnemonic length this application offers.
  *
- * @details The `LEDGER_ASSERT` that enforces this still terminates the
- * process on a violation exactly as before; only the condition moved here, so
- * that both sides of each bound can be checked by a unit test.
+ * @details Deliberately narrower than BIP-85. The specification's Words Table
+ * defines five lengths -- 12, 15, 18, 21 and 24 words, for 128, 160, 192, 224
+ * and 256 bits of entropy -- and the truncation this file applies
+ * (`bip85_bip39_entropy_len()` below) is correct for all five. This
+ * application exposes only three: `src/nbgl/ui.c` sets the mnemonic size to
+ * `BIP39_MNEMONIC_SIZE_12`, `_18` or `_24` and nothing else, and that is the
+ * only source of `words`.
+ *
+ * The narrower condition is the point. This backs a `LEDGER_ASSERT` in
+ * `bolos_ux_bip85_bip39()`, whose job is to stop a programming error before a
+ * secret is derived, and nothing downstream would catch one:
+ * `bolos_ux_bip39_mnemonic_encode()` accepts any entropy length that is a
+ * multiple of 4 from 16 to 32 bytes, so the 20 or 28 bytes a 15 or 21 would
+ * produce still yield a perfectly valid mnemonic -- of a length the rest of
+ * the application never asked for.
+ *
+ * Do not widen this back to the Words Table without also exposing 15 and 21
+ * in the UI: the divergence is intentional.
+ *
+ * The `LEDGER_ASSERT` that enforces this still terminates the process on a
+ * violation exactly as before; the condition lives here so that both sides of
+ * it can be checked by a unit test.
  *
  * @param[in] words Number of mnemonic words requested.
  *
- * @return `true` if the value is in range.
+ * @return `true` if this application offers that length.
  */
 bool bip85_bip39_words_valid(uint8_t words) {
-    return (words >= BIP39_MNEMONIC_SIZE_12) && (words % 3 == 0) &&
-           (words <= BIP39_MNEMONIC_SIZE_24);
+    return (words == BIP39_MNEMONIC_SIZE_12) ||
+           (words == BIP39_MNEMONIC_SIZE_18) ||
+           (words == BIP39_MNEMONIC_SIZE_24);
+}
+
+/**
+ * @brief Returns the number of entropy bytes a `words`-word BIP39 mnemonic is
+ * built from, i.e. how much of the 64-byte BIP85 output the BIP39 application
+ * keeps.
+ *
+ * @details BIP-85's Words Table pairs each mnemonic length with an entropy
+ * size -- 12 words / 128 bits, 15 / 160, 18 / 192, 21 / 224, 24 / 256 -- which
+ * is `words * 4 / 3` bytes throughout. That expression used to be spelled out
+ * three times inside `bolos_ux_bip85_bip39()`, below the `HAVE_NBGL` guard,
+ * where no test target compiles it. Here it has external linkage and sits
+ * outside the guard, for the same reason `bip85_dice_bits_per_roll()` above
+ * does: so a unit test can hold it against the table.
+ *
+ * @param[in] words Number of mnemonic words. `bip85_bip39_words_valid()`
+ * above says which values reach this.
+ *
+ * @return The entropy length, in bytes.
+ */
+uint8_t bip85_bip39_entropy_len(uint8_t words) {
+    return (uint8_t)(words * 4 / 3);
 }
 
 /**
@@ -452,6 +493,11 @@ bool bip85_hex_num_bytes_valid(uint8_t num_bytes) {
  * @return `true` if the value is in range.
  */
 bool bip85_pwd_base64_len_valid(uint8_t pwd_len) {
+    // `BASE64_ENCODE_LENGTH - 2` is 86, the upper bound BIP-85 states:
+    // Base64-encoding 64 bytes yields 88 characters, of which the last two
+    // are `=` padding and carry nothing. `bip85_pwd_base85_len_valid()` below
+    // needs no such correction -- Base85 has no padding, so all 80 of its
+    // characters are usable.
     return (pwd_len >= 20) && (pwd_len <= BASE64_ENCODE_LENGTH - 2);
 }
 
@@ -477,6 +523,14 @@ bool bip85_pwd_base85_len_valid(uint8_t pwd_len) {
  * @return `true` if the value is in range.
  */
 bool bip85_dice_sides_valid(uint32_t sides) {
+    // BIP-85 writes `2 <= sides <= 2^32 - 1`, but its own derivation path
+    // makes the top half of that range unrepresentable: every component is
+    // hardened, `0x80000000 | sides`, which leaves 31 usable bits. A `sides`
+    // of 2^31 would derive from the same path as a `sides` of 0. Allowing the
+    // upper half would mean two different parameters deriving the same secret.
+    // The bound below is therefore intentional: the inconsistency is in the
+    // specification, not here. Same reasoning for `bip85_dice_rolls_valid()`
+    // below.
     return (sides >= 2) && (sides <= (UINT32_MAX >> 1));
 }
 
@@ -525,6 +579,11 @@ bool bolos_ux_bip85_entropy(uint8_t* entropy, const unsigned int* path,
     if (os_derive_bip32_no_throw(CX_CURVE_256K1, path, path_len, entropy,
                                  entropy + 32) != CX_OK) {
         PRINTF("An error occurred while generating BIP85 entropy\n");
+        // All five callers do wipe `entropy` before their LEDGER_ASSERT, so
+        // nothing leaks today. Wiped here as well because the syscall may
+        // have written part of the buffer before failing, and the function
+        // that owns the secret should be the one that clears it.
+        memzero(entropy, BIP85_ENTROPY_LENGTH);
         return 0;
     }
     PRINTF("Root key from device: 32 bytes\n");
@@ -590,11 +649,13 @@ uint8_t bolos_ux_bip85_bip39(uint8_t* hex_out, uint8_t language, uint8_t words,
         LEDGER_ASSERT(false, "BIP85 entropy failed");
     }
 
-    memcpy(hex_out, buffer, words * 4 / 3);
+    uint8_t entropy_len = bip85_bip39_entropy_len(words);
+
+    memcpy(hex_out, buffer, entropy_len);
     memzero(buffer, BIP85_ENTROPY_LENGTH);
 
-    PRINTF("BIP85 BIP39 hex output: %u bytes\n", words * 4 / 3);
-    return words * 4 / 3;
+    PRINTF("BIP85 BIP39 hex output: %u bytes\n", entropy_len);
+    return entropy_len;
 }
 
 void bolos_ux_bip85_hex(uint8_t* hex_out, uint8_t num_bytes,
