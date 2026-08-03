@@ -370,27 +370,77 @@ unsigned int bolos_ux_sskr_hex_check(unsigned char* sskr_shares_hex,
         return 0;
     }
 
+    // The distance from one share to the next, computed once here rather than
+    // re-derived at each use below. Both of its operands come from the caller,
+    // and the length handed to cx_crc32() is this minus checksum_len on
+    // unsigned int: one below checksum_len that subtraction wraps to
+    // 0xFFFFFFFF, which is a four-gigabyte read from the share buffer. The
+    // bound is <= and not <, because at exactly checksum_len the subtraction
+    // is well defined and gives zero -- there would be no byte left to
+    // checksum, and the four bytes read as a stored CRC would be the CBOR tag.
+    //
+    // Redundant with the arithmetic of both entry paths, which cannot produce
+    // a stride below 8: sskr_shares_check() (nbgl/sskr_shares.c) only calls
+    // this function once sskr_shares_complete_check() holds, which needs every
+    // share to have reached shares.final_size -- which
+    // bolos_ux_sskr_entry_header_update() sets to four header bytes plus the
+    // declared shard length plus the four of the CRC, so at least 8 -- and
+    // needs as many shares as the count says; the BAGL screens do the same
+    // arithmetic with bip39_type standing in for final_size. Kept for the
+    // same reason as
+    // the sskr_share_len bound in bolos_ux_sskr_combine() above: this is where
+    // data typed on the device turns into an offset. Because it is redundant,
+    // the test that holds it calls this function directly; see
+    // tests/unit/tests/sskr_hex_check_guards.c.
+    const unsigned int stride = sskr_shares_hex_length / sskr_shares_count;
+    if (stride <= checksum_len) {
+        memzero(sskr_shares_hex, sskr_shares_hex_length);
+        return 0;
+    }
+
+    // What every share of one group must agree on is its metadata, not a fixed
+    // count of bytes: the CBOR tag and byte-string header, the two-byte
+    // identifier, group-threshold/group-count, and
+    // group-index/member-threshold. The header is four bytes for a shard under
+    // 24 bytes -- the short form, which is every 128-bit seed -- and five
+    // above it, which moves every field after it along by one. group-index
+    // therefore sits at byte 7 for a 12-word seed and at byte 8 for an 18- or
+    // 24-word one, and a comparison of a constant 8 bytes covered it at the
+    // first size only. Derived here the way bolos_ux_sskr_combine() derives it
+    // above, from the additional-information nibble alone.
+    //
+    // Reading byte 3 is in bounds because of the stride bound: a stride above
+    // checksum_len with a share count of at least one leaves at least five
+    // bytes in the buffer. It happens before the loop has checked any share's
+    // CBOR tag, which only means that a first frame that is not a shard at all
+    // gives a wrong length here, never an out-of-range one -- and the tag
+    // comparison in the loop refuses it either way.
+    const unsigned int header_len = 4u + ((sskr_shares_hex[3] & 0x1F) > 23);
+    const unsigned int metadata_len = header_len + 4u;
+
+    // ...and that comparison has to stay inside the share it starts from. At
+    // its widest it is 9 bytes, so a shorter stride would read into the next
+    // share, and past the buffer entirely on the last one. This cannot be
+    // folded into the bound above: metadata_len is not known until byte 3 has
+    // been read, and reading byte 3 is what that bound makes safe.
+    if (stride < metadata_len) {
+        memzero(sskr_shares_hex, sskr_shares_hex_length);
+        return 0;
+    }
+
     for (unsigned int i = 0; i < sskr_shares_count; i++) {
-        checksum = crc32_nbo(
-            sskr_shares_hex + i * (sskr_shares_hex_length / sskr_shares_count),
-            (sskr_shares_hex_length / sskr_shares_count) - checksum_len);
-        // First 8 bytes of all shares in group should be same
-        // Test checksum
-        if ((os_secure_memcmp(cbor,
-                              sskr_shares_hex + i * sskr_shares_hex_length /
-                                                    sskr_shares_count,
-                              3) != 0) ||
-            (i > 0 &&
-             os_secure_memcmp(sskr_shares_hex,
-                              sskr_shares_hex + i * sskr_shares_hex_length /
-                                                    sskr_shares_count,
-                              8) != 0) ||
-            (os_secure_memcmp(
-                 &checksum,
-                 sskr_shares_hex +
-                     ((sskr_shares_hex_length / sskr_shares_count) * (i + 1)) -
-                     checksum_len,
-                 checksum_len) != 0)) {
+        checksum =
+            crc32_nbo(sskr_shares_hex + i * stride, stride - checksum_len);
+        // Test the CBOR tag, the metadata shared by every share, and the
+        // checksum
+        if ((os_secure_memcmp(cbor, sskr_shares_hex + i * stride, 3) != 0) ||
+            (i > 0 && os_secure_memcmp(sskr_shares_hex,
+                                       sskr_shares_hex + i * stride,
+                                       metadata_len) != 0) ||
+            (os_secure_memcmp(&checksum,
+                              sskr_shares_hex + (stride * (i + 1)) -
+                                  checksum_len,
+                              checksum_len) != 0)) {
             memzero(sskr_shares_hex, sskr_shares_hex_length);
             checksum = 0;
             return 0;

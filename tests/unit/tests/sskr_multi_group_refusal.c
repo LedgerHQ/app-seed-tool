@@ -64,6 +64,24 @@
  * the specification's own published wire form for the third shard,
  * d99d75554bbf1101025abd490ee65b6084859854ee67736e75, which is what
  * authenticates them.
+ *
+ * That published set is a 128-bit secret, so its shards are 21 bytes and its
+ * byte-string header is the short CBOR form, one byte. It is only one of the
+ * three seed sizes this application supports, and the size does not merely
+ * lengthen the frame: at 192 and 256 bits the shard is 29 and 37 bytes, the
+ * header takes the long form, 0x58 followed by a length byte, and every field
+ * after it moves along by one. group-index sits at byte 7 in the short form
+ * and at byte 8 in the long one.
+ *
+ * The last two tests cover those two sizes, at both refusals. There is no
+ * published multi-group vector at either size, so their frames are built
+ * here, and what they are built from is stated rather than implied: the
+ * identifier, group threshold and group count of the published set, a
+ * group-index that differs between the two frames, and filler for the value.
+ * Filler is enough because neither refusal interpolates anything -- both
+ * decide on metadata, one on the bytes every share of a group must share and
+ * the other on the group index itself, before a single share byte is used.
+ * The 128-bit case keeps the published shards precisely because it can.
  */
 
 #include <cmocka.h>
@@ -134,6 +152,76 @@ static const uint8_t k_group1_wire[GROUP_SIZE][WIRE_LEN] = {
      0x76, 0x31, 0x55, 0xFC, 0xFD, 0xB5, 0x88, 0x7A, 0xBC, 0xE6,
      0xEE, 0x69, 0xC4, 0xBB, 0xCD, 0x82, 0xD1, 0x9A, 0xB8},
 };
+
+/* The two seed sizes whose shards need the long-form CBOR byte-string
+ * header, i.e. every shard of 24 bytes or more. */
+#define VALUE_LEN_192 (24)
+#define VALUE_LEN_256 (32)
+#define MAX_SHARD_LEN (SSKR_METADATA_LENGTH_BYTES + SSKR_MAX_STRENGTH_BYTES)
+#define MAX_WIRE_LEN  (5 + MAX_SHARD_LEN + 4) /* long header + shard + CRC */
+
+/* CRC-32 (IEEE 802.3: reflected, polynomial 0xEDB88320, initial and final
+ * value 0xFFFFFFFF), written out rather than calling the cx_crc32() the code
+ * under test uses: sharing that implementation would make the built frames
+ * agree with hex_check() by construction. It is checked against the published
+ * CRCs of k_group0_wire below rather than trusted. */
+static uint32_t crc32_ieee(const uint8_t* buf, size_t len) {
+    uint32_t crc = 0xFFFFFFFFu;
+
+    for (size_t i = 0; i < len; i++) {
+        crc ^= buf[i];
+        for (int bit = 0; bit < 8; bit++) {
+            crc = (crc >> 1) ^ (0xEDB88320u & (uint32_t)(-(int32_t)(crc & 1)));
+        }
+    }
+    return crc ^ 0xFFFFFFFFu;
+}
+
+/* One serialized shard: identifier, group-threshold/group-count,
+ * group-index/member-threshold, member-index, then the value. Everything but
+ * group-index and the value is taken from the published set: identifier
+ * 0x4BBF, and 0x11 for a group threshold and count of 2 each. */
+static void build_shard(uint8_t* shard, uint8_t value_len,
+                        uint8_t group_index) {
+    shard[0] = 0x4B;
+    shard[1] = 0xBF;
+    shard[2] = 0x11;
+    shard[3] = (uint8_t)((group_index & 0x0F) << 4 | 0x01); /* mt - 1 = 1 */
+    shard[4] = 0x00;                                        /* member index */
+    for (uint8_t i = 0; i < value_len; i++) {
+        shard[SSKR_METADATA_LENGTH_BYTES + i] =
+            (uint8_t)(0x30 + group_index * 0x40 + i);
+    }
+}
+
+/* The same shard in the form the entry screens hand to
+ * bolos_ux_sskr_hex_check(). Returns the wire length. */
+static unsigned int build_wire(uint8_t* wire, uint8_t value_len,
+                               uint8_t group_index) {
+    const uint8_t shard_len =
+        (uint8_t)(SSKR_METADATA_LENGTH_BYTES + value_len);
+    unsigned int n = 0;
+
+    wire[n++] = 0xD9;
+    wire[n++] = 0x9D;
+    wire[n++] = 0x75;
+    if (shard_len < 24) {
+        wire[n++] = (uint8_t)(0x40 | shard_len);
+    } else {
+        wire[n++] = 0x58;
+        wire[n++] = shard_len;
+    }
+    build_shard(&wire[n], value_len, group_index);
+    n += shard_len;
+
+    const uint32_t crc = crc32_ieee(wire, n);
+    wire[n++] = (uint8_t)(crc >> 24);
+    wire[n++] = (uint8_t)(crc >> 16);
+    wire[n++] = (uint8_t)(crc >> 8);
+    wire[n++] = (uint8_t)crc;
+
+    return n;
+}
 
 /*
  * The refusal at sskr.c:507, read at the library boundary rather than
@@ -242,11 +330,106 @@ static void test_hex_check_refuses_two_groups_in_the_short_form(void** state) {
     assert_int_equal(hex_check_copy(mixed, 2), 0);
 }
 
+/* The built frames are only worth anything if the CRC-32 written here is the
+ * one bolos_ux_sskr_hex_check() recomputes. Pinned against the published wire
+ * form of the third shard of group 0 rather than against cx_crc32(). */
+static void test_crc_helper_reproduces_the_published_crc(void** state) {
+    (void)state;
+
+    const uint32_t crc = crc32_ieee(k_group0_wire[2], WIRE_LEN - 4);
+    const uint8_t expected[4] = {(uint8_t)(crc >> 24), (uint8_t)(crc >> 16),
+                                 (uint8_t)(crc >> 8), (uint8_t)crc};
+
+    assert_memory_equal(&k_group0_wire[2][WIRE_LEN - 4], expected, 4);
+}
+
+/*
+ * The same refusal as test_hex_check_refuses_shares_from_two_groups(), at the
+ * two seed sizes whose byte-string header takes the long form. There the
+ * shard is 29 or 37 bytes, the header is 0x58 plus a length byte, and
+ * group-index lands at byte 8 rather than byte 7 -- outside a metadata
+ * comparison whose length is written as a constant 8, and inside one derived
+ * from the header.
+ *
+ * The two controls are not decoration: this function refuses a bad CRC-32
+ * too, so without them a refusal here could come from a frame that is simply
+ * malformed, and the fix would look right for the wrong reason. Each group on
+ * its own has to be accepted first.
+ */
+static void test_hex_check_refuses_two_groups_at_the_long_header_sizes(
+    void** state) {
+    (void)state;
+
+    const uint8_t value_lens[] = {VALUE_LEN_192, VALUE_LEN_256};
+
+    for (unsigned int v = 0; v < sizeof(value_lens); v++) {
+        uint8_t group0[MAX_WIRE_LEN];
+        uint8_t group1[MAX_WIRE_LEN];
+        uint8_t scratch[2 * MAX_WIRE_LEN];
+
+        const unsigned int wire_len = build_wire(group0, value_lens[v], 0);
+        (void)build_wire(group1, value_lens[v], 1);
+
+        /* the long form, and group-index one byte past where the short form
+         * puts it */
+        assert_int_equal(group0[3], 0x58);
+        assert_int_equal(group0[8] >> 4, 0);
+        assert_int_equal(group1[8] >> 4, 1);
+        assert_memory_equal(group0, group1, 8);
+
+        memcpy(scratch, group0, wire_len);
+        assert_int_equal(bolos_ux_sskr_hex_check(scratch, wire_len, 1), 1);
+        memcpy(scratch, group1, wire_len);
+        assert_int_equal(bolos_ux_sskr_hex_check(scratch, wire_len, 1), 1);
+
+        memcpy(scratch, group0, wire_len);
+        memcpy(scratch + wire_len, group1, wire_len);
+        assert_int_equal(bolos_ux_sskr_hex_check(scratch, 2 * wire_len, 2), 0);
+    }
+}
+
+/*
+ * The guard at sskr.c:507 at those same two sizes. Until the metadata
+ * comparison above covered group-index there, this was the only thing between
+ * a two-group set typed on the device and a write to groups[1] of a
+ * one-element array -- and no test reached it at either size, only at 128
+ * bits. Both layers have to hold on their own, so it is read here at the
+ * library boundary whether or not the layer above it lets anything through.
+ */
+static void test_combine_refuses_two_groups_at_the_long_header_sizes(
+    void** state) {
+    (void)state;
+
+    const uint8_t value_lens[] = {VALUE_LEN_192, VALUE_LEN_256};
+
+    for (unsigned int v = 0; v < sizeof(value_lens); v++) {
+        uint8_t shard0[MAX_SHARD_LEN];
+        uint8_t shard1[MAX_SHARD_LEN];
+        uint8_t output[SSKR_MAX_STRENGTH_BYTES];
+
+        build_shard(shard0, value_lens[v], 0);
+        build_shard(shard1, value_lens[v], 1);
+
+        const uint8_t* shards[] = {shard0, shard1};
+        const int16_t result = sskr_combine_shards(
+            shards, (uint8_t)(SSKR_METADATA_LENGTH_BYTES + value_lens[v]), 2,
+            output, sizeof(output));
+
+        assert_int_equal(result, SSKR_ERROR_INVALID_SHARD_SET);
+    }
+}
+
 int main(void) {
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(test_combine_refuses_shards_from_two_groups),
         cmocka_unit_test(
             test_combine_refuses_a_single_group_of_a_two_group_set),
+        cmocka_unit_test(test_hex_check_refuses_shares_from_two_groups),
+        cmocka_unit_test(test_crc_helper_reproduces_the_published_crc),
+        cmocka_unit_test(
+            test_hex_check_refuses_two_groups_at_the_long_header_sizes),
+        cmocka_unit_test(
+            test_combine_refuses_two_groups_at_the_long_header_sizes),
         cmocka_unit_test(test_hex_check_refuses_two_groups_in_the_short_form),
     };
     return cmocka_run_group_tests(tests, NULL, NULL);
