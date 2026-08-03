@@ -67,7 +67,24 @@ set(CMAKE_C_STANDARD_REQUIRED True)
 # repository cannot act on. ENABLE_SDK_WERROR defaults to 0 and is not
 # overridden here, so they would not break that build -- they would just bury
 # the app's own diagnostics.
-set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -Wall -Wmissing-prototypes -Wstrict-prototypes -pedantic -g -O0 --coverage")
+# Held in a variable because two build types need the same list, and setting
+# one of the two says nothing about the other. The -O2 and -Os entries of
+# .github/workflows/unit-tests-matrix.yml build Release precisely so that the
+# -O0 on the line below cannot win over their -O level; that also puts them
+# past the only line that carried the warning flags. They are the only
+# optimised builds in the repository, so they are the only configurations
+# where -Wmaybe-uninitialized, an aliasing diagnostic or a dead-store
+# observation can fire at all -- which made the two entries most likely to
+# find something the only two that reported nothing.
+#
+# Deliberately not folded into CMAKE_C_FLAGS, which would cover both build
+# types in a single line: OPENSSL_CFLAGS further down is derived from
+# CMAKE_C_FLAGS, and the OpenSSL build is a third-party dependency this
+# repository does not diagnose and cannot act on. The per-build-type variables
+# do not reach it.
+set(APP_WARNING_FLAGS "-Wall -Wmissing-prototypes -Wstrict-prototypes -pedantic")
+set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} ${APP_WARNING_FLAGS} -g -O0 --coverage")
+set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} ${APP_WARNING_FLAGS}")
 
 # Hold src/ at zero, rather than trusting the comment above to be re-read.
 # Promoting -Wmissing-prototypes to an error globally is not an option: the
