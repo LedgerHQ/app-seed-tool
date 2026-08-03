@@ -124,9 +124,22 @@ llvm-cov-21 report ./build-cov/fuzz_sskr_hex_check -instr-profile=cov.profdata .
 `.clusterfuzzlite/` and `.github/workflows/clusterfuzzlite.yml` are the
 integration Ledger's `app-boilerplate` uses, adapted to these targets: the
 build runs in the OSS-Fuzz base builder with the SDK copied in from
-`ledger-app-builder-lite`, and the reusable workflow decides how long to fuzz
-from the event (a short run on a pull request, a longer one on the weekly
-schedule).
+`ledger-app-builder-lite`, and `reusable_clusterfuzz_tests.yml` decides how
+long to fuzz from the event (a short run on a pull request, a longer one on
+the weekly schedule).
+
+That workflow runs a **matrix of sanitizers**, not just AddressSanitizer:
+`address`, `undefined` and `memory` on a pull request, and `address`,
+`memory`, a corpus prune and a `coverage` build on push and on schedule. All
+four builds are expected to work; a target that only ever gets built under
+ASan locally will fail in CI under one of the others.
+
+MemorySanitizer is the one with a catch here, and `extra/host_syscalls.c`
+carries the answer: MSan's shadow only follows the writes it can see, the
+OSS-Fuzz toolchain does not intercept `explicit_bzero()`, and `memzero()`
+expands to `explicit_bzero()` throughout `src/`. Without the shim in that
+file, every buffer the application clears reads back as uninitialized and the
+`memory` job reports on the seed corpus itself.
 
 The full container flow can be reproduced locally:
 
