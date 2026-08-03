@@ -141,13 +141,15 @@ void generate_sskr(void) {
                G_bolos_ux_context.sskr_share_count);
         for (uint8_t share = 0; share < G_bolos_ux_context.sskr_share_count;
              share++) {
+            // A length, never the share itself. Any threshold of these
+            // reconstructs the seed, and on the Nano targets PRINTF leaves
+            // over SEPROXYHAL, which is whatever host the device is plugged
+            // into. The same shape as sskr_shares_from_bip39_mnemonic()
+            // (nbgl/sskr_shares.c), with %u rather than %zu because the two
+            // operands here are an unsigned int and a uint8_t, not size_t.
             PRINTF("SSKR share %d:\n", share + 1);
-            PRINTF("%.*s\n",
-                   G_bolos_ux_context.sskr_words_buffer_length /
-                       G_bolos_ux_context.sskr_share_count,
-                   G_bolos_ux_context.sskr_words_buffer +
-                       share * G_bolos_ux_context.sskr_words_buffer_length /
-                           G_bolos_ux_context.sskr_share_count);
+            PRINTF("(%u bytes)\n", G_bolos_ux_context.sskr_words_buffer_length /
+                                       G_bolos_ux_context.sskr_share_count);
         }
     }
     G_bolos_ux_context.sskr_share_index = 1;
