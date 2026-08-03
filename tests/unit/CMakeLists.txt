@@ -440,6 +440,15 @@ add_executable(test_sskr_duplicate_member_index ./tests/sskr_duplicate_member_in
 target_include_directories(test_sskr_duplicate_member_index PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common)
 target_link_libraries(test_sskr_duplicate_member_index PUBLIC cmocka gcov sskr sss testutils)
 
+# The three type bits of the CBOR byte-string header, over all eight values
+# they can take. Both readers of that byte are swept in one target, so
+# sskr_entry_header.c comes along with seed_sskr.c: the entry path and the
+# input check each keep their own copy of the `& 0x1F` mask, and a rule that
+# held on one but not the other would be worse than none.
+add_executable(test_sskr_cbor_major_type ./tests/sskr_cbor_major_type.c ../../src/common/bip39/seed_rom_variables.c ../../src/common/bip39/seed_bip39.c ../../src/common/sskr/seed_rom_variables.c ../../src/common/sskr/seed_sskr.c ../../src/common/sskr/sskr_entry_header.c)
+target_include_directories(test_sskr_cbor_major_type PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common)
+target_link_libraries(test_sskr_cbor_major_type PUBLIC cmocka gcov sskr sss testutils)
+
 # Which layer refuses a multi-group shard set, per CBOR form of the entered
 # shares. Same source list and same sanitizer setup as
 # test_sskr_multi_group_refusal above, and for the same reason: with the
