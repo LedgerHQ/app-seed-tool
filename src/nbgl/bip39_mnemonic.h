@@ -67,8 +67,13 @@ size_t bip39_mnemonic_word_add(const char *const buffer, const size_t size);
 
 /*
  * Generate BIP39 mnemonic from SSKR shares
+ *
+ * Returns whether the shards combined into a mnemonic. `derived` is set to
+ * whether the seed derivation that follows succeeded, which is a different
+ * question with a different answer for the user: unusable shares on one side,
+ * a derivation that did not complete on the other.
  */
-bool bip39_mnemonic_from_sskr_shares(unsigned char *seed);
+bool bip39_mnemonic_from_sskr_shares(unsigned char *seed, bool *derived);
 
 /*
  * Encode BIP39 mnemonic from hex input

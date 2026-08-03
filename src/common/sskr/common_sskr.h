@@ -91,7 +91,12 @@ bool bolos_ux_sskr_share_slice(size_t buffer_length,
 bool bolos_ux_sskr_byteword_to_hex(const unsigned char *byteword, uint8_t *value);
 
 // Combine hex value SSKR shares into seed
-void bolos_ux_sskr_to_seed_convert(unsigned char *sskr_shares_hex,
+//
+// Returns what bolos_ux_bip39_mnemonic_to_seed() returned: whether the seed
+// derivation itself succeeded, and nothing else. Whether the shards combined
+// is still reported by *words_buffer_length, which is zero when they did not.
+// The two are distinct outcomes and reach the user as different screens.
+bool bolos_ux_sskr_to_seed_convert(unsigned char *sskr_shares_hex,
                                    unsigned int sskr_shares_hex_length,
                                    unsigned int sskr_shares_count,
                                    unsigned char *words_buffer,

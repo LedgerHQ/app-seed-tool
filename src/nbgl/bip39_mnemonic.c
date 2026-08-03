@@ -132,7 +132,7 @@ bool bip39_mnemonic_check(bool* match) {
     return true;
 }
 
-bool bip39_mnemonic_from_sskr_shares(unsigned char* seed) {
+bool bip39_mnemonic_from_sskr_shares(unsigned char* seed, bool* derived) {
     // mnemonic.length is a size_t, like every other field of this struct,
     // while every length in the common bolos_ux_* API is an unsigned int.
     // They are the same type on the 32-bit ARM targets, which is why handing
@@ -142,7 +142,11 @@ bool bip39_mnemonic_from_sskr_shares(unsigned char* seed) {
     // convention.
     unsigned int words_buffer_length = BIP39_MNEMONIC_MAX_LENGTH;
 
-    bolos_ux_sskr_to_seed_convert(
+    // Two outcomes, not one: *derived says whether the seed derivation ran to
+    // completion, the return value says whether the shards combined. A caller
+    // that folded them together would report a failed derivation as unusable
+    // shares, which is the wrong thing to tell the user and the wrong screen.
+    *derived = bolos_ux_sskr_to_seed_convert(
         (unsigned char*)sskr_shares_get(), sskr_shares_length_get(),
         sskr_sharecount_get(), (unsigned char*)bip39_mnemonic_get(),
         &words_buffer_length, seed);

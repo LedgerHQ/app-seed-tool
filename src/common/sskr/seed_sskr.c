@@ -137,7 +137,7 @@ unsigned int bolos_ux_sskr_combine(unsigned char* sskr_shares_hex,
     return (unsigned int)output_len;
 }
 
-void bolos_ux_sskr_to_seed_convert(unsigned char* sskr_shares_hex,
+bool bolos_ux_sskr_to_seed_convert(unsigned char* sskr_shares_hex,
                                    unsigned int sskr_shares_hex_length,
                                    unsigned int sskr_shares_count,
                                    unsigned char* words_buffer,
@@ -154,7 +154,15 @@ void bolos_ux_sskr_to_seed_convert(unsigned char* sskr_shares_hex,
         bolos_ux_bip39_mnemonic_encode(seed_buffer, (uint8_t)seed_buffer_len,
                                        words_buffer, *words_buffer_length);
     memzero(seed_buffer, sizeof(seed_buffer));
-    bolos_ux_bip39_mnemonic_to_seed(words_buffer, *words_buffer_length, seed);
+
+    // Only the seed derivation is reported here. Whether the shards combined
+    // at all is a separate question, and the answer is still
+    // *words_buffer_length: a set that could not be combined encodes to an
+    // empty mnemonic, and deriving a seed from an empty mnemonic succeeds --
+    // it just does not mean anything. Callers read both, and they mean
+    // different things to the user.
+    return bolos_ux_bip39_mnemonic_to_seed(words_buffer, *words_buffer_length,
+                                           seed);
 }
 
 unsigned int bolos_ux_sskr_generate(uint8_t groups_threshold,

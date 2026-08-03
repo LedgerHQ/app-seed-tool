@@ -33,7 +33,7 @@ unsigned int bolos_ux_bip39_mnemonic_to_seed_hash_length128(
     return mnemonic_length;
 }
 
-void bolos_ux_bip39_mnemonic_to_seed(const unsigned char* mnemonic,
+bool bolos_ux_bip39_mnemonic_to_seed(const unsigned char* mnemonic,
                                      unsigned int mnemonic_length,
                                      unsigned char* seed) {
     // Need to keep BIP39 mnemonic in case we want to generate SSKR from it
@@ -44,10 +44,38 @@ void bolos_ux_bip39_mnemonic_to_seed(const unsigned char* mnemonic,
     mnemonic_length = bolos_ux_bip39_mnemonic_to_seed_hash_length128(
         mnemonic_hash, mnemonic_length);
     memcpy(passphrase, BIP39_MNEMONIC, BIP39_MNEMONIC_LENGTH);
-    cx_pbkdf2_sha512(mnemonic_hash, mnemonic_length, passphrase,
-                     BIP39_MNEMONIC_LENGTH, BIP39_PBKDF2_ROUNDS, seed, 64);
+
+    // cx_pbkdf2_sha512 reads as a void call and is not one: it is a macro
+    // (lcx_pbkdf2.h) over cx_pbkdf2_no_throw(CX_SHA512, ...), which returns a
+    // cx_err_t. The SDK header says outright, above that prototype, that it
+    // does not mark the return WARN_UNUSED_RESULT because "return value is
+    // never checked", so no compiler and no conformance tool will point at
+    // this. It is the seed derivation of the whole application.
+    //
+    // The only error the SDK documents is CX_INVALID_PARAMETER, for a NULL
+    // password, salt or output -- none of which this call site can produce,
+    // all three being stack arrays. What a non-CX_OK return actually reports
+    // here is a failure inside the 2048 rounds of HMAC-SHA512, i.e. the
+    // hardware, which is exactly the condition a fault-injection attempt
+    // creates on purpose.
+    const cx_err_t derivation_status =
+        cx_pbkdf2_sha512(mnemonic_hash, mnemonic_length, passphrase,
+                         BIP39_MNEMONIC_LENGTH, BIP39_PBKDF2_ROUNDS, seed, 64);
+
     memzero(mnemonic_hash, sizeof(mnemonic_hash));
+
+    if (derivation_status != CX_OK) {
+        // cx_pbkdf2_hmac() fills the output block by block, so a failure part
+        // way through leaves some of it derived and the rest untouched. That
+        // is not a seed and must not reach the HMAC as one -- the caller
+        // cannot tell the difference by looking at it.
+        memzero(seed, 64);
+        PRINTF("BIP39 seed derivation failed\n");
+        return false;
+    }
+
     PRINTF("BIP39 seed computed: 64 bytes\n");
+    return true;
 }
 
 unsigned int bolos_ux_bip39_mnemonic_decode(const unsigned char* mnemonic,

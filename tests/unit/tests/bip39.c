@@ -25,8 +25,8 @@ const unsigned char seed[] = {
 static void test_bip39(void** state) {
     uint8_t buffer[64] = {0};
 
-    bolos_ux_bip39_mnemonic_to_seed(bip39_mnemonic, sizeof(bip39_mnemonic) - 1,
-                                    buffer);
+    assert_true(bolos_ux_bip39_mnemonic_to_seed(
+        bip39_mnemonic, sizeof(bip39_mnemonic) - 1, buffer));
 
     assert_memory_equal(buffer, seed, sizeof(seed));
 }
@@ -55,8 +55,9 @@ static void test_bip39_seed_short_mnemonic(void** state) {
         0x19, 0xef, 0xdf, 0xd2, 0x61, 0x7b, 0x49, 0xeb, 0xe3};
     uint8_t out_seed[64];
 
-    bolos_ux_bip39_mnemonic_to_seed((unsigned char*)mnemonic,
-                                    sizeof(mnemonic) - 1, out_seed);
+    assert_true(bolos_ux_bip39_mnemonic_to_seed((unsigned char*)mnemonic,
+                                                sizeof(mnemonic) - 1,
+                                                out_seed));
 
     assert_memory_equal(out_seed, expected_seed, sizeof(expected_seed));
 }
@@ -92,10 +93,10 @@ static void test_bip39_seed_length_boundary(void** state) {
     uint8_t seed_128[64];
     uint8_t seed_129[64];
 
-    bolos_ux_bip39_mnemonic_to_seed(buf, 128, seed_128);
+    assert_true(bolos_ux_bip39_mnemonic_to_seed(buf, 128, seed_128));
     assert_memory_equal(seed_128, expected_seed_128, sizeof(expected_seed_128));
 
-    bolos_ux_bip39_mnemonic_to_seed(buf, 129, seed_129);
+    assert_true(bolos_ux_bip39_mnemonic_to_seed(buf, 129, seed_129));
     assert_memory_equal(seed_129, expected_seed_129, sizeof(expected_seed_129));
 }
 
