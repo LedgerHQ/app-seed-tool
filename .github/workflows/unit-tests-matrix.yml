@@ -23,6 +23,15 @@ name: Unit test configuration matrix
 # default Debug build type would silently lose to that -O0 (the last -O
 # flag on the command line wins). Release sidesteps that line entirely.
 #
+# Sidestepping it used to cost the warning flags too, since they sat on that
+# same CMAKE_C_FLAGS_DEBUG line: these two entries, the only ones compiled
+# with optimisation and so the only ones where -Wmaybe-uninitialized and its
+# neighbours can say anything at all, were the two that reported no
+# diagnostic. tests/unit/CMakeLists.txt now carries the same warning list on
+# CMAKE_C_FLAGS_RELEASE, appending to it rather than replacing it, so the
+# -DCMAKE_C_FLAGS_RELEASE below still decides the -O level on its own and no
+# flag is repeated here.
+#
 # This sweep is heavier than unit_tests.yml (6 OpenSSL builds + 6 full test
 # builds), so it does not run on every pull request; it runs on push to the
 # integration branches and on demand.

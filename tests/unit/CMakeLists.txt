@@ -67,7 +67,24 @@ set(CMAKE_C_STANDARD_REQUIRED True)
 # repository cannot act on. ENABLE_SDK_WERROR defaults to 0 and is not
 # overridden here, so they would not break that build -- they would just bury
 # the app's own diagnostics.
-set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -Wall -Wmissing-prototypes -Wstrict-prototypes -pedantic -g -O0 --coverage")
+# Held in a variable because two build types need the same list, and setting
+# one of the two says nothing about the other. The -O2 and -Os entries of
+# .github/workflows/unit-tests-matrix.yml build Release precisely so that the
+# -O0 on the line below cannot win over their -O level; that also puts them
+# past the only line that carried the warning flags. They are the only
+# optimised builds in the repository, so they are the only configurations
+# where -Wmaybe-uninitialized, an aliasing diagnostic or a dead-store
+# observation can fire at all -- which made the two entries most likely to
+# find something the only two that reported nothing.
+#
+# Deliberately not folded into CMAKE_C_FLAGS, which would cover both build
+# types in a single line: OPENSSL_CFLAGS further down is derived from
+# CMAKE_C_FLAGS, and the OpenSSL build is a third-party dependency this
+# repository does not diagnose and cannot act on. The per-build-type variables
+# do not reach it.
+set(APP_WARNING_FLAGS "-Wall -Wmissing-prototypes -Wstrict-prototypes -pedantic")
+set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} ${APP_WARNING_FLAGS} -g -O0 --coverage")
+set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} ${APP_WARNING_FLAGS}")
 
 # Hold src/ at zero, rather than trusting the comment above to be re-read.
 # Promoting -Wmissing-prototypes to an error globally is not an option: the
@@ -422,6 +439,21 @@ target_link_libraries(test_sskr_combine_invariants PUBLIC cmocka gcov sskr sss t
 add_executable(test_sskr_duplicate_member_index ./tests/sskr_duplicate_member_index.c ../../src/common/bip39/seed_rom_variables.c ../../src/common/bip39/seed_bip39.c ../../src/common/sskr/seed_rom_variables.c ../../src/common/sskr/seed_sskr.c)
 target_include_directories(test_sskr_duplicate_member_index PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common)
 target_link_libraries(test_sskr_duplicate_member_index PUBLIC cmocka gcov sskr sss testutils)
+
+# Which layer refuses a multi-group shard set, per CBOR form of the entered
+# shares. Same source list and same sanitizer setup as
+# test_sskr_multi_group_refusal above, and for the same reason: with the
+# `next_group < group_threshold` guard removed, the long-form set this file
+# pushes through bolos_ux_sskr_hex_check() and bolos_ux_sskr_combine() reads
+# past gx[SSKR_MAX_GROUP_COUNT] inside sss_recover_secret(), which has no
+# observable form without the sanitizer. sskr.c, sss.c and interpolate.c are
+# compiled into the target rather than linked from libsskr/libsss so their
+# stack frames are instrumented too.
+add_executable(test_sskr_hex_check_long_form ./tests/sskr_hex_check_long_form.c ../../src/common/sskr/sskr.c ../../src/common/sskr/sss/sss.c ../../src/common/sskr/sss/interpolate.c ../../src/common/bip39/seed_rom_variables.c ../../src/common/bip39/seed_bip39.c ../../src/common/sskr/seed_rom_variables.c ../../src/common/sskr/seed_sskr.c)
+target_include_directories(test_sskr_hex_check_long_form PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common/sskr ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common/sskr/sss)
+target_compile_options(test_sskr_hex_check_long_form PRIVATE -fsanitize=address -fno-omit-frame-pointer)
+target_link_options(test_sskr_hex_check_long_form PRIVATE -fsanitize=address)
+target_link_libraries(test_sskr_hex_check_long_form PUBLIC cmocka gcov testutils)
 
 # The ByteWords table itself, against BCR-2020-012. Data, not behaviour: the
 # only source besides the test is seed_rom_variables.c, and nothing that reads

@@ -288,17 +288,20 @@ static unsigned int hex_check_copy(const uint8_t* frames,
 /*
  * The path the user actually reaches: the shares are typed in, and
  * bolos_ux_sskr_hex_check() runs before sskr_combine_shards() ever sees
- * them. What refuses a set drawn from two groups is its comparison of the
- * metadata every share of one group must agree on -- the CBOR tag and
- * byte-string header, the identifier, group-threshold/group-count, and
- * group-index/member-threshold. Here that is
- * D9 9D 75 55 4B BF 11 01 against ... 11 12, differing at byte 7.
+ * them. Its "the first 8 bytes of every share must match" test is what
+ * refuses this set, because for a 128-bit secret the byte carrying the group
+ * index falls inside those 8 -- D9 9D 75 55 4B BF 11 01 against
+ * ... 11 12, differing at byte 7.
  *
- * Byte 7 because these frames carry the short header form. The length of the
- * metadata is not a constant: it follows the header, four bytes or five, and
- * a fixed count of 8 covers group-index for this size and stops one byte
- * short of it at the two longer ones. That is what
- * test_hex_check_refuses_two_groups_at_the_long_header_sizes() below is for.
+ * That is a property of this vector's wire form, not a general property of
+ * the function, and the difference is the whole of tests/unit/tests/
+ * sskr_hex_check_long_form.c: a 21-byte shard takes a one-byte CBOR
+ * byte-string header (0x55) and puts the group index at byte 7, while the
+ * 29- and 37-byte shards of an 18- or 24-word seed take a two-byte one
+ * (0x58 0x1D, 0x58 0x25) and push it to byte 8, out of the compared window.
+ * The assertion below holds for what it is given; it does not generalize to
+ * the other two seed sizes, where the same mixed-group set is accepted here
+ * and refused later, by sskr_combine_shards().
  *
  * The three controls come first and are not decoration: this function
  * rejects on a bad CRC-32 too, and a wrong CRC in the frames above would
@@ -306,7 +309,7 @@ static unsigned int hex_check_copy(const uint8_t* frames,
  * is accepted, so the CRCs are right and the tag is right, and the only
  * thing left to reject the mixed set is the byte comparison.
  */
-static void test_hex_check_refuses_shares_from_two_groups(void** state) {
+static void test_hex_check_refuses_two_groups_in_the_short_form(void** state) {
     (void)state;
 
     /* controls: each group, on its own, is well-formed */
@@ -315,8 +318,8 @@ static void test_hex_check_refuses_shares_from_two_groups(void** state) {
     assert_int_equal(hex_check_copy(&k_group0_wire[0][0], 1), 1);
     assert_int_equal(hex_check_copy(&k_group1_wire[0][0], 1), 1);
 
-    /* the frames differ for the first time at byte 7, inside the 8 bytes
-     * compared, and nowhere earlier */
+    /* the frames differ for the first time at byte 7 -- the group index of a
+     * 21-byte shard -- inside the 8 bytes compared, and nowhere earlier */
     assert_memory_equal(k_group0_wire[0], k_group1_wire[0], 7);
     assert_int_not_equal(k_group0_wire[0][7], k_group1_wire[0][7]);
 
@@ -427,6 +430,7 @@ int main(void) {
             test_hex_check_refuses_two_groups_at_the_long_header_sizes),
         cmocka_unit_test(
             test_combine_refuses_two_groups_at_the_long_header_sizes),
+        cmocka_unit_test(test_hex_check_refuses_two_groups_in_the_short_form),
     };
     return cmocka_run_group_tests(tests, NULL, NULL);
 }

@@ -353,7 +353,9 @@ static void key_press_callback(const char touchedKey) {
         .suggestionButtons = suggestionButtons,
         .tuneId = TUNE_TAP_CASUAL,
     };
-    PRINTF("Current text is: '%s' (size '%d')\n", textToEnter, textLen);
+    // A length, never the text. Accumulated over an entry session these
+    // traces spell out the whole recovery phrase, or every share of it.
+    PRINTF("Current text is %zu characters\n", textLen);
 
     if (textLen < 2) {
         // Suggestions only when the word contains 2+ letters
@@ -396,8 +398,10 @@ static void bip39_keyboard_dispatcher(const int token, uint8_t index) {
             display_bip39_select_phrase_length_page();
         }
     } else if (token >= CHECK_FIRST_SUGGESTION_TOKEN) {
-        PRINTF("Selected word is '%s' (size '%d')\n",
-               buttonTexts[token - CHECK_FIRST_SUGGESTION_TOKEN],
+        // The length only, for the same reason as above. The word number is
+        // traced by bip39_mnemonic_word_add() on the very next line, so
+        // nothing is lost by leaving the word out.
+        PRINTF("Selected word is %zu characters\n",
                strlen(buttonTexts[token - CHECK_FIRST_SUGGESTION_TOKEN]));
         bip39_mnemonic_word_add(
             buttonTexts[token - CHECK_FIRST_SUGGESTION_TOKEN],
@@ -422,8 +426,8 @@ static void sskr_keyboard_dispatcher(const int token, uint8_t index) {
             display_select_tool_page();
         }
     } else if (token >= CHECK_FIRST_SUGGESTION_TOKEN) {
-        PRINTF("Selected word is '%s' (size '%d')\n",
-               buttonTexts[token - CHECK_FIRST_SUGGESTION_TOKEN],
+        // The length only, as above: these are the ByteWords of the shares.
+        PRINTF("Selected word is %zu characters\n",
                strlen(buttonTexts[token - CHECK_FIRST_SUGGESTION_TOKEN]));
         sskr_shares_word_add(buttonTexts[token - CHECK_FIRST_SUGGESTION_TOKEN]);
         if (sskr_shares_complete_check()) {
