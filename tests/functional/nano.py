@@ -32,6 +32,8 @@ only geometric assumption in this file.
 
 from time import sleep, time
 
+from ragger.navigator import NavInsID
+
 # The middle slot of the three-slot carousel. Measured on both 128x64 Nano
 # devices, where the slots sit at x = 34, 62 and 90 for a one-character item;
 # the window is wide enough to hold an item of a few characters centred on the
@@ -101,24 +103,34 @@ def _title(backend):
     return min(events, key=lambda e: e["y"]).get("text", "")
 
 
-def select_in_menu(backend, label, backwards=False):
+def select_in_menu(navigator, label, timeout=30):
     """Walk a one-item-at-a-time list until `label` is on screen, then choose it.
 
-    Used for the home menu and for every list the flows put in front of a
-    choice. `label` is matched as a prefix of any line, so "Check BIP39"
-    finds the entry whose second line is "recovery phrase".
+    This is Ragger's own `navigate_until_text()`, which is exactly the right
+    tool for a menu and is what the touch tests and the existing two-button
+    paths already use. It is wrapped here only so that a flow reads as a
+    sequence of intentions rather than of instruction identifiers.
+
+    It is not the right tool for the two carousels below, for two different
+    reasons, both of which are why this module exists at all.
+
+    `screen_change_before_first_instruction` has to be off, as it is at every
+    call site in this repository: the entry the caller is after is often
+    already displayed when this is called -- the home screen opens on
+    "Check BIP39" -- and waiting for a screen change that nobody is going to
+    cause times out.
     """
-    for _ in range(_MAX_CLICKS):
-        if any(text.startswith(label) for text in _texts(backend)):
-            _click(backend, "both")
-            return
-        _click(backend, "left" if backwards else "right")
-    raise AssertionError(
-        f"'{label}' never appeared; last screen was {_texts(backend)}")
+    navigator.navigate_until_text(NavInsID.RIGHT_CLICK, [NavInsID.BOTH_CLICK],
+                                  label, timeout=timeout,
+                                  screen_change_before_first_instruction=False)
 
 
 def enter_letter(backend, letter):
     """Move the letter carousel onto `letter` and validate it.
+
+    `navigate_until_text()` cannot do this: three letters are on the screen at
+    once and only the middle one is selected, so "the letter is on the screen"
+    is not the condition to stop on. Hence the x-position test.
 
     The carousel only offers letters that still lead to a word, and it offers
     them in alphabetical order -- so comparing the wanted letter with the
@@ -148,6 +160,13 @@ def enter_word(backend, word):
     carousel on its own, as soon as what has been typed is specific enough --
     which is why this types letters until the screen stops being a letter
     screen, rather than typing a fixed prefix length.
+
+    The candidate carousel does show one word at a time, so
+    `navigate_until_text()` looks applicable -- but it matches its argument as
+    a regular expression anchored at the start, and the candidates are exactly
+    the words sharing a prefix: asked for "age" it would stop on "agent". The
+    comparison below is equality, which is what picking a word out of a list
+    of its own prefixes requires.
     """
     for letter in word:
         if not _title(backend).startswith("Enter"):

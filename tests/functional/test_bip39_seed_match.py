@@ -45,9 +45,9 @@ def set_seed():
     configuration.OPTIONAL.CUSTOM_SEED = DEVICE_PHRASE
 
 
-def _two_button_check(backend, phrase, first_line, second_line):
-    nano.select_in_menu(backend, "Check BIP39")
-    nano.select_in_menu(backend, "12 words")
+def _two_button_check(backend, navigator, phrase, first_line, second_line):
+    nano.select_in_menu(navigator, "Check BIP39")
+    nano.select_in_menu(navigator, "12 words")
     nano.enter_phrase(backend, phrase)
     nano.wait_for_lines(backend, first_line, second_line)
 
@@ -75,16 +75,18 @@ def _touch_check(backend, device, phrase, verdict):
 
 
 @mark.use_on_backend("speculos")
-def test_bip39_phrase_matches_the_seed(device, backend, set_seed):
+def test_bip39_phrase_matches_the_seed(device, backend, navigator, set_seed):
     if device.type in (DeviceType.NANOSP, DeviceType.NANOX):
-        _two_button_check(backend, DEVICE_PHRASE, "BIP39 Phrase", "is correct")
+        _two_button_check(backend, navigator, DEVICE_PHRASE,
+                          "BIP39 Phrase", "is correct")
     else:
         _touch_check(backend, device, DEVICE_PHRASE, "matches")
 
 
 @mark.use_on_backend("speculos")
-def test_bip39_phrase_does_not_match_the_seed(device, backend, set_seed):
+def test_bip39_phrase_does_not_match_the_seed(device, backend, navigator, set_seed):
     if device.type in (DeviceType.NANOSP, DeviceType.NANOX):
-        _two_button_check(backend, OTHER_PHRASE, "BIP39 Phrase", "doesn't match")
+        _two_button_check(backend, navigator, OTHER_PHRASE,
+                          "BIP39 Phrase", "doesn't match")
     else:
         _touch_check(backend, device, OTHER_PHRASE, "doesn't match")
