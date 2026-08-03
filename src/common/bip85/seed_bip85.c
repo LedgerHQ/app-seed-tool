@@ -219,16 +219,24 @@ bool bip85_entropy_from_key(const uint8_t key[32], uint8_t* out,
                             size_t out_len) {
     cx_hmac_sha512_t ctx;
     const char hmac_key[] = "bip-entropy-from-k";
+    bool result = false;
 
     if (cx_hmac_sha512_init_no_throw(&ctx, (const uint8_t*)hmac_key,
                                      strlen(hmac_key)) != CX_OK) {
-        return false;
+        goto cleanup;
     }
     if (cx_hmac_no_throw((cx_hmac_t*)&ctx, CX_LAST, key, 32, out, out_len) !=
         CX_OK) {
-        return false;
+        goto cleanup;
     }
-    return true;
+    result = true;
+
+cleanup:
+    // `ctx` carries the HMAC padding blocks and the running SHA-512 state over
+    // the root key it was just fed. Wiped on every exit, the way this module
+    // already wipes every entropy buffer it puts on the stack.
+    explicit_bzero(&ctx, sizeof(ctx));
+    return result;
 }
 #endif  // HAVE_HMAC
 
