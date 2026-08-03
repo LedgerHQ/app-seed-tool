@@ -9,11 +9,19 @@
 #include "common/bip85/bip85_internal.h"
 
 #define BIP85_DRNG_MAX_DIGEST_SIZE 256
+#define BIP85_ENTROPY_LENGTH       64
 
-static uint8_t seed[] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
-                         0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10,
-                         0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18,
-                         0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f, 0x20};
+// 64 bytes, the only seed length bolos_ux_bip85_drng_with_seed() accepts:
+// BIP-85 specifies the DRNG's input as exactly the 64 bytes of BIP85 HMAC
+// output. The contents are arbitrary -- the function hashes whatever it is
+// given -- but the length is not.
+static uint8_t seed[BIP85_ENTROPY_LENGTH] = {
+    0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b,
+    0x0c, 0x0d, 0x0e, 0x0f, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16,
+    0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f, 0x20, 0x21,
+    0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2a, 0x2b, 0x2c,
+    0x2d, 0x2e, 0x2f, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37,
+    0x38, 0x39, 0x3a, 0x3b, 0x3c, 0x3d, 0x3e, 0x3f, 0x40};
 
 // bolos_ux_bip85_drng_with_seed() is a thin wrapper around cx_shake256_hash()
 // -- no derivation, no BOLOS syscall -- so its output for a given
@@ -119,6 +127,44 @@ static void test_drng_with_seed_accepts_max_digest_size(void** state) {
     assert_memory_equal(digest, expected, sizeof(digest));
 }
 
+// BIP-85 specifies the DRNG's input as exactly the 64 bytes of BIP85 HMAC
+// output. Anything else is refused rather than hashed: SHAKE256 would accept
+// it and return a perfectly well-formed stream, which is what makes the
+// wrong length worth catching -- there is nothing downstream that would
+// notice.
+//
+// One byte short and one byte long, rather than a single arbitrary wrong
+// length: the guard is an equality test, and the two values on either side
+// of it are the ones that would survive a `<` or `>` written in its place.
+//
+// The over-long case gets its own buffer that really is one byte longer,
+// rather than the 64-byte `seed` above with a larger length passed alongside
+// it: the point is what the function does with a 65-byte seed, not what the
+// sanitizers say about reading past a 64-byte array.
+static uint8_t seed_one_byte_too_long[BIP85_ENTROPY_LENGTH + 1];
+
+static void test_drng_with_seed_rejects_wrong_seed_length(void** state) {
+    (void)state;
+
+    uint8_t digest[64];
+
+    // Pre-filled with a value the function never writes, so that "the digest
+    // was left alone" is an assertion and not an assumption about whatever
+    // the stack happened to hold.
+    memset(digest, 0xa5, sizeof(digest));
+    memset(seed_one_byte_too_long, 0x5a, sizeof(seed_one_byte_too_long));
+
+    assert_false(bolos_ux_bip85_drng_with_seed(seed, BIP85_ENTROPY_LENGTH - 1,
+                                               digest, sizeof(digest)));
+    assert_false(bolos_ux_bip85_drng_with_seed(seed_one_byte_too_long,
+                                               sizeof(seed_one_byte_too_long),
+                                               digest, sizeof(digest)));
+
+    for (size_t i = 0; i < sizeof(digest); i++) {
+        assert_int_equal(digest[i], 0xa5);
+    }
+}
+
 // digest_length > BIP85_DRNG_MAX_DIGEST_SIZE is deliberately not exercised:
 // that path is a LEDGER_ASSERT, not a returned error, and LEDGER_ASSERT
 // terminates the process on this host build -- same as every other
@@ -132,6 +178,7 @@ int main(void) {
         cmocka_unit_test(test_drng_with_seed_matches_cx_shake256_hash),
         cmocka_unit_test(test_drng_with_seed_matches_bip85_vector),
         cmocka_unit_test(test_drng_with_seed_accepts_max_digest_size),
+        cmocka_unit_test(test_drng_with_seed_rejects_wrong_seed_length),
     };
     return cmocka_run_group_tests(tests, NULL, NULL);
 }
