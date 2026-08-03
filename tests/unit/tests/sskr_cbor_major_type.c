@@ -10,18 +10,19 @@
  *     d9 9d 75 55 4b bf ...
  *              ^^ 010 10101 -- major type 2, additional info 21
  *
- * Every place this port reads that byte masks it with 0x1F and keeps only the
- * additional information. The type bits are discarded, never compared:
- *
- *     src/common/sskr/seed_sskr.c        sskr_shares_hex[3] & 0x1F   (twice)
- *     src/common/sskr/sskr_entry_header.c  buffer[3] & 0x1F          (four
- *                                                                    times)
- *
- * so 0x15, 0x35, 0x75, 0x95, 0xB5, 0xD5 and 0xF5 are read exactly as 0x55 is.
+ * Every place this port reads that byte takes the additional information out
+ * of it with `& 0x1F` -- twice in seed_sskr.c, four times in
+ * sskr_entry_header.c. The type bits used to be discarded by all six, so
+ * 0x15, 0x35, 0x75, 0x95, 0xB5, 0xD5 and 0xF5 were read exactly as 0x55 is.
  * Six of those are a different CBOR type altogether -- unsigned integer,
  * negative integer, text string, array, map, tag -- and the seventh is a
  * simple value or float. None of them is a byte string, and none of them can
- * begin a share.
+ * begin a share. All eight were accepted end to end: the entry path computed
+ * the same expected word count and share count for each, hex_check() passed
+ * each, and combine() returned the published secret from each.
+ *
+ * SSKR_CBOR_IS_BYTE_STRING() is the other half of that byte, applied at all
+ * six sites, and the `accepted` column below now follows `conformant`.
  *
  * This file measures that rather than assuming it, over both halves of the
  * code that reads the byte:
@@ -33,12 +34,12 @@
  *     which are what stands between typed ByteWords and the Shamir
  *     recombination.
  *
- * The k_cases table below carries two separate columns on purpose. `conformant`
- * is what RFC 8949 and BCR-2020-011 say, and it does not depend on this
- * repository. `accepted` is what this build does, which is the measurement --
- * changing what the application accepts on its input is a decision for the
- * maintainer, not something a test should smuggle in, so this file states the
- * current answer plainly and leaves the two columns free to disagree.
+ * The k_cases table below carries two separate columns on purpose.
+ * `conformant` is what RFC 8949 and BCR-2020-011 say, and it does not depend
+ * on this repository. `accepted` is what this build does. They agree now; they
+ * are kept apart because they are two different facts, and because the sweep
+ * is worth having either way -- remove the six checks and this file reports
+ * exactly which readers stopped holding the rule.
  *
  * Vector: the 2-of-3 128-bit share pair generated with Blockchain Commons'
  * bc-sskr already used by sskr_duplicate_member_index.c, sskr_share_len.c and
@@ -103,14 +104,14 @@ typedef struct {
 } major_type_case_t;
 
 static const major_type_case_t k_cases[] = {
-    {0, false, true}, /* 0x15  unsigned integer */
-    {1, false, true}, /* 0x35  negative integer */
-    {2, true, true},  /* 0x55  byte string -- the only conformant one */
-    {3, false, true}, /* 0x75  text string */
-    {4, false, true}, /* 0x95  array */
-    {5, false, true}, /* 0xB5  map */
-    {6, false, true}, /* 0xD5  tag */
-    {7, false, true}, /* 0xF5  simple value / float */
+    {0, false, false}, /* 0x15  unsigned integer */
+    {1, false, false}, /* 0x35  negative integer */
+    {2, true, true},   /* 0x55  byte string -- the only conformant one */
+    {3, false, false}, /* 0x75  text string */
+    {4, false, false}, /* 0x95  array */
+    {5, false, false}, /* 0xB5  map */
+    {6, false, false}, /* 0xD5  tag */
+    {7, false, false}, /* 0xF5  simple value / float */
 };
 
 #define CASE_COUNT (sizeof(k_cases) / sizeof(k_cases[0]))
@@ -268,11 +269,13 @@ static void test_combine_over_every_major_type(void** state) {
  * the member-threshold nibble. The two positions used here are the short-form
  * ones, which is what additional info 21 selects.
  *
- * The reserved additional-info values already have a defined answer here --
+ * The reserved additional-info values already had a defined answer here --
  * SSKR_SHARE_MAX_WIRE_LENGTH, and the share count left untouched, so entry can
- * finish and bolos_ux_sskr_hex_check() gets the chance to refuse. That is the
- * shape a non-conformant major type would take too, and it is what the
- * `accepted` column selects below.
+ * finish and bolos_ux_sskr_hex_check() gets the chance to refuse. A
+ * non-conformant major type now takes that same shape, which is what the
+ * `accepted` column selects below: entry is never cut short on the strength of
+ * a byte that is not a length, and the refusal still comes from the check that
+ * exists to refuse.
  */
 static void test_entry_header_over_every_major_type(void** state) {
     (void)state;

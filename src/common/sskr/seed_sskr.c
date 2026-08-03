@@ -95,6 +95,14 @@ unsigned int bolos_ux_sskr_combine(unsigned char* sskr_shares_hex,
         memzero(sskr_shares_hex, sskr_shares_hex_length);
         return 0;
     }
+    // The shard length is read out of the low five bits of byte 3 below, which
+    // is only a length if that byte is a CBOR byte-string header. A share is
+    // one; anything else is not a share, and its low five bits mean something
+    // else entirely.
+    if (!SSKR_CBOR_IS_BYTE_STRING(sskr_shares_hex[3])) {
+        memzero(sskr_shares_hex, sskr_shares_hex_length);
+        return 0;
+    }
     uint8_t sskr_share_len = sskr_shares_hex[3] & 0x1F;
     if (sskr_share_len > 23) {
         sskr_share_len = sskr_shares_hex[4];
@@ -415,6 +423,17 @@ unsigned int bolos_ux_sskr_hex_check(unsigned char* sskr_shares_hex,
     // CBOR tag, which only means that a first frame that is not a shard at all
     // gives a wrong length here, never an out-of-range one -- and the tag
     // comparison in the loop refuses it either way.
+    //
+    // Byte 3 has to be a CBOR byte-string header for its low five bits to be
+    // the additional information the form is derived from. Refused here rather
+    // than folded into the loop below because that form is what decides how
+    // many bytes of metadata the loop compares. Only the first share's byte is
+    // tested, and that is enough: the metadata comparison in the loop covers
+    // byte 3, so every later share has to carry the same one.
+    if (!SSKR_CBOR_IS_BYTE_STRING(sskr_shares_hex[3])) {
+        memzero(sskr_shares_hex, sskr_shares_hex_length);
+        return 0;
+    }
     const unsigned int header_len = 4u + ((sskr_shares_hex[3] & 0x1F) > 23);
     const unsigned int metadata_len = header_len + 4u;
 

@@ -28,26 +28,33 @@ void bolos_ux_sskr_entry_header_update(const uint8_t* buffer, size_t index,
     switch (word_number) {
         // 4th byte of CBOR header contains number of data bytes to follow
         case 3:
-            if ((buffer[index] & 0x1F) <= 24) {
+            if (SSKR_CBOR_IS_BYTE_STRING(buffer[index]) &&
+                (buffer[index] & 0x1F) <= 24) {
                 // SSKR bytes = 4 bytes CBOR + n bytes share + 4 bytes CRC
                 // checksum. This is only a literal length for 0-23; 24 (one
                 // length byte follows) is corrected below once that byte is
                 // read.
                 *final_size = 4 + (buffer[index] & 0x1F) + sizeof(uint32_t);
             } else {
-                // 25-31 are reserved CBOR additional-info values (two/four/
-                // eight-byte length, reserved, or indefinite length) with no
-                // literal length of their own -- there is nothing valid to
-                // compute here. Force the same maximum bound used below for an
-                // out-of-range declared length, so entry can still complete
-                // and bolos_ux_sskr_hex_check() rejects it, instead of
-                // treating the reserved value as if it encoded a
-                // 25-to-31-byte payload.
+                // Two ways to get here, with the same answer. 25-31 are
+                // reserved CBOR additional-info values (two/four/eight-byte
+                // length, reserved, or indefinite length) with no literal
+                // length of their own. A major type other than 2 is not a byte
+                // string at all, so its low five bits are not a length either
+                // -- they are part of an integer, a text string, an array, a
+                // map, a tag or a simple value.
+                //
+                // Neither has anything valid to compute here. Force the same
+                // maximum bound used below for an out-of-range declared
+                // length, so entry can still complete and
+                // bolos_ux_sskr_hex_check() rejects it, instead of reading the
+                // low bits as if they encoded a payload length.
                 *final_size = SSKR_SHARE_MAX_WIRE_LENGTH;
             }
             break;
         case 4:
-            if ((buffer[3] & 0x1F) == 24) {
+            if (SSKR_CBOR_IS_BYTE_STRING(buffer[3]) &&
+                (buffer[3] & 0x1F) == 24) {
                 // The declared length is read as the unsigned wire byte it is:
                 // callers hold the entered bytes in a `char` buffer, and
                 // `char` is signed on the host that builds the unit tests and
@@ -64,12 +71,14 @@ void bolos_ux_sskr_entry_header_update(const uint8_t* buffer, size_t index,
             break;
         // 8th byte of SSKR phrase contains member-threshold
         case 7:
-            if ((buffer[3] & 0x1F) < 24) {
+            if (SSKR_CBOR_IS_BYTE_STRING(buffer[3]) &&
+                (buffer[3] & 0x1F) < 24) {
                 *count = (buffer[index] & 0x0F) + 1;
             }
             break;
         case 8:
-            if ((buffer[3] & 0x1F) == 24) {
+            if (SSKR_CBOR_IS_BYTE_STRING(buffer[3]) &&
+                (buffer[3] & 0x1F) == 24) {
                 *count = (buffer[index] & 0x0F) + 1;
             }
             PRINTF("SSKR member threshold: %u\n", (unsigned int)*count);
