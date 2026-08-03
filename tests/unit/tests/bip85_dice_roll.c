@@ -92,6 +92,109 @@ static void test_dice_roll_matches_bip85_vector(void** state) {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Rolls wider than one byte.
+//
+// bip85_dice_roll() assembles bytes_per_roll bytes of the DRNG stream into
+// one integer, most significant byte first:
+//
+//     roll_result = roll_result << 8 | *digest_ptr++;
+//
+// BIP-85 requires exactly that order, and reversing it draws a different --
+// still perfectly plausible -- sequence. Nothing in this file could see the
+// difference before: bytes_per_roll is ceil(ceil(log2(sides)) / 8), so it is
+// 1 for every sides up to and including 256, and a single byte has no order.
+// The vector above uses sides = 6 and the sweep below asserts only that no
+// roll reaches sides, so the loop above ran over one byte in every pinned
+// case. sides > 256 is the exact threshold at which bytes_per_roll becomes 2
+// and the assembly order starts to matter.
+//
+// Oracle for the two sequences below: not this repository. They were computed
+// with a separate SHAKE256 implementation (Python's hashlib.shake_256) driven
+// by the DICE algorithm as BIP-85 states it in prose --
+//
+//     "bits_per_roll = ceil(log_2(sides))"
+//     "bytes_per_roll = ceil(bits_per_roll / 8)"
+//     "Trim any bits in excess of bits_per_roll (retain the most significant
+//      bits)"
+//     "If the trial is greater than or equal to the number of sides, skip it"
+//
+// -- and that separate implementation was first checked against the one DICE
+// vector the specification publishes: fed the derived entropy above with
+// sides = 6 and 10 rolls, it reproduces 1,0,0,2,0,1,5,5,2,4 exactly. Only
+// then was it run at the two wider sides below, on the same published
+// entropy. So the expected values are an extension of a published vector by
+// an implementation that agrees with it, not an output of the code under
+// test.
+//
+// The seed is the specification's own DERIVED ENTROPY (dice_vector_entropy
+// above) for both, so the whole input side of these two cases is published
+// too; only sides and the roll count differ from the printed vector.
+// ---------------------------------------------------------------------------
+
+// sides = 257: bits_per_roll = 9, bytes_per_roll = 2, and the worst
+// acceptance rate a 9-bit draw can have -- 257 of the 512 values a trial can
+// take are kept, so roughly half the draws are discarded. That makes this
+// case hold the rejection rule as well as the byte order: within these 20
+// rolls a trial comes out exactly equal to 257, so accepting on `<= sides`
+// instead of `< sides` would splice a 257 in as the 18th roll -- a value a
+// 257-sided die cannot show -- and shift everything after it.
+//
+// Reversing the two bytes instead yields
+// 127,36,16,127,200,25,42,9,202,238,... and keeping the low nine bits rather
+// than the high nine yields 18,182,12,4,149,221,170,185,234,134,... Both are
+// sequences of twenty valid rolls, which is why only pinned values catch
+// either one.
+static const uint32_t wide_257_rolls[] = {12,  154, 131, 146, 206, 202, 237,
+                                          105, 138, 63,  24,  102, 108, 128,
+                                          208, 215, 155, 121, 160, 212};
+
+#define WIDE_257_SIDES 257
+#define WIDE_257_COUNT (sizeof(wide_257_rolls) / sizeof(uint32_t))
+
+// sides = 500: the other end of the same 9-bit band, where 500 of 512 trials
+// are accepted and rejection almost never fires -- so this one is about the
+// byte order alone, on a sides that is not one more than a power of two.
+// Reversing the bytes yields 127,36,16,127,427,365,274,200,369,485.
+static const uint32_t wide_500_rolls[] = {390, 12,  154, 478, 345,
+                                          131, 146, 359, 383, 460};
+
+#define WIDE_500_SIDES 500
+#define WIDE_500_COUNT (sizeof(wide_500_rolls) / sizeof(uint32_t))
+
+static void test_dice_roll_wide_matches_external_oracle(void** state) {
+    (void)state;
+
+    // The premise of both cases: above 256 sides a roll is assembled from two
+    // bytes. Asserted rather than assumed, because if this ever became 1 the
+    // pinned values below would still pass for the wrong reason.
+    assert_int_equal(bip85_dice_bits_per_roll(WIDE_257_SIDES), 9);
+    assert_int_equal(bip85_dice_bits_per_roll(WIDE_500_SIDES), 9);
+    // ...and one byte still suffices at 256, which is what makes 257 the
+    // threshold rather than an arbitrary choice.
+    assert_int_equal(bip85_dice_bits_per_roll(256), 8);
+
+    uint32_t out_257[WIDE_257_COUNT];
+    int32_t produced_257 =
+        bip85_dice_roll(out_257, WIDE_257_COUNT, WIDE_257_SIDES,
+                        WIDE_257_COUNT, dice_vector_entropy);
+    assert_int_equal(produced_257, (int32_t)WIDE_257_COUNT);
+    for (size_t i = 0; i < WIDE_257_COUNT; i++) {
+        assert_true(out_257[i] < WIDE_257_SIDES);
+        assert_int_equal(out_257[i], wide_257_rolls[i]);
+    }
+
+    uint32_t out_500[WIDE_500_COUNT];
+    int32_t produced_500 =
+        bip85_dice_roll(out_500, WIDE_500_COUNT, WIDE_500_SIDES,
+                        WIDE_500_COUNT, dice_vector_entropy);
+    assert_int_equal(produced_500, (int32_t)WIDE_500_COUNT);
+    for (size_t i = 0; i < WIDE_500_COUNT; i++) {
+        assert_true(out_500[i] < WIDE_500_SIDES);
+        assert_int_equal(out_500[i], wide_500_rolls[i]);
+    }
+}
+
 // The vector above pins one case; this pins the rule behind it.
 //
 // Rejection only does anything when `sides` is not a power of two, so the
@@ -217,6 +320,7 @@ static void test_dice_roll_reports_drng_exhaustion(void** state) {
 int main(void) {
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(test_dice_roll_matches_bip85_vector),
+        cmocka_unit_test(test_dice_roll_wide_matches_external_oracle),
         cmocka_unit_test(test_dice_roll_never_exceeds_sides),
         cmocka_unit_test(test_dice_roll_extends_past_256_bytes),
         cmocka_unit_test(test_dice_roll_exact_when_well_under_capacity),

@@ -27,6 +27,22 @@
 // and the CRC32. Nothing longer can be a share, whatever its header declares.
 #define SSKR_SHARE_MAX_WIRE_LENGTH (5 + SSKR_METADATA_LENGTH_BYTES + SSKR_MAX_STRENGTH_BYTES + 4)
 
+// Byte 3 of a share on the wire is a CBOR initial byte: three bits of major
+// type, five of additional information (RFC 8949 section 3). BCR-2020-011
+// wraps a shard as a byte string, so the only major type a share can carry
+// there is 2, and the initial byte of a 21-byte shard is 0x55 -- 010 10101.
+//
+// Everywhere that byte is read, the additional-information field is taken out
+// of it with `& 0x1F`. This is the other half of the same byte, kept here in
+// one place because it is read from two files and four functions, and a rule
+// that held on some of them and not the others would be worse than no rule:
+// the entry path would size a frame the input check then refuses, or the other
+// way round.
+#define SSKR_CBOR_MAJOR_TYPE_MASK     0xE0
+#define SSKR_CBOR_MAJOR_TYPE_BYTE_STR 0x40
+#define SSKR_CBOR_IS_BYTE_STRING(byte) \
+    (((byte) & SSKR_CBOR_MAJOR_TYPE_MASK) == SSKR_CBOR_MAJOR_TYPE_BYTE_STR)
+
 // Read what the CBOR header of a share being entered says about that share,
 // one entered byte at a time.
 //
