@@ -423,6 +423,21 @@ add_executable(test_sskr_duplicate_member_index ./tests/sskr_duplicate_member_in
 target_include_directories(test_sskr_duplicate_member_index PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common)
 target_link_libraries(test_sskr_duplicate_member_index PUBLIC cmocka gcov sskr sss testutils)
 
+# Which layer refuses a multi-group shard set, per CBOR form of the entered
+# shares. Same source list and same sanitizer setup as
+# test_sskr_multi_group_refusal above, and for the same reason: with the
+# `next_group < group_threshold` guard removed, the long-form set this file
+# pushes through bolos_ux_sskr_hex_check() and bolos_ux_sskr_combine() reads
+# past gx[SSKR_MAX_GROUP_COUNT] inside sss_recover_secret(), which has no
+# observable form without the sanitizer. sskr.c, sss.c and interpolate.c are
+# compiled into the target rather than linked from libsskr/libsss so their
+# stack frames are instrumented too.
+add_executable(test_sskr_hex_check_long_form ./tests/sskr_hex_check_long_form.c ../../src/common/sskr/sskr.c ../../src/common/sskr/sss/sss.c ../../src/common/sskr/sss/interpolate.c ../../src/common/bip39/seed_rom_variables.c ../../src/common/bip39/seed_bip39.c ../../src/common/sskr/seed_rom_variables.c ../../src/common/sskr/seed_sskr.c)
+target_include_directories(test_sskr_hex_check_long_form PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common/sskr ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common/sskr/sss)
+target_compile_options(test_sskr_hex_check_long_form PRIVATE -fsanitize=address -fno-omit-frame-pointer)
+target_link_options(test_sskr_hex_check_long_form PRIVATE -fsanitize=address)
+target_link_libraries(test_sskr_hex_check_long_form PUBLIC cmocka gcov testutils)
+
 # The ByteWords table itself, against BCR-2020-012. Data, not behaviour: the
 # only source besides the test is seed_rom_variables.c, and nothing that reads
 # the table is linked in, so a failure here can only be the table.
