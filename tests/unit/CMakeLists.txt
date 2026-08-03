@@ -818,6 +818,16 @@ add_executable(test_bip85_derivation_path tests/bip85_derivation_path.c ../../sr
 target_include_directories(test_bip85_derivation_path PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src)
 target_link_libraries(test_bip85_derivation_path PUBLIC cmocka gcov testutils)
 
+# The BIP-85 BIP39 language code and the wordlist it stands for. Unlike
+# test_bip85_derivation_path just above, this one needs the BIP-39 wordlist
+# compiled in as well: what it holds is the agreement between the two, and
+# neither file knows about the other. seed_bip39.c comes along for
+# bolos_ux_bip39_idx_strcpy(), the accessor the entry screens read the list
+# through; the wordlist itself is in seed_rom_variables.c.
+add_executable(test_bip85_bip39_language ./tests/bip85_bip39_language.c ../../src/common/bip85/seed_bip85.c ../../src/common/bip39/seed_rom_variables.c ../../src/common/bip39/seed_bip39.c)
+target_include_directories(test_bip85_bip39_language PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common)
+target_link_libraries(test_bip85_bip39_language PUBLIC cmocka gcov testutils)
+
 # The property targets below sweep invariants over randomly drawn inputs, rather
 # than checking a particular case the way the rest of the suite does. They share
 # tests/unit/lib/testprng.h, a seeded generator kept header-only on purpose:
