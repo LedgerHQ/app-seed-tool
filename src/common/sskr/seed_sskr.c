@@ -442,13 +442,12 @@ unsigned int bolos_ux_sskr_hex_check(unsigned char* sskr_shares_hex,
         // Test the CBOR tag, the metadata shared by every share, and the
         // checksum
         if ((os_secure_memcmp(cbor, sskr_shares_hex + i * stride, 3) != 0) ||
-            (i > 0 && os_secure_memcmp(sskr_shares_hex,
-                                       sskr_shares_hex + i * stride,
-                                       metadata_len) != 0) ||
-            (os_secure_memcmp(&checksum,
-                              sskr_shares_hex + (stride * (i + 1)) -
-                                  checksum_len,
-                              checksum_len) != 0)) {
+            (i > 0 &&
+             os_secure_memcmp(sskr_shares_hex, sskr_shares_hex + i * stride,
+                              metadata_len) != 0) ||
+            (os_secure_memcmp(
+                 &checksum, sskr_shares_hex + (stride * (i + 1)) - checksum_len,
+                 checksum_len) != 0)) {
             memzero(sskr_shares_hex, sskr_shares_hex_length);
             checksum = 0;
             return 0;

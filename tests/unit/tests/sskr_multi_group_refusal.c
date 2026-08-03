@@ -424,7 +424,6 @@ int main(void) {
         cmocka_unit_test(test_combine_refuses_shards_from_two_groups),
         cmocka_unit_test(
             test_combine_refuses_a_single_group_of_a_two_group_set),
-        cmocka_unit_test(test_hex_check_refuses_shares_from_two_groups),
         cmocka_unit_test(test_crc_helper_reproduces_the_published_crc),
         cmocka_unit_test(
             test_hex_check_refuses_two_groups_at_the_long_header_sizes),

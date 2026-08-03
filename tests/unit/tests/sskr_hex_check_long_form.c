@@ -1,37 +1,43 @@
 /*
  * Where the group index sits in each of the two CBOR forms a share can be
- * entered in, and what bolos_ux_sskr_hex_check() therefore does with a set of
- * shares drawn from more than one group.
+ * entered in, and that bolos_ux_sskr_hex_check() refuses a set of shares
+ * drawn from more than one group in every one of them.
  *
  * That function checks three things about each entered share: the three CBOR
- * tag bytes, the CRC-32, and -- from the second share on -- that the first 8
- * bytes are the same as the first share's. The third one is what refuses a
- * set built from two different groups, because the group index is one of the
- * bytes the shards of a set do not agree on.
+ * tag bytes, the CRC-32, and -- from the second share on -- that the metadata
+ * every share of one group carries is the same as the first share's. The
+ * third one is what refuses a set built from two different groups, because
+ * the group index is one of the bytes the shards of a set do not agree on.
  *
- * It only reaches that byte in the short CBOR form. A wire record is the tag
- * (3 bytes), a byte-string header, the serialized shard, then the CRC-32; the
- * shard's own byte 3 is the group-index/member-threshold pair. Byte strings
- * shorter than 24 bytes carry their length in the header byte itself, longer
- * ones need one more byte, and that extra byte shifts everything after it:
+ * How much of the record that metadata spans depends on the CBOR form, and
+ * that is what this file pins. A wire record is the tag (3 bytes), a
+ * byte-string header, the serialized shard, then the CRC-32; the shard's own
+ * byte 3 is the group-index/member-threshold pair. Byte strings shorter than
+ * 24 bytes carry their length in the header byte itself, longer ones need one
+ * more byte, and that extra byte shifts everything after it:
  *
  *   seed   share_len  byte-string header  index of the group-index byte
- *   128    21         0x55                3 + 4 = 7   inside the window
- *   192    29         0x58 0x1D           3 + 5 = 8   outside the window
- *   256    37         0x58 0x25           3 + 5 = 8   outside the window
+ *   128    21         0x55                3 + 4 = 7
+ *   192    29         0x58 0x1D           3 + 5 = 8
+ *   256    37         0x58 0x25           3 + 5 = 8
  *
- * Measured, not deduced: the first test below runs all three through the
- * function and asserts the verdict each one actually gives. For 12 words the
- * mixed set is refused; for 18 and 24 words it is accepted. The bytes those
- * two forms do compare -- tag, byte-string length, share identifier, group
- * threshold and group count -- are the same across a set drawn from two
- * groups of one backup, so nothing in the window distinguishes them.
+ * A comparison of a fixed 8 bytes reaches that byte in the short form only.
+ * It did exactly that until the metadata length was derived from the header
+ * instead, and a set drawn from two groups of one backup was accepted at 18
+ * and 24 words: the bytes such a fixed window does compare -- tag,
+ * byte-string length, share identifier, group threshold and group count --
+ * are the same across the two groups, so nothing inside it distinguished
+ * them.
  *
- * What follows from that is the point of this file. A multi-group set for an
- * 18- or 24-word seed goes past the entry screen and into
- * bolos_ux_sskr_combine(), so for those two sizes the refusals inside
- * sskr_combine_shards() are not defence in depth behind an input check --
- * they are the only thing left:
+ * Measured, not deduced: the first test below runs all three forms through
+ * the function and asserts the verdict each one actually gives. All three
+ * refuse. That assertion is the regression test on the width of the
+ * comparison -- narrow it back to a constant 8 and the two long forms turn
+ * green-to-red here.
+ *
+ * The second test keeps the layer below honest. Whatever the entry screen
+ * does, sskr_combine_shards() has its own refusals, and they are what stands
+ * between a multi-group set and two arrays that hold one element each:
  *
  *   - `next_group >= SSKR_MAX_GROUP_COUNT` -> SSKR_ERROR_INVALID_SHARD_SET,
  *     for shards naming two different groups. SSKR_MAX_GROUP_COUNT is 1 in
@@ -43,10 +49,10 @@
  *     one sss_recover_secret() is called with the entered group threshold of
  *     2 and reads gx[1].
  *
- * The second guard is the one this file demonstrates is load-bearing on this
- * path. Turning it into `else if (0)` and building this target with
- * -fsanitize=address gives, from the entered wire records and not from a
- * direct library call:
+ * The second guard is the one this file demonstrates is load-bearing.
+ * Turning it into `else if (0)` and building this target with
+ * -fsanitize=address gives, from wire records rather than from a direct
+ * library call:
  *
  *     ERROR: AddressSanitizer: stack-buffer-overflow ... READ of size 1
  *     #0 interpolate interpolate.c:168
@@ -54,21 +60,18 @@
  *     #2 sskr_combine_shards_internal sskr.c:563
  *     #3 sskr_combine_shards sskr.c:617
  *     #4 bolos_ux_sskr_combine seed_sskr.c:127
- *     #5 test_long_form_multi_group_set_stops_in_the_library
+ *     #5 test_multi_group_set_also_stops_in_the_library
  *     [48, 49) 'gx' <== Memory access at offset 49 overflows this variable
  *
  * which is why this target is built with the sanitizer. That mutant fails
  * sskr_multi_group_refusal.c as well, which reaches the same guard by calling
- * sskr_combine_shards() directly; what is new here is the frame at #4, an
- * entered share set that bolos_ux_sskr_hex_check() had just accepted.
+ * sskr_combine_shards() directly; what is added here is the frame at #4, the
+ * wrapper the device reaches, which turns every failure alike into 0.
  *
- * Nothing here is a live defect and nothing in src/ changes for it: both
- * refusals are present and correct, and the set is refused in the end. What
- * this records is which layer does the refusing, which is not what the width
- * of the comparison suggests. Widening that window, or having it parse the
- * byte-string header to find the group-index byte, would change the set of
- * inputs the entry screens accept -- a decision for the maintainer, not for a
- * test.
+ * Nothing here is a live defect and nothing in src/ changes for it. What this
+ * records is that both layers refuse, and that the entry screen's refusal
+ * does not depend on the seed length -- which is the property that was not
+ * true before the metadata length replaced the constant 8.
  *
  * Vectors
  * -------
@@ -201,17 +204,15 @@ struct wire_form {
     const uint8_t* g1m0;
     /* NULL for the short form, where the point it controls does not arise */
     const uint8_t* g1m0_other_id;
-    /* what bolos_ux_sskr_hex_check() returns for the mixed-group set */
-    unsigned int mixed_verdict;
 };
 
 static const struct wire_form k_forms[] = {
     /* 12 words, short form */
-    {16, 29, 4, k_128_g0m0, k_128_g0m1, k_128_g1m0, NULL, 0},
+    {16, 29, 4, k_128_g0m0, k_128_g0m1, k_128_g1m0, NULL},
     /* 18 words, long form */
-    {24, 38, 5, k_192_g0m0, k_192_g0m1, k_192_g1m0, k_192_g1m0_other_id, 1},
+    {24, 38, 5, k_192_g0m0, k_192_g0m1, k_192_g1m0, k_192_g1m0_other_id},
     /* 24 words, long form */
-    {32, 46, 5, k_256_g0m0, k_256_g0m1, k_256_g1m0, k_256_g1m0_other_id, 1},
+    {32, 46, 5, k_256_g0m0, k_256_g0m1, k_256_g1m0, k_256_g1m0_other_id},
 };
 
 #define FORM_COUNT (sizeof(k_forms) / sizeof(k_forms[0]))
@@ -244,14 +245,13 @@ static unsigned int hex_check_pair(const struct wire_form* form,
  * The controls come first and are not decoration: this function rejects on a
  * wrong CRC-32 or a wrong tag too, so a set of records with a bad CRC would
  * be refused for a reason that has nothing to do with the group index, and
- * the 128-bit row below would pass while proving nothing. Each group of each
- * set is accepted on its own, in all three forms, which leaves the byte
+ * every row below would pass while proving nothing. Each group of each set is
+ * accepted on its own, in all three forms, which leaves the metadata
  * comparison as the only check that can be deciding anything here.
  *
- * The `_other_id` control closes the other reading: in the long form the
- * comparison is still performed and still rejects -- it is the position of
- * the group-index byte that has moved out of its reach, not the comparison
- * that has stopped happening.
+ * The `_other_id` control pins the comparison from the other side: a byte
+ * that differs inside the compared span is caught in the long form too, so a
+ * refusal there cannot be read as the function having stopped comparing.
  */
 static void test_hex_check_verdict_by_cbor_form(void** state) {
     (void)state;
@@ -280,9 +280,8 @@ static void test_hex_check_verdict_by_cbor_form(void** state) {
         assert_int_equal(hex_check_pair(form, form->g1m0, NULL), 1);
         assert_int_equal(hex_check_pair(form, form->g0m0, form->g0m1), 1);
 
-        /* the measurement */
-        assert_int_equal(hex_check_pair(form, form->g0m0, form->g1m0),
-                         form->mixed_verdict);
+        /* the measurement: refused, in every form */
+        assert_int_equal(hex_check_pair(form, form->g0m0, form->g1m0), 0);
 
         /* control: a byte that differs inside the compared window is still
          * caught in this form */
@@ -297,30 +296,32 @@ static void test_hex_check_verdict_by_cbor_form(void** state) {
 }
 
 /*
- * Where a long-form multi-group set stops, once the entry screen has let it
- * through. Both cases go through bolos_ux_sskr_combine() -- the entry point
- * the device reaches next -- and both are refused there; the error codes
- * underneath name which of the two guards did it, since that wrapper turns
- * every failure alike into 0.
+ * The layer below the entry screen, kept honest on its own terms. Both cases
+ * go through bolos_ux_sskr_combine() -- the entry point the device reaches
+ * next -- and both are refused there; the error codes underneath name which
+ * of the two guards did it, since that wrapper turns every failure alike
+ * into 0.
+ *
+ * These calls do not run through bolos_ux_sskr_hex_check() first, which is
+ * the point: the guards below have to hold whatever the gate above them
+ * accepts, and they are what this file mutates to show they are load-bearing.
+ * All three forms are exercised, since none of this depends on the gate's
+ * verdict.
  */
-static void test_long_form_multi_group_set_stops_in_the_library(void** state) {
+static void test_multi_group_set_also_stops_in_the_library(void** state) {
     (void)state;
 
     for (size_t i = 0; i < FORM_COUNT; i++) {
         const struct wire_form* form = &k_forms[i];
-
-        /* the short form is refused at entry and never gets here */
-        if (form->header_len == 4) {
-            continue;
-        }
 
         const unsigned int shard_len =
             form->wire_len - form->header_len - CRC_LEN;
         uint8_t buffer[2 * MAX_WIRE_LEN];
         uint8_t output[SSKR_MAX_STRENGTH_BYTES];
 
-        /* shards of two different groups: accepted at entry, refused here */
-        assert_int_equal(hex_check_pair(form, form->g0m0, form->g1m0), 1);
+        /* shards of two different groups: refused at entry, and refused here
+         * too */
+        assert_int_equal(hex_check_pair(form, form->g0m0, form->g1m0), 0);
 
         load(buffer, form, form->g0m0, form->g1m0);
         assert_int_equal(
@@ -353,7 +354,7 @@ static void test_long_form_multi_group_set_stops_in_the_library(void** state) {
 int main(void) {
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(test_hex_check_verdict_by_cbor_form),
-        cmocka_unit_test(test_long_form_multi_group_set_stops_in_the_library),
+        cmocka_unit_test(test_multi_group_set_also_stops_in_the_library),
     };
     return cmocka_run_group_tests(tests, NULL, NULL);
 }
