@@ -754,6 +754,24 @@ static void bip85_index_validate(const uint8_t* indexentry, uint8_t length) {
     }
     PRINTF("BIP85 index entered is '%d'\n", bip85_index_get());
 
+    // The bound below and the message on the else branch are two different
+    // numbers on purpose, so neither is a typo for the other.
+    //
+    // `UINT32_MAX >> 1` is what the derivation needs: the index goes into a
+    // hardened BIP32 path component as `0x80000000 | index`, so anything that
+    // does not fit in 31 bits would run into the hardening bit.
+    //
+    // The keypad above (`display_bip85_select_index_page()`) caps entry at
+    // `BIP85_INDEX_MAX_NUMBER_LENGTH` digits, so the largest value that can
+    // reach this function is 9,999,999 -- well inside 31 bits, and far too
+    // small for the `10 * index + digit` accumulation to overflow the
+    // `uint32_t` it runs in. The else branch is therefore unreachable from
+    // the screens, and the check is kept as a guard on the derivation
+    // precondition rather than on the entry.
+    //
+    // The message states the keypad's limit rather than the 31-bit one
+    // because it is addressed to whoever is typing, and 9,999,999 is what
+    // they can actually enter.
     if (bip85_index_get() <= (UINT32_MAX >> 1)) {
         switch (bip85_type_get()) {
             case BIP85_APP_BIP39:
