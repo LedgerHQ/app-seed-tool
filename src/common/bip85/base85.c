@@ -23,6 +23,15 @@
 /**
  * @brief Encodes 64 bytes of data into a Base85 string.
  *
+ * @details The grouping below is Ascii85's -- 4 bytes read big-endian into a
+ * 32-bit value, emitted as 5 base-85 digits, most significant first -- while
+ * the alphabet is RFC 1924's (`BASE85_TABLE`, seed_rom_variables.c, where the
+ * choice of alphabet is explained). Neither name describes this encoding on
+ * its own: RFC 1924 defines no chunking at all, encoding a whole 16-byte IPv6
+ * address as a single big number, and Ascii85 uses a different alphabet. The
+ * combination is what BIP-85's published password vector requires, and it is
+ * what this repository verifies against it.
+ *
  * @param[in]  src Pointer to the input data.
  * @param[out] dst Pointer to the output buffer.
  *
