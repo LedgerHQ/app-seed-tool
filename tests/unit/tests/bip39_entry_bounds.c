@@ -51,7 +51,7 @@
  * It is not on the entry path under test; this exists only so the object links,
  * and aborts if it is ever reached.
  */
-bool compare_recovery_phrase(bool* reconstructed) {
+unsigned int compare_recovery_phrase(bool* reconstructed) {
     (void)reconstructed;
     fail_msg("not on the entry path");
 }

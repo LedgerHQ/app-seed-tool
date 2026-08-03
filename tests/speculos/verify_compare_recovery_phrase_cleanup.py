@@ -169,11 +169,14 @@ def resolve_cleanup_breakpoints(link_addr, size):
       buffer_device as plain pointer arguments (not local stack arrays),
       so the compiler keeps them in call-preserved registers across both
       calls instead of spilling them to the stack -- confirmed by
-      disassembly, not assumed: this function's prologue is
-      `push {r4,r5,r6,lr}` with no `sub sp, #N` at all, so there is no
-      per-buffer SP offset to resolve here, unlike the SP-relative
-      approach Check 1/3's globals and this function's own former host
-      (compare_recovery_phrase()) need -- see README.md gotcha 5.
+      disassembly, not assumed. The function does now carry a stack frame
+      of its own (the fault-resistance work gave it a volatile checkpoint
+      counter and a volatile spin variable, both stack-resident), but the
+      two pointers are not part of it: they stay in registers, so there is
+      still no per-buffer SP offset to resolve here, unlike the
+      SP-relative approach Check 1/3's globals and this function's own
+      former host (compare_recovery_phrase()) need -- see README.md
+      gotcha 5.
 
     Nothing here is hardcoded as a raw address or register number --
     only the function's own resolved link_addr/size (from
@@ -306,8 +309,10 @@ class MemorySampler:
     itself), buffer/buffer_device arrive here as plain pointer arguments
     that the compiler keeps in two call-preserved registers for the whole
     function body (confirmed by disassembly, see
-    resolve_cleanup_breakpoints -- no stack frame at all, so no per-buffer
-    offset to add to anything): read those two registers directly at
+    resolve_cleanup_breakpoints -- the function's own stack frame holds
+    only its volatile counters, never the two pointers, so there is no
+    per-buffer offset to add to anything): read those two registers
+    directly at
     either breakpoint and dereference them, no SP/frame-base bookkeeping
     needed at all.
     """

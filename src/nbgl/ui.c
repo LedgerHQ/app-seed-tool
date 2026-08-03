@@ -516,6 +516,26 @@ static void display_home_page() {
 /*
  * Result page
  */
+/*
+ * This runs when the user taps to leave the result screen, and it calls
+ * bip39_mnemonic_check() / sskr_shares_check() a second time -- so
+ * compare_recovery_phrase(), the device-seed derivation and the whole verdict,
+ * all over again. That is a second derivation the application pays for, and it
+ * would be easy to remove by reading the seed_match the first call already
+ * left behind.
+ *
+ * Deliberately kept. It is a second, independent decision standing between a
+ * single glitched verdict and the screen the user is sent on to, taken on
+ * freshly derived bytes rather than on a stored flag. It was not put here for
+ * that -- it is where the navigation happens to lead -- but it is worth what
+ * it costs, and naming it here is what stops it being refactored away as
+ * duplicate work.
+ *
+ * It is not a substitute for the hardening in compare_recovery_phrase_finish()
+ * and must not be read as one: the result screen the user reads and acts on
+ * has already been painted on the strength of the first call, and the BAGL
+ * targets call once, not twice.
+ */
 static void check_result_callback(int token __attribute__((unused)),
                                   uint8_t index __attribute__((unused))) {
     if (tool_type == TOOL_TYPE_BIP39 && bip39_mnemonic_check(&seed_match) &&

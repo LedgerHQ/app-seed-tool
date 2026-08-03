@@ -42,7 +42,7 @@ extern unsigned char const SSKR_WORDLIST[];
 char *bip39_mnemonic_get(void) { fail_msg("not on the entry path"); }
 size_t bip39_mnemonic_length_get(void) { fail_msg("not on the entry path"); }
 uint8_t bip39_mnemonic_final_size_get(void) { fail_msg("not on the entry path"); }
-bool compare_recovery_phrase(void) { fail_msg("not on the entry path"); }
+unsigned int compare_recovery_phrase(void) { fail_msg("not on the entry path"); }
 
 /* ByteWord whose decoded value is `b`; the table holds 256 four-letter words. */
 static const char *word_for(uint8_t b)

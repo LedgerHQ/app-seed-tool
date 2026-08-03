@@ -63,7 +63,7 @@ extern unsigned char const SSKR_WORDLIST[];
 char *bip39_mnemonic_get(void) { fail_msg("not on the entry path"); }
 size_t bip39_mnemonic_length_get(void) { fail_msg("not on the entry path"); }
 uint8_t bip39_mnemonic_final_size_get(void) { fail_msg("not on the entry path"); }
-bool compare_recovery_phrase(void) { fail_msg("not on the entry path"); }
+unsigned int compare_recovery_phrase(void) { fail_msg("not on the entry path"); }
 
 /* Largest a serialized share can be on the wire: CBOR long-form header
  * (tag + 0x58 + length byte), the shard itself, and the CRC32. */

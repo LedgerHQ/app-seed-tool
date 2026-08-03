@@ -373,7 +373,10 @@ void compare_recovery_phrase_and_display_result(void) {
     io_seproxyhal_general_status();
 
     bool reconstructed = true;
-    const bool match = compare_recovery_phrase(&reconstructed);
+    // Against VERDICT_MATCH, not "not zero": every other value, corrupted or
+    // not, is a mismatch. See common.h.
+    const bool match =
+        (compare_recovery_phrase(&reconstructed) == VERDICT_MATCH);
 
     if (!reconstructed) {
         // shards were well-formed but could not be combined: report them as
