@@ -229,6 +229,14 @@ unsigned int compare_recovery_phrase(bool* reconstructed) {
     LEDGER_ASSERT(cx_hmac_no_throw((cx_hmac_t*)&ctx, CX_LAST, buffer, 64,
                                    buffer, 64) == CX_OK,
                   "HMAC failed");
+
+    // `ctx` carries the HMAC padding blocks and the running SHA-512 state over
+    // the 64 seed bytes it was just fed. It is dead from here on, and the
+    // function leaves by `return` a few lines below without passing the
+    // `cleanup:` label, so it is wiped here rather than there -- the same way
+    // `buffer` and `buffer_device` are wiped on every path out.
+    memzero(&ctx, sizeof(ctx));
+
     PRINTF("Root key from input: 64 bytes\n");
 
     // get rootkey from device's seed

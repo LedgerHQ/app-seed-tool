@@ -169,15 +169,35 @@ int32_t bip85_dice_roll(uint32_t* out, size_t out_capacity, uint32_t sides,
  * @param[out] digest         Pointer to the buffer to store the generated
  * digest.
  * @param[in]  digest_length  Length of the digest in bytes.
- * @param[in]  seed           Pointer to the seed data.
+ * @param[in]  seed           Pointer to the seed data. Must be
+ * `BIP85_ENTROPY_LENGTH` bytes.
  * @param[in]  seed_length    Length of the seed data in bytes.
  *
- * @return 1 on success, 0 on failure.
+ * @return `true` on success, `false` if `seed_length` is not
+ * `BIP85_ENTROPY_LENGTH`, or if the SHAKE256 call failed.
  */
 bool bolos_ux_bip85_drng_with_seed(uint8_t* seed, size_t seed_length,
                                    uint8_t* digest, size_t digest_length) {
     LEDGER_ASSERT(digest_length <= BIP85_DRNG_MAX_DIGEST_SIZE,
                   "BIP85 DRNG digest length exceeds maximum");
+
+    // BIP-85 defines the DRNG as SHAKE256 over the BIP85 HMAC output and is
+    // explicit that its input must be exactly 64 bytes. Any other length
+    // still produces a well-formed SHAKE256 stream, just not the one the
+    // specification defines -- so the digest length was bounded here while
+    // the seed length was not.
+    //
+    // Reported rather than asserted, unlike `digest_length` one line above.
+    // That one bounds a write into the caller's buffer, where an out-of-range
+    // value is a memory error and stopping is the safe answer; a wrong
+    // `seed_length` only yields a wrong result. `false` is already this
+    // function's error channel for the SHAKE256 failure below, and it is a
+    // form a test can reach, which LEDGER_ASSERT is not on the host build.
+    if (seed_length != BIP85_ENTROPY_LENGTH) {
+        PRINTF("BIP85 DRNG seed is not %u bytes\n", BIP85_ENTROPY_LENGTH);
+        return false;
+    }
+
     if (cx_shake256_hash(seed, seed_length, digest, digest_length) != CX_OK) {
         PRINTF("SHAKE256 hash error\n");
         return 0;
@@ -219,16 +239,24 @@ bool bip85_entropy_from_key(const uint8_t key[32], uint8_t* out,
                             size_t out_len) {
     cx_hmac_sha512_t ctx;
     const char hmac_key[] = "bip-entropy-from-k";
+    bool result = false;
 
     if (cx_hmac_sha512_init_no_throw(&ctx, (const uint8_t*)hmac_key,
                                      strlen(hmac_key)) != CX_OK) {
-        return false;
+        goto cleanup;
     }
     if (cx_hmac_no_throw((cx_hmac_t*)&ctx, CX_LAST, key, 32, out, out_len) !=
         CX_OK) {
-        return false;
+        goto cleanup;
     }
-    return true;
+    result = true;
+
+cleanup:
+    // `ctx` carries the HMAC padding blocks and the running SHA-512 state over
+    // the root key it was just fed. Wiped on every exit, the way this module
+    // already wipes every entropy buffer it puts on the stack.
+    explicit_bzero(&ctx, sizeof(ctx));
+    return result;
 }
 #endif  // HAVE_HMAC
 
