@@ -583,6 +583,16 @@ target_compile_options(test_bip39 PRIVATE -fsanitize=address -fno-omit-frame-poi
 target_link_options(test_bip39 PRIVATE -fsanitize=address)
 target_link_libraries(test_bip39 PUBLIC cmocka gcov testutils)
 
+# The seed derivation's own failure path. Same sources as test_bip39 above,
+# but a separate target rather than more cases in tests/bip39.c: this one
+# defines cx_pbkdf2_no_throw() itself, overriding the SDK build of it that
+# libtestutils exports, and that override applies to every test in the
+# executable. tests/bip39.c has to keep the real one -- it checks published
+# vectors -- so the two cannot share a binary.
+add_executable(test_bip39_seed_derivation_failure ./tests/bip39_seed_derivation_failure.c ../../src/common/bip39/seed_rom_variables.c ../../src/common/bip39/seed_bip39.c)
+target_include_directories(test_bip39_seed_derivation_failure PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common)
+target_link_libraries(test_bip39_seed_derivation_failure PUBLIC cmocka gcov testutils)
+
 add_executable(test_roundtrip ./tests/roundtrip.c ../../src/common/bip39/seed_rom_variables.c ../../src/common/bip39/seed_bip39.c ../../src/common/sskr/seed_rom_variables.c ../../src/common/sskr/seed_sskr.c)
 target_include_directories(test_roundtrip PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common)
 target_link_libraries(test_roundtrip PUBLIC cmocka gcov testutils sskr sss)
@@ -759,13 +769,16 @@ target_compile_options(test_compare_recovery_phrase_finish PRIVATE -include cx.h
 target_compile_definitions(test_compare_recovery_phrase_finish PRIVATE HAVE_ECC_WEIERSTRASS HAVE_SECP256K1_CURVE)
 target_link_options(test_compare_recovery_phrase_finish PRIVATE -Wl,--gc-sections)
 target_link_libraries(test_compare_recovery_phrase_finish PUBLIC cmocka gcov testutils)
-# Expected, harmless compiler warning from this target only: with neither
-# HAVE_BAGL nor HAVE_NBGL defined (a combination the real app build never
-# hits -- one of the two is always set), the two `goto cleanup;` sites
-# inside compare_recovery_phrase()'s UI-specific block are preprocessed
-# out, leaving its `cleanup:` label with no remaining jump to it:
-#   common_seed.c:126:1: warning: label 'cleanup' defined but not used
-#     [-Wunused-label]
+# This target used to be the one place a `-Wunused-label` warning appeared:
+# with neither HAVE_BAGL nor HAVE_NBGL defined (a combination the real app
+# build never hits -- one of the two is always set), both `goto cleanup;`
+# sites inside compare_recovery_phrase()'s UI-specific block were
+# preprocessed out, leaving its `cleanup:` label with no remaining jump to
+# it. The seed-derivation failure check added since sits outside that block
+# and jumps to the same label unconditionally, so the warning is gone. It is
+# recorded here rather than deleted because its absence is now load-bearing:
+# it reappearing would mean that check was moved back inside the guards,
+# where a failed derivation on the other UI stack would stop being handled.
 
 # bip85_finalize_pwd() (also outside the HAVE_NBGL guard) is the
 # memcpy-and-terminate tail shared by bolos_ux_bip85_pwd_base64()/

@@ -72,8 +72,9 @@ static void test_shards_convert_to_mnemonic_and_seed(void** state) {
     memset(words_buffer, 0x00, sizeof(words_buffer));
     memset(seed, 0x5A, sizeof(seed));
 
-    bolos_ux_sskr_to_seed_convert(shares, sizeof(shares), 2, words_buffer,
-                                  &words_buffer_length, seed);
+    assert_true(bolos_ux_sskr_to_seed_convert(shares, sizeof(shares), 2,
+                                              words_buffer,
+                                              &words_buffer_length, seed));
 
     /* The mnemonic length the encode step reported, propagated to the caller
      * and used as the length fed to the seed derivation. */

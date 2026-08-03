@@ -45,7 +45,13 @@ unsigned int bolos_ux_bip39_mnemonic_check(const unsigned char *mnemonic,
                                            unsigned int mnemonic_length);
 
 // passphrase will be prefixed with "MNEMONIC" from BIP39, the passphrase content shall start @ 8
-void bolos_ux_bip39_mnemonic_to_seed(const unsigned char *mnemonic,
+//
+// Returns false, with the 64 bytes of `seed` zeroed, when the PBKDF2 call
+// underneath reports an error. That call fills its output block by block, so a
+// failure part way through leaves a partly derived buffer that nothing
+// downstream could tell from a real seed; refusing here is what keeps it from
+// being HMAC'd and compared as one.
+bool bolos_ux_bip39_mnemonic_to_seed(const unsigned char *mnemonic,
                                      const unsigned int mnemonic_length,
                                      unsigned char *seed /*, unsigned char *workBuffer*/);
 

@@ -161,39 +161,62 @@ unsigned int compare_recovery_phrase(bool* reconstructed) {
 
     *reconstructed = true;
 
+    // Whether the PBKDF2 that turns the mnemonic into the 64-byte seed ran to
+    // completion. True on the branch neither tool takes, which is the same
+    // reason buffer[] is zeroed above: nothing here should depend on a value
+    // no path sets.
+    bool derived = true;
+
 #if defined(HAVE_BAGL)
     if (G_bolos_ux_context.tool_type == TOOL_TYPE_BIP39) {
-        bolos_ux_bip39_mnemonic_to_seed(
+        derived = bolos_ux_bip39_mnemonic_to_seed(
             (unsigned char*)G_bolos_ux_context.words_buffer,
             G_bolos_ux_context.words_buffer_length, buffer);
     } else if (G_bolos_ux_context.tool_type == TOOL_TYPE_SSKR) {
         G_bolos_ux_context.words_buffer_length =
             sizeof(G_bolos_ux_context.words_buffer);
-        bolos_ux_sskr_to_seed_convert(
+        derived = bolos_ux_sskr_to_seed_convert(
             (unsigned char*)G_bolos_ux_context.sskr_words_buffer,
             G_bolos_ux_context.sskr_words_buffer_length,
             G_bolos_ux_context.sskr_share_count,
             (unsigned char*)&G_bolos_ux_context.words_buffer,
             &G_bolos_ux_context.words_buffer_length, buffer);
         if (G_bolos_ux_context.words_buffer_length == 0) {
-            // shards accepted by the CRC check but not combinable
+            // shards accepted by the CRC check but not combinable. Checked
+            // ahead of `derived` on purpose: shards that never became a
+            // mnemonic are what the user has to act on, and the derivation
+            // that ran on the empty mnemonic afterwards says nothing.
             *reconstructed = false;
             goto cleanup;
         }
     }
 #elif defined(HAVE_NBGL)
     if (tool_type == TOOL_TYPE_BIP39) {
-        bolos_ux_bip39_mnemonic_to_seed(
+        derived = bolos_ux_bip39_mnemonic_to_seed(
             (const unsigned char*)bip39_mnemonic_get(),
             bip39_mnemonic_length_get(), buffer);
     } else if (tool_type == TOOL_TYPE_SSKR) {
-        if (!bip39_mnemonic_from_sskr_shares(buffer)) {
-            // shards accepted by the CRC check but not combinable
+        if (!bip39_mnemonic_from_sskr_shares(buffer, &derived)) {
+            // shards accepted by the CRC check but not combinable, as above
             *reconstructed = false;
             goto cleanup;
         }
     }
 #endif
+
+    if (!derived) {
+        // The seed derivation reported an error, so `buffer` is 64 zeroes and
+        // not a seed. Treated exactly as a failed device derivation is a few
+        // lines below -- no match, the phrase is left alone, both buffers are
+        // erased -- because that is what it is: an outcome the comparison
+        // cannot be run on. This was already the reported result before the
+        // error was noticed, since a wrong seed does not match; what changes
+        // is that it is now a decision rather than a coincidence, and that no
+        // partly-derived buffer reaches the HMAC.
+        PRINTF("An error occurred while deriving the seed from the input\n");
+        goto cleanup;
+    }
+
     PRINTF("Input seed: 64 bytes\n");
 
     // get rootkey from hex-seed
