@@ -19,6 +19,15 @@ jobs:
       upload_app_binaries_artifact: compiled_app_binaries
       run_for_devices: '["nanox", "nanosp", "stax", "flex", "apex_p"]'
 
+  # The device list below used to be a subset of the one above: nanox and
+  # nanosp were built on every pull request and then never run. That is not two
+  # devices missing, it is one of the two interface stacks -- everything under
+  # src/bagl -- never exercised end to end, while the other one, src/nbgl, was
+  # covered by nine test files.
+  #
+  # nanos is deliberately still absent, from both lists. It was removed from
+  # the build matrix on purpose ("Remove nanos from tests", 10/2025) and
+  # nothing here puts it back.
   ledger_app_test_function:
     name: Run ragger tests using the reusable workflow
     needs: ledger_app_build
@@ -27,4 +36,4 @@ jobs:
       download_app_binaries_artifact: compiled_app_binaries
       test_dir: tests/functional
       post_stack_consumption: false
-      run_for_devices: '["stax", "flex", "apex_p"]'
+      run_for_devices: '["nanox", "nanosp", "stax", "flex", "apex_p"]'
