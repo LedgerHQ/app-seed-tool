@@ -8,6 +8,12 @@
 #ifndef SSS_CONSTANTS_H
 #define SSS_CONSTANTS_H
 
+// Recovery enters exactly as many shares as the member threshold, so this
+// bounds the threshold a backup may have to be recoverable on a given device,
+// not the number of shares it may have been split into: a 3-of-12 set is
+// recoverable on a Nano S, an 11-of-12 set is not. Generation stays inside
+// each device's own limit -- the share-count menu offers 1..7 on Nano S and
+// 1..16 elsewhere (bagl/ux_sskr_menu.c, which static-asserts against this).
 #if defined(TARGET_NANOS)
 #define SSS_MAX_SHARE_COUNT 10
 #else

@@ -10,9 +10,20 @@
 
 #include "sss-constants.h"
 
-#define SSKR_METADATA_LENGTH_BYTES       5
-#define SSKR_MIN_STRENGTH_BYTES          16
-#define SSKR_MAX_STRENGTH_BYTES          32
+#define SSKR_METADATA_LENGTH_BYTES 5
+#define SSKR_MIN_STRENGTH_BYTES    16
+#define SSKR_MAX_STRENGTH_BYTES    32
+// Upstream bc-sskr allows 16 here, and BCR-2020-011 encodes group-count in 4
+// bits, so 16 is what a shard set may name. 1 is what this port holds: the
+// arrays it sizes -- groups[], gx[], gy[] in sskr_combine_shards_internal(),
+// group_shares[] in sskr_generate_shards_internal() -- are fixed-size on the
+// stack rather than allocated as upstream does.
+//
+// The consequence falls on recovery, not on generation: both interfaces
+// generate a single group, but a multi-group backup made elsewhere cannot be
+// recombined here, including the worked example of BCR-2020-011 itself. It is
+// refused with SSKR_ERROR_INVALID_SHARD_SET (shards of different groups) or
+// SSKR_ERROR_NOT_ENOUGH_GROUPS (the shards of one group of several).
 #define SSKR_MAX_GROUP_COUNT             1
 #define SSKR_MIN_SERIALIZED_LENGTH_BYTES (SSKR_METADATA_LENGTH_BYTES + SSKR_MIN_STRENGTH_BYTES)
 
