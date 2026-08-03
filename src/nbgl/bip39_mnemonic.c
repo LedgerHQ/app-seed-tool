@@ -122,7 +122,9 @@ bool bip39_mnemonic_check(bool* match) {
     }
 
     bool reconstructed = true;
-    *match = compare_recovery_phrase(&reconstructed);
+    // Against VERDICT_MATCH, not "not zero": every other value, corrupted or
+    // not, is a mismatch. See common.h.
+    *match = (compare_recovery_phrase(&reconstructed) == VERDICT_MATCH);
     // Don't clear the mnemonic just yet as we may need it to generate SSKR
     // shares
     //    bip39_mnemonic_reset();

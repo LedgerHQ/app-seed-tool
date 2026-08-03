@@ -28,14 +28,38 @@
 #endif
 
 /*
- * Compares the entered secret with the device's seed.
+ * The two values the seed comparison speaks in, and the reason it does not
+ * speak in a bool.
+ *
+ * This is the one decision in the application worth injecting a fault into:
+ * a false "no match" sends the user back to the entry screen, but a false
+ * "match" sends them away with a backup that will not open their device, and
+ * they find out when they need it. Compiled from a bool, that decision was two
+ * ARM instructions wide and the whole of it lived in bit 0 of one register --
+ * a single bit flip, in the direction that costs the funds.
+ *
+ * These two differ in all 32 bits, so no single bit flip on the path from
+ * compare_recovery_phrase_finish() to the screen turns one into the other,
+ * and neither is a value a register arrives at by accident: not zero, not one,
+ * not a small count, not an address in this application's map.
+ *
+ * Callers must test for VERDICT_MATCH and treat *everything* else as a
+ * mismatch, VERDICT_NO_MATCH included but not only -- a verdict that is
+ * neither is a corrupted one, and a corrupted verdict is not a match.
+ */
+#define VERDICT_MATCH    0xA5C3F00Du
+#define VERDICT_NO_MATCH 0x5A3C0FF2u
+
+/*
+ * Compares the entered secret with the device's seed. Returns VERDICT_MATCH
+ * and nothing else on agreement; see above.
  *
  * `reconstructed` is set to false when the input could not be turned into a
  * mnemonic at all (SSKR shards that pass their CRC but cannot be combined).
  * That is a distinct outcome from a seed mismatch and must not be reported as
  * one. It is always true for the BIP39 tool, which has nothing to reconstruct.
  */
-bool compare_recovery_phrase(bool *reconstructed);
+unsigned int compare_recovery_phrase(bool *reconstructed);
 
 /*
  * The tail of compare_recovery_phrase(): everything that happens once
@@ -45,6 +69,6 @@ bool compare_recovery_phrase(bool *reconstructed);
  * file that defines it, and the unit suite that drives it, are checked against
  * one declaration.
  */
-bool compare_recovery_phrase_finish(cx_err_t derivation_status,
-                                    uint8_t buffer[64],
-                                    uint8_t buffer_device[64]);
+unsigned int compare_recovery_phrase_finish(cx_err_t derivation_status,
+                                            uint8_t buffer[64],
+                                            uint8_t buffer_device[64]);

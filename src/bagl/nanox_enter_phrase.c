@@ -433,7 +433,10 @@ void screen_onboarding_restore_word_validate(void) {
                 // Display loading icon to user
                 ux_flow_init(0, ux_load_flow, NULL);
                 bool reconstructed = true;
-                if (compare_recovery_phrase(&reconstructed)) {
+                // Against VERDICT_MATCH, not "not zero": every other value,
+                // corrupted or not, is a mismatch. See common.h.
+                if (compare_recovery_phrase(&reconstructed) ==
+                    VERDICT_MATCH) {
                     ux_flow_init(0, &ux_bip39_match_flow, NULL);
                 } else {
                     memzero(G_bolos_ux_context.words_buffer,
@@ -478,7 +481,10 @@ void screen_onboarding_restore_word_validate(void) {
                     // Display loading icon to user
                     ux_flow_init(0, ux_load_flow, NULL);
                     bool reconstructed = true;
-                    const bool match = compare_recovery_phrase(&reconstructed);
+                    // Against VERDICT_MATCH, as above.
+                    const bool match =
+                        (compare_recovery_phrase(&reconstructed) ==
+                         VERDICT_MATCH);
                     if (!reconstructed) {
                         // shards were well-formed but could not be combined
                         ux_flow_init(0, &ux_sskr_invalid_flow, NULL);

@@ -771,9 +771,11 @@ target_link_libraries(test_bip85_hex_vector PUBLIC cmocka gcov testutils)
 # compiles with -ffunction-sections/-fdata-sections and links with
 # --gc-sections so the linker drops compare_recovery_phrase() and
 # everything it alone pulls in before ever needing to resolve those
-# symbols -- verified with nm on the built test binary, not assumed: only
-# compare_recovery_phrase_finish() and its own gcov counters remain: the
-# defined text symbol for compare_recovery_phrase() itself is gone.
+# symbols -- verified with nm on the built test binary, not assumed: what
+# remains is compare_recovery_phrase_finish(), the two file-static helpers
+# it alone calls (compare_reversed() and verdict_jitter(), both part of the
+# fault resistance around the verdict) and their gcov counters. The defined
+# text symbol for compare_recovery_phrase() itself is gone.
 add_executable(test_compare_recovery_phrase_finish ./tests/compare_recovery_phrase_finish.c ../../src/common/common_seed.c)
 target_include_directories(test_compare_recovery_phrase_finish PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common)
 # common_seed.c's untouched compare_recovery_phrase() body uses

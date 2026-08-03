@@ -181,10 +181,12 @@ buffers are still erased on the same path); only where the two
 `explicit_bzero()` calls physically live moved. This also simplified the
 addressing: `compare_recovery_phrase_finish()` receives `buffer`/
 `buffer_device` as plain pointer arguments rather than declaring them as
-its own stack-local arrays, so its prologue is a bare `push
-{r4,r5,r6,lr}` with no `sub sp, #N` at all — the compiler keeps both
-pointers in call-preserved registers for the function's whole body instead
-of spilling them to the stack. That means this check no longer needs
+its own stack-local arrays — the compiler keeps both pointers in
+call-preserved registers for the function's whole body instead of
+spilling them to the stack. The function does now have a stack frame (the
+fault-resistance work gave it a volatile checkpoint counter and a
+volatile spin variable, both of which have to live in memory), but the
+two pointers are not in it. That means this check no longer needs
 gotcha 5's SP-relative-offset approach: it reads the two argument
 registers directly at each breakpoint (which register holds which buffer
 is read back from the disassembly, not hardcoded — see
@@ -546,9 +548,10 @@ the whole call.
 Since `compare_recovery_phrase()`'s tail (the two `explicit_bzero()` calls)
 was extracted into `compare_recovery_phrase_finish()` — see Check 2 above
 — `buffer`/`buffer_device` arrive there as plain pointer *arguments*
-rather than that function's own stack-local arrays, and its prologue
-(`push {r4,r5,r6,lr}`, no `sub sp, #N` at all) has no stack frame to be
-SP-relative *into* in the first place. The compiler instead keeps both
+rather than that function's own stack-local arrays. Whatever stack frame
+that function has holds its own volatile counters and nothing else, so
+there is no per-buffer offset to be SP-relative *into* in the first
+place. The compiler instead keeps both
 pointers in call-preserved registers for the whole function body — an
 even simpler case than the SP-relative one above: read the two argument
 registers directly at either breakpoint and dereference them, no offset

@@ -72,7 +72,7 @@ size_t bip39_mnemonic_length_get(void) { fail_msg("not on the entry path"); }
 size_t bip39_mnemonic_final_size_get(void) {
     fail_msg("not on the entry path");
 }
-bool compare_recovery_phrase(bool* reconstructed) {
+unsigned int compare_recovery_phrase(bool* reconstructed) {
     (void)reconstructed;
     fail_msg("not on the entry path");
 }
