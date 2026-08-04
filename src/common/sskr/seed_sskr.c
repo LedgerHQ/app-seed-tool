@@ -177,8 +177,8 @@ unsigned int bolos_ux_sskr_combine(unsigned char* sskr_shares_hex,
         return 0;
     }
     const unsigned int header_len = 4u + (additional_info == 24);
-    uint8_t sskr_share_len = (additional_info == 24) ? sskr_shares_hex[4]
-                                                     : (uint8_t)additional_info;
+    uint8_t sskr_share_len =
+        (additional_info == 24) ? sskr_shares_hex[4] : (uint8_t)additional_info;
 
     // The length comes from the entered data. A serialized shard is
     // SSKR_METADATA_LENGTH_BYTES plus a SSKR_MIN_STRENGTH_BYTES..
