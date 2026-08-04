@@ -45,6 +45,7 @@
 #include "testutils.h"
 #include "sskr/common_sskr.h"
 #include "sskr/sskr-constants.h"
+#include "sskr/sskr.h"
 // clang-format on
 
 /* The same 2-of-3 share set over a 128-bit secret that sskr_share_len.c uses,
@@ -123,23 +124,91 @@ static void test_combine_refuses_a_shard_longer_than_its_frame(void **state) {
     assert_int_equal(combine_exactly(short_frame, sizeof(short_frame), 1), 0);
 }
 
-static void test_combine_refuses_reserved_cbor_additional_info(void **state) {
+/* A 21-byte shard written in the long form instead of in-line. CBOR allows
+ * it, and the length is the same one the short form spells out. */
+#define LONG_ALT_WIRE (5 + 21 + 4)
+
+static void test_combine_reads_a_long_form_shard_from_the_right_offset(
+    void **state) {
     (void) state;
 
-    /* 25 to 31 are the two-, four- and eight-byte lengths, the reserved value
-     * and the indefinite form. None is a length this function can act on, and
-     * none may appear in a share; hex_check() already refuses them. Treated as
-     * merely "greater than 23", the length would be taken from byte 4, which
-     * is not where a two-byte length lives.
+    /* Where the shard begins follows from the CBOR additional information: 24
+     * means one length byte follows, so the shard starts at offset 5. Deriving
+     * that from the decoded length instead -- "greater than 23", as this
+     * function used to -- puts it at offset 4 for exactly the lengths 21 to
+     * 23, and hex_check() and this function then disagree about where the same
+     * share starts. The shards below are the ones the control case combines,
+     * reframed and nothing else, so the answer has to be the same secret.
      *
-     * The frame is long enough that nothing is overread either way, so this
-     * asserts the refusal itself rather than a bound. */
-    uint8_t reserved_form[SHORT_WIRE];
-    memcpy(reserved_form, k_valid_shares, sizeof(reserved_form));
-    reserved_form[3] = 0x59;
+     * The CRC is left at zero: bolos_ux_sskr_combine() never reads it. */
+    uint8_t wire[2 * LONG_ALT_WIRE];
+    uint8_t output[SSKR_MAX_STRENGTH_BYTES] = {0};
 
-    assert_int_equal(combine_exactly(reserved_form, sizeof(reserved_form), 1),
-                     0);
+    memset(wire, 0, sizeof(wire));
+    for (unsigned int i = 0; i < 2; i++) {
+        uint8_t *share = &wire[i * LONG_ALT_WIRE];
+        share[0] = 0xD9;
+        share[1] = 0x9D;
+        share[2] = 0x75;
+        share[3] = 0x58; /* byte string, one length byte follows */
+        share[4] = 21;   /* what byte 3 of the short form spells in-line */
+        memcpy(&share[5], &k_valid_shares[i * SHORT_WIRE + 4], 21);
+    }
+
+    assert_int_equal(bolos_ux_sskr_combine(wire, sizeof(wire), 2, output),
+                     sizeof(k_secret));
+    assert_memory_equal(output, k_secret, sizeof(k_secret));
+}
+
+/* Five metadata bytes over a 20-byte secret: a shard of 25 bytes, which is
+ * what makes the frame below parse rather than merely fail later. */
+#define RESERVED_SHARD_LEN (SSKR_METADATA_LENGTH_BYTES + 20)
+#define RESERVED_WIRE      (4 + RESERVED_SHARD_LEN + 4)
+
+static void test_combine_refuses_a_reserved_form_that_would_parse(
+    void **state) {
+    (void) state;
+
+    /* 0x59 is additional information 25, which RFC 8949 gives the meaning "a
+     * two-byte length follows"; 25 to 31 are all lengths of that shape, the
+     * reserved value, or the indefinite form, and a share may use none of
+     * them.
+     *
+     * Read as a length rather than as a form, 25 is the size of a real shard.
+     * So a frame laid out this way parses cleanly, combines, and answers with
+     * the secret -- which is what makes the refusal worth a test of its own.
+     * Asserting the refusal on a frame that is malformed in some other way
+     * asserts nothing, because such a frame is refused further down whether
+     * the reserved forms are checked for or not.
+     *
+     * The share set is generated here rather than transcribed: it has to be a
+     * genuinely combinable one, or the assertion goes back to being about a
+     * frame that fails for another reason. */
+    const sskr_group_descriptor_t groups[] = {{.threshold = 2, .count = 3}};
+    uint8_t secret[20];
+    uint8_t shards[3 * RESERVED_SHARD_LEN];
+    uint8_t shard_len = 0;
+    uint8_t wire[2 * RESERVED_WIRE];
+    uint8_t output[SSKR_MAX_STRENGTH_BYTES] = {0};
+
+    memset(secret, 0x5A, sizeof(secret));
+    assert_int_equal(sskr_generate_shards(1, groups, 1, secret, sizeof(secret),
+                                          &shard_len, shards, sizeof(shards),
+                                          test_rng),
+                     3);
+    assert_int_equal(shard_len, RESERVED_SHARD_LEN);
+
+    memset(wire, 0, sizeof(wire));
+    for (unsigned int i = 0; i < 2; i++) {
+        uint8_t *share = &wire[i * RESERVED_WIRE];
+        share[0] = 0xD9;
+        share[1] = 0x9D;
+        share[2] = 0x75;
+        share[3] = 0x59; /* the reserved form */
+        memcpy(&share[4], &shards[i * RESERVED_SHARD_LEN], RESERVED_SHARD_LEN);
+    }
+
+    assert_int_equal(bolos_ux_sskr_combine(wire, sizeof(wire), 2, output), 0);
 }
 
 static void test_combine_still_accepts_a_well_formed_set(void **state) {
@@ -163,7 +232,9 @@ int main(void) {
         cmocka_unit_test(
             test_combine_refuses_a_long_form_length_it_cannot_read),
         cmocka_unit_test(test_combine_refuses_a_shard_longer_than_its_frame),
-        cmocka_unit_test(test_combine_refuses_reserved_cbor_additional_info),
+        cmocka_unit_test(
+            test_combine_reads_a_long_form_shard_from_the_right_offset),
+        cmocka_unit_test(test_combine_refuses_a_reserved_form_that_would_parse),
         cmocka_unit_test(test_combine_still_accepts_a_well_formed_set),
     };
 
