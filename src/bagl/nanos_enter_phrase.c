@@ -193,8 +193,20 @@ const bagl_element_t* screen_onboarding_restore_word_keyboard_callback(
                 }
             } else {
                 // validate next letter of the word
-                G_ux.string_buffer[16 + strlen(G_ux.string_buffer + 16)] =
-                    G_ux.string_buffer[32 +
+                //
+                // The stem cannot reach the candidate letters at offset 32
+                // while the keyboard only offers letters that extend a real
+                // prefix, because no word in either list is that long. This
+                // is the same bound expressed where the write happens, so
+                // that it does not depend on the wordlist staying that shape.
+                const size_t stem_length =
+                    strlen(G_ux.string_buffer + RESTORE_STEM_OFFSET);
+                if (stem_length >= RESTORE_STEM_MAX_LENGTH) {
+                    return NULL;
+                }
+
+                G_ux.string_buffer[RESTORE_STEM_OFFSET + stem_length] =
+                    G_ux.string_buffer[RESTORE_CANDIDATES_OFFSET +
                                        G_bolos_ux_context.hslider3_current];
 
                 // continue displaying until less than X words matches the stem
@@ -395,6 +407,16 @@ void compare_recovery_phrase_and_display_result(void) {
 
 void screen_onboarding_restore_word_validate(void) {
     if (G_bolos_ux_context.tool_type == TOOL_TYPE_BIP39) {
+        // The SSKR branch below bounds its own buffer; this one did not.
+        // bolos_ux_bip39_idx_strcpy() writes a word and a terminator at
+        // words_buffer_length, and what keeps that inside words_buffer is
+        // bip39_type, which is now written only by the 12/18/24 menu. This
+        // is the bound that does not rely on that staying true.
+        if (G_bolos_ux_context.words_buffer_length + BIP39_MAX_WORD_LENGTH + 1 >
+            WORDS_BUFFER_MAX_SIZE_B) {
+            return;
+        }
+
         bolos_ux_bip39_idx_strcpy(
             G_bolos_ux_context.onboarding_index +
                 G_bolos_ux_context.hslider3_current,
@@ -417,13 +439,13 @@ void screen_onboarding_restore_word_validate(void) {
             .sskr_words_buffer[G_bolos_ux_context.sskr_words_buffer_length] =
             G_bolos_ux_context.onboarding_index +
             G_bolos_ux_context.hslider3_current;
-        size_t final_size = G_bolos_ux_context.bip39_type;
+        size_t final_size = G_bolos_ux_context.sskr_share_word_count;
         bolos_ux_sskr_entry_header_update(
             (const uint8_t*)G_bolos_ux_context.sskr_words_buffer,
             G_bolos_ux_context.sskr_words_buffer_length,
             G_bolos_ux_context.onboarding_step, &final_size,
             &G_bolos_ux_context.sskr_share_count);
-        G_bolos_ux_context.bip39_type = (unsigned int)final_size;
+        G_bolos_ux_context.sskr_share_word_count = (unsigned int)final_size;
 
         G_bolos_ux_context.sskr_words_buffer_length++;
     }
@@ -432,6 +454,18 @@ void screen_onboarding_restore_word_validate(void) {
     G_bolos_ux_context.onboarding_step++;
 
     if (G_bolos_ux_context.tool_type == TOOL_TYPE_BIP39) {
+        // bip39_type is what bounds this loop, and through it the writes into
+        // words_buffer. Only number_of_bip39_words_selector() writes it, and
+        // only with these three values -- but that is a property of the screen
+        // graph, held nowhere near this line, and a screen that reached word
+        // entry without passing through the menu would run the loop to
+        // whatever the field happened to hold.
+        if (G_bolos_ux_context.bip39_type != BIP39_MNEMONIC_SIZE_12 &&
+            G_bolos_ux_context.bip39_type != BIP39_MNEMONIC_SIZE_18 &&
+            G_bolos_ux_context.bip39_type != BIP39_MNEMONIC_SIZE_24) {
+            return;
+        }
+
         if (G_bolos_ux_context.onboarding_step ==
             G_bolos_ux_context.bip39_type) {
             unsigned char valid;
@@ -464,7 +498,13 @@ void screen_onboarding_restore_word_validate(void) {
                     PROCESSING_COMPARE_RECOVERY_PHRASE;
             }
         } else {
-            // add a space before next word
+            // add a space before next word, if there is room for it and for
+            // the word that follows
+            if (G_bolos_ux_context.words_buffer_length + BIP39_MAX_WORD_LENGTH +
+                    2 >
+                WORDS_BUFFER_MAX_SIZE_B) {
+                return;
+            }
             G_bolos_ux_context
                 .words_buffer[G_bolos_ux_context.words_buffer_length++] = ' ';
 
@@ -476,7 +516,7 @@ void screen_onboarding_restore_word_validate(void) {
         }
     } else if (G_bolos_ux_context.tool_type == TOOL_TYPE_SSKR) {
         if (G_bolos_ux_context.onboarding_step ==
-            G_bolos_ux_context.bip39_type) {
+            G_bolos_ux_context.sskr_share_word_count) {
             G_bolos_ux_context.sskr_share_index++;
 
             if (G_bolos_ux_context.sskr_share_index <
@@ -615,6 +655,12 @@ void screen_onboarding_restore_word_init(unsigned int firstWord) {
                 G_bolos_ux_context.words_buffer_length);
         G_bolos_ux_context.words_buffer_length = 0;
         G_bolos_ux_context.sskr_words_buffer_length = 0;
+        // Not yet known: it comes out of the CBOR header of the first share,
+        // four words in. Reset here and not when moving to the next share of
+        // the same set, which reaches this function with
+        // RESTORE_WORD_ACTION_REENTER_WORD precisely so that the shape read
+        // from the first share is kept.
+        G_bolos_ux_context.sskr_share_word_count = 0;
     }
 
     memzero(G_ux.string_buffer, sizeof(G_ux.string_buffer));
