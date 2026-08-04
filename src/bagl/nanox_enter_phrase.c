@@ -18,6 +18,7 @@
 #include <lcx_hmac.h>
 #include <lcx_rng.h>
 
+#include "common/ui_strings.h"
 #include "constants.h"
 #include "ui.h"
 
@@ -36,13 +37,13 @@ const bagl_element_t screen_onboarding_restore_word_intro_elements[] = {
 
     {{BAGL_LABELINE, 0x31, 0, 12, 128, 32, 0, 0, 0, 0xFFFFFF, 0x000000,
       BAGL_FONT_OPEN_SANS_REGULAR_11px | BAGL_FONT_ALIGNMENT_CENTER, 0},
-     "Enter first letters"},
+     UI_STR_BAGL_NANOX_INTRO_L1},
     {{BAGL_LABELINE, 0x32, 0, 12, 128, 32, 0, 0, 0, 0xFFFFFF, 0x000000,
       BAGL_FONT_OPEN_SANS_REGULAR_11px | BAGL_FONT_ALIGNMENT_CENTER, 0},
-     "Next, enter letters"},
+     UI_STR_BAGL_NANOX_INTRO_L2},
     {{BAGL_LABELINE, 0x33, 0, 12, 128, 32, 0, 0, 0, 0xFFFFFF, 0x000000,
       BAGL_FONT_OPEN_SANS_REGULAR_11px | BAGL_FONT_ALIGNMENT_CENTER, 0},
-     "Finally, enter letters"},
+     UI_STR_BAGL_NANOX_INTRO_L3},
     {{BAGL_LABELINE, 0x30, 0, 26, 128, 32, 0, 0, 0, 0xFFFFFF, 0x000000,
       BAGL_FONT_OPEN_SANS_REGULAR_11px | BAGL_FONT_ALIGNMENT_CENTER, 0},
      G_ux.string_buffer},
@@ -67,7 +68,7 @@ const bagl_element_t screen_onboarding_restore_word_select_elements[] = {
      (const char*)&C_icon_clear_14px},
     {{BAGL_LABELINE, 0x24, 0, 43, 128, 32, 0, 0, 0, 0xFFFFFF, 0x000000,
       BAGL_FONT_OPEN_SANS_EXTRABOLD_11px | BAGL_FONT_ALIGNMENT_CENTER, 0},
-     "Clear word"},
+     UI_STR_BAGL_NANOX_CLEAR_WORD},
 
     // left/rights icons
     {{BAGL_ICON, 0x22, 2, 28, 4, 7, 0, 0, 0, 0xFFFFFF, 0x000000, 0, 0},
@@ -76,7 +77,7 @@ const bagl_element_t screen_onboarding_restore_word_select_elements[] = {
      (const char*)&C_icon_right},
 };
 
-UX_STEP_NOCB(ux_load_step, pn, {&C_icon_loader_14px, "Processing"});
+UX_STEP_NOCB(ux_load_step, pn, {&C_icon_loader_14px, UI_STR_BAGL_PROCESSING});
 UX_FLOW(ux_load_flow, &ux_load_step);
 
 extern const ux_flow_step_t* const ux_bip39_match_flow;
@@ -110,10 +111,11 @@ void screen_onboarding_restore_word_display_auto_complete(void) {
     (G_bolos_ux_context.tool_type == TOOL_TYPE_BIP39)
         ? snprintf(G_ux.string_buffer + 32 + auto_complete_count + 1,
                    sizeof(G_ux.string_buffer) - 32 - auto_complete_count - 1,
-                   "Enter word #%d", G_bolos_ux_context.onboarding_step + 1)
+                   UI_STR_BAGL_NANOX_ENTER_BIP39_WORD,
+                   G_bolos_ux_context.onboarding_step + 1)
         : snprintf(G_ux.string_buffer + 32 + auto_complete_count + 1,
                    sizeof(G_ux.string_buffer) - 32 - auto_complete_count - 1,
-                   "Enter Share#%d word#%d",
+                   UI_STR_BAGL_NANOX_ENTER_SSKR_WORD,
                    G_bolos_ux_context.sskr_share_index + 1,
                    G_bolos_ux_context.onboarding_step + 1);
 
@@ -299,7 +301,7 @@ screen_onboarding_restore_word_before_element_display_callback(
     switch (element->component.userid) {
         case 0x30:
             // word index
-            SPRINTF(G_ux.string_buffer, "of word #%d",
+            SPRINTF(G_ux.string_buffer, UI_STR_BAGL_NANOX_OF_WORD,
                     G_bolos_ux_context.onboarding_step + 1);
             break;
 
@@ -336,7 +338,7 @@ screen_onboarding_restore_word_before_element_display_callback(
             goto not_on_last_item;
 
         case 0x21:
-            SPRINTF(G_ux.string_buffer, "Select word #%d",
+            SPRINTF(G_ux.string_buffer, UI_STR_BAGL_NANOX_SELECT_WORD,
                     G_bolos_ux_context.onboarding_step + 1);
             goto not_on_last_item;
 
@@ -365,7 +367,7 @@ screen_onboarding_restore_word_before_element_display_callback(
             break;
         case 0x25:
             // word index
-            SPRINTF(G_ux.string_buffer, "Enter word #%d",
+            SPRINTF(G_ux.string_buffer, UI_STR_BAGL_NANOX_ENTER_BIP39_WORD,
                     G_bolos_ux_context.onboarding_step + 1);
             break;
     }

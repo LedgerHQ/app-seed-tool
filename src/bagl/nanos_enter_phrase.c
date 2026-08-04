@@ -18,6 +18,7 @@
 #include <lcx_hmac.h>
 #include <os_io_seproxyhal.h>
 
+#include "common/ui_strings.h"
 #include "constants.h"
 // For app_ticker_event_callback()'s declaration: defining it below without one
 // would leave nothing to check the definition against, since the SDK calls it
@@ -62,7 +63,7 @@ const bagl_element_t screen_onboarding_restore_word_select_elements[] = {
      (const char*)&C_icon_back},
     {{BAGL_LABELINE, 0x05, 41, 12, 128, 32, 0, 0, 0, 0xFFFFFF, 0x000000,
       BAGL_FONT_OPEN_SANS_EXTRABOLD_11px, 0},
-     "Restart from"},
+     UI_STR_BAGL_NANOS_RESTART_FROM},
     {{BAGL_LABELINE, 0x06, 41, 26, 128, 32, 0, 0, 0, 0xFFFFFF, 0x000000,
       BAGL_FONT_OPEN_SANS_EXTRABOLD_11px, 0},
      G_ux.string_buffer},
@@ -88,7 +89,7 @@ UX_STEP_NOCB_POSTINIT(processing_step, pb,
                       screen_processing_postinit(stack_slot),
                       {
                           &C_icon_loader_16px,
-                          "Processing",
+                          UI_STR_BAGL_PROCESSING,
                       });
 
 UX_FLOW(processing_flow, &processing_step);
@@ -285,7 +286,8 @@ const bagl_element_t* screen_onboarding_restore_word_keyboard_callback(
             if (value < 8) {
                 G_ux.tmp_element.component.x += 5;
                 // prefix word stem with "%d:" with the current word index
-                snprintf(G_ux.string_buffer + 2, 5, "#%d ",
+                snprintf(G_ux.string_buffer + 2, 5,
+                         UI_STR_BAGL_NANOS_WORD_INDEX_PREFIX,
                          G_bolos_ux_context.onboarding_step + 1);
                 // ensure font is left aligned
                 G_ux.tmp_element.text = G_ux.string_buffer;
@@ -318,7 +320,7 @@ screen_onboarding_restore_word_before_element_display_callback(
                     G_bolos_ux_context.onboarding_words_checked) {
                 return NULL;
             }
-            SPRINTF(G_ux.string_buffer, "Word #%d",
+            SPRINTF(G_ux.string_buffer, UI_STR_BAGL_NANOS_WORD_HEADER,
                     G_bolos_ux_context.onboarding_step + 1);
             break;
 
@@ -369,7 +371,7 @@ screen_onboarding_restore_word_before_element_display_callback(
                     G_bolos_ux_context.onboarding_words_checked) {
                 return NULL;
             }
-            SPRINTF(G_ux.string_buffer, "word #%d",
+            SPRINTF(G_ux.string_buffer, UI_STR_BAGL_NANOS_WORD_HEADER_LOWER,
                     G_bolos_ux_context.hslider3_total -
                         G_bolos_ux_context.hslider3_current);
             break;
@@ -671,9 +673,9 @@ void screen_onboarding_restore_word_init(unsigned int firstWord) {
 
     // elements to be displayed
     (G_bolos_ux_context.tool_type == TOOL_TYPE_BIP39)
-        ? SPRINTF(G_ux.string_buffer, "word #%d",
+        ? SPRINTF(G_ux.string_buffer, UI_STR_BAGL_NANOS_WORD_HEADER_LOWER,
                   G_bolos_ux_context.onboarding_step + 1)
-        : SPRINTF(G_ux.string_buffer, "Share#%d Word#%d",
+        : SPRINTF(G_ux.string_buffer, UI_STR_BAGL_NANOS_ENTER_SSKR_WORD,
                   G_bolos_ux_context.sskr_share_index + 1,
                   G_bolos_ux_context.onboarding_step + 1);
     ux_flow_init(0, &ux_restore_flow, NULL);

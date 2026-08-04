@@ -24,6 +24,7 @@
 #if defined(HAVE_BAGL)
 
 #include "./ux_sskr_menu.h"
+#include "common/ui_strings.h"
 
 bool get_next_data(bool share_step) {
     size_t offset;
@@ -34,7 +35,7 @@ bool get_next_data(bool share_step) {
                                   G_bolos_ux_context.sskr_share_count,
                                   G_bolos_ux_context.sskr_share_index - 1,
                                   &offset, &length)) {
-        SPRINTF(G_bolos_ux_context.string_buffer, "SSKR Share #%d",
+        SPRINTF(G_bolos_ux_context.string_buffer, UI_STR_SSKR_SHARE_HEADER,
                 G_bolos_ux_context.sskr_share_index);
         memcpy(G_bolos_ux_context.words_buffer,
                G_bolos_ux_context.sskr_words_buffer + offset, length);
@@ -109,7 +110,7 @@ UX_STEP_NOCB(step_display_shares, bnnn_paging,
 UX_STEP_INIT(step_lower_delimiter, NULL, NULL, { display_next_state(false); });
 
 UX_STEP_CB(step_sskr_clean_exit, pb, clean_exit(0),
-           {&C_icon_dashboard_x, "Quit"});
+           {&C_icon_dashboard_x, UI_STR_QUIT});
 
 UX_FLOW(dynamic_flow, &step_upper_delimiter, &step_display_shares,
         &step_lower_delimiter, &step_sskr_clean_exit, FLOW_LOOP);
@@ -159,15 +160,15 @@ void generate_sskr(void) {
 UX_STEP_NOCB(ux_threshold_warn_step_1, pnn,
              {
                  &C_icon_warning,
-                 "1-of-m shares",
-                 "where m > 1",
+                 UI_STR_BAGL_SSKR_ONE_OF_M_WARN_L1,
+                 UI_STR_BAGL_SSKR_ONE_OF_M_WARN_L2,
              });
 
 UX_STEP_NOCB(ux_threshold_warn_step_2, pbb,
              {
                  &C_icon_warning,
-                 "Not",
-                 "Supported",
+                 UI_STR_BAGL_SSKR_ONE_OF_M_NOT_L1,
+                 UI_STR_BAGL_SSKR_ONE_OF_M_NOT_L2,
              });
 
 UX_FLOW(ux_threshold_warn_flow, &ux_threshold_warn_step_1,
@@ -198,7 +199,9 @@ void sskr_threshold_selector(unsigned int idx) {
     }
 }
 
-UX_STEP_NOCB(ux_threshold_instruction_step, nn, {"Select", "threshold"});
+UX_STEP_NOCB(ux_threshold_instruction_step, nn,
+             {UI_STR_BAGL_SSKR_THRESHOLD_TITLE_L1,
+              UI_STR_BAGL_SSKR_THRESHOLD_TITLE_L2});
 
 UX_STEP_MENULIST(ux_threshold_menu_step, sskr_threshold_getter,
                  sskr_threshold_selector);
@@ -216,7 +219,8 @@ void sskr_shares_number_selector(unsigned int idx) {
 }
 
 UX_STEP_NOCB(ux_shares_number_instruction_step, nn,
-             {"Select number", "of shares"});
+             {UI_STR_BAGL_SSKR_NUMSHARES_TITLE_L1,
+              UI_STR_BAGL_SSKR_NUMSHARES_TITLE_L2});
 
 UX_STEP_MENULIST(ux_shares_number_menu_step, sskr_shares_number_getter,
                  sskr_shares_number_selector);
