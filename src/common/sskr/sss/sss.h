@@ -8,6 +8,7 @@
 #ifndef SSS_H
 #define SSS_H
 
+#include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include "sss-constants.h"

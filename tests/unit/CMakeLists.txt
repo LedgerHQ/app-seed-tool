@@ -281,6 +281,53 @@ target_link_libraries(test_sskr_to_seed_convert PUBLIC cmocka gcov sskr sss test
 add_executable(test_sskr_generate_combine_guards tests/sskr_generate_combine_guards.c)
 target_link_libraries(test_sskr_generate_combine_guards PUBLIC cmocka gcov testutils sskr sss)
 
+# Every public header of src/common/, each compiled as the first thing in a
+# translation unit of its own.
+#
+# One file including them all in turn does not work: the second header is
+# satisfied by whatever the first one included. Hence one object library per
+# header, all of them the same source with a different HEADER_UNDER_TEST, and
+# an executable that only has to depend on them -- compiling is the test.
+set(SEED_PUBLIC_HEADERS
+    bip39/common_bip39.h
+    sskr/common_sskr.h
+    sskr/sskr.h
+    sskr/sskr-constants.h
+    sskr/group.h
+    sskr/shard.h
+    sskr/sss/sss.h
+    sskr/sss/sss-constants.h
+    bip85/common_bip85.h
+    bip85/bip85_internal.h
+    common.h)
+
+add_executable(test_header_self_contained tests/header_self_contained_main.c)
+target_link_libraries(test_header_self_contained PUBLIC cmocka gcov testutils)
+
+foreach(hdr ${SEED_PUBLIC_HEADERS})
+    string(MAKE_C_IDENTIFIER "${hdr}" hdr_id)
+    add_library(hdrchk_${hdr_id} OBJECT tests/header_self_contained.c)
+    target_compile_definitions(hdrchk_${hdr_id} PRIVATE HEADER_UNDER_TEST="${hdr}")
+    # cx_errors.h includes <stdint.h>, so it goes in front of only the header
+    # that needs cx_err_t. In front of all of them it would satisfy the very
+    # dependency this check exists to find.
+    if(hdr STREQUAL "common.h")
+        target_compile_definitions(hdrchk_${hdr_id} PRIVATE HEADER_NEEDS_CX_ERRORS)
+    endif()
+    # The project's own include path, the same one the application build
+    # gives these files. What is being checked is that a caller does not have
+    # to supply <stdint.h> and friends, not that a header resolves its
+    # neighbours without help: sskr-constants.h includes sss-constants.h by
+    # bare name, and does so in the device build too.
+    target_include_directories(hdrchk_${hdr_id} PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common/sskr
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common/sskr/sss
+        ${CMAKE_CURRENT_SOURCE_DIR}/lib
+        $ENV{LEDGER_SECURE_SDK}/lib_cxng/include)
+    add_dependencies(test_header_self_contained hdrchk_${hdr_id})
+endforeach()
+
 add_executable(test_sskr_threshold_three_roundtrip tests/sskr_threshold_three_roundtrip.c)
 target_link_libraries(test_sskr_threshold_three_roundtrip PUBLIC cmocka gcov testutils sskr sss)
 
