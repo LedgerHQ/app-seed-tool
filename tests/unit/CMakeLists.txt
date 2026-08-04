@@ -377,6 +377,17 @@ target_compile_options(test_sskr_hex_check_guards PRIVATE -fsanitize=address -fn
 target_link_options(test_sskr_hex_check_guards PRIVATE -fsanitize=address)
 target_link_libraries(test_sskr_hex_check_guards PUBLIC cmocka gcov sskr sss testutils)
 
+# The bound bolos_ux_sskr_combine() places on the buffer its share count
+# divides, as opposed to the one on the count itself that test_sskr_combine_
+# bounds holds. Built with AddressSanitizer, and the frames are allocated at
+# exactly their own length so that the overreads it is about are heap
+# overflows ASan reports rather than reads of adjacent padding.
+add_executable(test_sskr_combine_frame_length ./tests/sskr_combine_frame_length.c ../../src/common/bip39/seed_rom_variables.c ../../src/common/bip39/seed_bip39.c ../../src/common/sskr/seed_rom_variables.c ../../src/common/sskr/seed_sskr.c)
+target_include_directories(test_sskr_combine_frame_length PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common)
+target_compile_options(test_sskr_combine_frame_length PRIVATE -fsanitize=address -fno-omit-frame-pointer)
+target_link_options(test_sskr_combine_frame_length PRIVATE -fsanitize=address)
+target_link_libraries(test_sskr_combine_frame_length PUBLIC cmocka gcov sskr sss testutils)
+
 # The other half of the bound test_sskr_share_len holds: what happens in
 # sskr_deserialize_shard() when a length that far out reaches it anyway.
 # Built with AddressSanitizer, and with sskr.c compiled into the test itself
