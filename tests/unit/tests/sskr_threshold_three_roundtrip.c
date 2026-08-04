@@ -50,7 +50,7 @@ static void generate_three_of_five(uint8_t output[SHARD_LEN * MEMBER_COUNT],
 
     int16_t shard_count = sskr_generate_shards(
         1, groups, 1, master_secret, sizeof(master_secret), shard_len, output,
-        SHARD_LEN * MEMBER_COUNT, cx_rng);
+        SHARD_LEN * MEMBER_COUNT, test_rng);
 
     assert_int_equal(shard_count, MEMBER_COUNT);
     assert_int_equal(*shard_len, SHARD_LEN);

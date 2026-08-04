@@ -100,7 +100,7 @@ static void test_sskr_generate(void **state) {
                                         &share_len,
                                         share_buffer,
                                         share_buffer_len,
-                                        cx_rng);
+                                        test_rng);
 
     assert_int_equal(share_count, groups[0].count);
     assert_int_equal(share_len, share_buffer_len / groups[0].count);

@@ -91,9 +91,9 @@
 /* Stands in for cx_rng. A fixed non-zero pattern rather than real
  * randomness: "the buffer is all zero afterwards" then means the erase ran,
  * not that the generator happened to hand back zeros. */
-static unsigned char* fill_with_pattern(uint8_t* buffer, size_t length) {
+static bool fill_with_pattern(uint8_t* buffer, size_t length) {
     memset(buffer, PATTERN, length);
-    return buffer;
+    return true;
 }
 
 /* threshold 2: the first loop runs zero times, so interpolate() fails

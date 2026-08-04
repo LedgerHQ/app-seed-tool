@@ -192,7 +192,7 @@ static int16_t run_error_case(const error_case_t* c, uint8_t* shard_len_out) {
 
     int16_t result = sskr_generate_shards(
         c->group_threshold, &c->group, c->groups_len, master_secret,
-        c->master_secret_len, &shard_len, output, c->buffer_size, cx_rng);
+        c->master_secret_len, &shard_len, output, c->buffer_size, test_rng);
 
     if (c->lock_bn) {
         cx_bn_unlock();
@@ -258,7 +258,7 @@ static void test_success_returns_the_shard_count_and_length(void** state) {
 
     int16_t result =
         sskr_generate_shards(1, groups, 1, master_secret, sizeof(master_secret),
-                             &shard_len, output, sizeof(output), cx_rng);
+                             &shard_len, output, sizeof(output), test_rng);
 
     assert_int_equal(result, 3);
     assert_int_equal(shard_len, SHARD_LEN);

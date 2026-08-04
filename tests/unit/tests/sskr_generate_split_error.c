@@ -64,7 +64,7 @@ static void test_generate_reports_the_split_error_instead_of_succeeding(void **s
 
     int16_t result = sskr_generate_shards(1, groups, 1, master_secret,
                                           SECRET_LEN, &share_len, share_buffer,
-                                          share_buffer_len, cx_rng);
+                                          share_buffer_len, test_rng);
 
     assert_int_equal(result, SSS_ERROR_TOO_MANY_SHARES);
     assert_int_equal(share_len, 0);
@@ -89,7 +89,7 @@ static void test_generate_accepts_a_group_at_capacity(void **state) {
 
     int16_t result = sskr_generate_shards(1, groups, 1, master_secret,
                                           SECRET_LEN, &share_len, share_buffer,
-                                          share_buffer_len, cx_rng);
+                                          share_buffer_len, test_rng);
 
     assert_int_equal(result, SHARDS_CAPACITY);
 }

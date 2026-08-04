@@ -274,6 +274,16 @@ static void test_hex_check_rejects_a_stride_under_the_metadata(void** state) {
  * other side of the bound above: it must refuse a stride it cannot read
  * safely and accept the first one it can, or it would be satisfied by a
  * function that refuses everything.
+ *
+ * The initial byte is 0x40 -- major type 2, additional information 0, a byte
+ * string of length zero -- and not 0x55 as it was while this function ignored
+ * the declared length. 0x55 declares 21 bytes of payload in a frame that
+ * carries none, which is now refused: the declared length, the header and the
+ * CRC-32 have to add up to the stride or the frame is not the share its header
+ * says it is (sskr_input_validation_guards.c). A zero-length byte string is
+ * still not a *shard*, which is exactly the division of responsibility this
+ * test was written to record -- so the control keeps its meaning, on a frame
+ * that is self-consistent.
  */
 static void test_hex_check_accepts_the_smallest_checkable_stride(void** state) {
     (void)state;
@@ -285,7 +295,7 @@ static void test_hex_check_accepts_the_smallest_checkable_stride(void** state) {
         frame[0] = 0xD9;
         frame[1] = 0x9D;
         frame[2] = 0x75;
-        frame[3] = 0x55;
+        frame[3] = 0x40;
         seal(frame, 4);
     }
 

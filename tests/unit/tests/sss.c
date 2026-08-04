@@ -225,7 +225,7 @@ static void test_sss_split(void **state) {
                                           seed,
                                           seed_length,
                                           result,
-                                          cx_rng);
+                                          test_rng);
 
     assert_int_equal(ret_val, share_count);
     assert_memory_equal(result, shares, sizeof(result));
@@ -236,7 +236,7 @@ static void test_sss_split(void **state) {
                                   seed,
                                   seed_length,
                                   result,
-                                  cx_rng);
+                                  test_rng);
 
     assert_int_equal(ret_val, SSS_ERROR_INVALID_THRESHOLD);
 }

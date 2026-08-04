@@ -45,5 +45,6 @@
 #define SSKR_ERROR_SECRET_TOO_LONG             (-16)
 #define SSKR_ERROR_INVALID_GROUP_LENGTH        (-17)
 #define SSKR_ERROR_INVALID_GROUP_COUNT         (-18)
+#define SSKR_ERROR_RNG_FAILURE                 (-19)
 
 #endif /* SSKR_CONSTANTS_H */

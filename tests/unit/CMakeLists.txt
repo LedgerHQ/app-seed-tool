@@ -221,7 +221,9 @@ else()
   message(STATUS "LEDGER_SECURE_SDK already set: $ENV{LEDGER_SECURE_SDK}")
 endif()
 
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/lib $ENV{LEDGER_SECURE_SDK}/include $ENV{LEDGER_SECURE_SDK}/lib_cxng/src $ENV{LEDGER_SECURE_SDK}/lib_cxng/include $ENV{LEDGER_SECURE_SDK}/lib_ux/include $ENV{LEDGER_SECURE_SDK}/lib_bagl/include $ENV{LEDGER_SECURE_SDK}/io/include $ENV{LEDGER_SECURE_SDK}/io_legacy/include)
+# ../../src so that application sources can include "constants.h" the way they
+# do in the device build, where APP_SOURCE_PATH puts src/ on the include path.
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../../src ${CMAKE_CURRENT_SOURCE_DIR}/lib $ENV{LEDGER_SECURE_SDK}/include $ENV{LEDGER_SECURE_SDK}/lib_cxng/src $ENV{LEDGER_SECURE_SDK}/lib_cxng/include $ENV{LEDGER_SECURE_SDK}/lib_ux/include $ENV{LEDGER_SECURE_SDK}/lib_bagl/include $ENV{LEDGER_SECURE_SDK}/io/include $ENV{LEDGER_SECURE_SDK}/io_legacy/include)
 
 # add src
 set(ExternalProject_Get_property(openssl INSTALL_DIR))
@@ -282,6 +284,17 @@ target_link_libraries(test_sskr_generate_combine_guards PUBLIC cmocka gcov testu
 add_executable(test_sskr_threshold_three_roundtrip tests/sskr_threshold_three_roundtrip.c)
 target_link_libraries(test_sskr_threshold_three_roundtrip PUBLIC cmocka gcov testutils sskr sss)
 
+# What generation does when a randomness draw fails. The generator is a
+# parameter of the public API, so this needs no hook into production code --
+# which is also why nothing held the behaviour before: every existing caller
+# passes a generator that always succeeds.
+add_executable(test_sskr_generate_rng_failure tests/sskr_generate_rng_failure.c)
+# testutils last, as test_sskr_memzero and test_sskr_share_len already do: this
+# file calls sss_split_secret() directly as well as through sskr_generate_shards(),
+# which makes libsss.so's own cx_bn_* references part of this executable's link,
+# and they are satisfied by testutils.
+target_link_libraries(test_sskr_generate_rng_failure PUBLIC cmocka gcov sskr sss testutils)
+
 # Built with AddressSanitizer, like test_sskr_combine_bounds and
 # test_sskr_generate_bound_groups below. The bound this covers is what keeps
 # sskr_deserialize_shard() from reading an entered length's worth of bytes out
@@ -301,6 +314,16 @@ target_link_libraries(test_sskr_share_len PUBLIC cmocka gcov sskr sss testutils)
 # AddressSanitizer, like test_sskr_combine_bounds and
 # test_sskr_generate_bound_groups below, for the offsets this function derives
 # by dividing a caller-supplied buffer length by a caller-supplied share count.
+# The CBOR additional-information rule and the bip39_type bound, both called
+# directly rather than through the entry path: the entry path is where they
+# happened to hold before, via a side effect, and the point is that these
+# functions now hold them themselves.
+add_executable(test_sskr_input_validation_guards ./tests/sskr_input_validation_guards.c ../../src/common/bip39/seed_rom_variables.c ../../src/common/bip39/seed_bip39.c ../../src/common/sskr/seed_rom_variables.c ../../src/common/sskr/seed_sskr.c)
+target_include_directories(test_sskr_input_validation_guards PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common)
+target_compile_options(test_sskr_input_validation_guards PRIVATE -fsanitize=address -fno-omit-frame-pointer)
+target_link_options(test_sskr_input_validation_guards PRIVATE -fsanitize=address)
+target_link_libraries(test_sskr_input_validation_guards PUBLIC cmocka gcov sskr sss testutils)
+
 add_executable(test_sskr_hex_check_guards ./tests/sskr_hex_check_guards.c ../../src/common/bip39/seed_rom_variables.c ../../src/common/bip39/seed_bip39.c ../../src/common/sskr/seed_rom_variables.c ../../src/common/sskr/seed_sskr.c)
 target_include_directories(test_sskr_hex_check_guards PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common)
 target_compile_options(test_sskr_hex_check_guards PRIVATE -fsanitize=address -fno-omit-frame-pointer)

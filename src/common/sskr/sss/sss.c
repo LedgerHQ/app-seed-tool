@@ -90,7 +90,7 @@ uint8_t* sss_create_digest(const uint8_t* random_data, uint32_t rdlen,
 int16_t sss_split_secret(uint8_t threshold, uint8_t share_count,
                          const uint8_t* secret, uint8_t secret_length,
                          uint8_t* result,
-                         unsigned char* (*random_generator)(uint8_t*, size_t)) {
+                         bool (*random_generator)(uint8_t*, size_t)) {
     int16_t error =
         sss_validate_parameters(threshold, share_count, secret_length);
     if (error) {
@@ -114,14 +114,29 @@ int16_t sss_split_secret(uint8_t threshold, uint8_t share_count,
         uint8_t* share = result;
 
         for (uint8_t i = 0; i < threshold - 2; ++i, share += secret_length) {
-            random_generator(share, secret_length);
+            // A failed draw here leaves `share` holding whatever the previous
+            // stack frame did, which would become a share of the secret. Same
+            // cleanup as the interpolation-failure path below.
+            if (!random_generator(share, secret_length)) {
+                memzero(result, (size_t)share_count * secret_length);
+                memzero(digest, sizeof(digest));
+                memzero(x, sizeof(x));
+                memzero(y, sizeof(y));
+                return SSS_ERROR_RNG_FAILURE;
+            }
             x[n] = i;
             y[n] = share;
             n += 1;
         }
 
         // generate secret_length - 4 bytes worth of random data
-        random_generator(digest + 4, secret_length - 4);
+        if (!random_generator(digest + 4, secret_length - 4)) {
+            memzero(result, (size_t)share_count * secret_length);
+            memzero(digest, sizeof(digest));
+            memzero(x, sizeof(x));
+            memzero(y, sizeof(y));
+            return SSS_ERROR_RNG_FAILURE;
+        }
         // put 4 bytes of digest at the top of the digest array
         sss_create_digest(digest + 4, secret_length - 4, secret, secret_length,
                           digest);

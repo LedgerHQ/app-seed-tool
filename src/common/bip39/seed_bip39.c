@@ -39,6 +39,18 @@ bool bolos_ux_bip39_mnemonic_to_seed(const unsigned char* mnemonic,
     // Need to keep BIP39 mnemonic in case we want to generate SSKR from it
     // It will be zeroed later if not needed
     unsigned char mnemonic_hash[257];
+
+    // No caller can overrun this today, and none of them can say so on its own:
+    // WORDS_BUFFER_MAX_SIZE_B (bagl/ux_nano.h) is also 257 and
+    // BIP39_MNEMONIC_MAX_LENGTH (nbgl/bip39_mnemonic.h) is 216, so the copy
+    // below fits by an arithmetic coincidence spread over three files that
+    // nothing holds together. This is the one place that can.
+    if (mnemonic_length > sizeof(mnemonic_hash)) {
+        memzero(seed, 64);
+        PRINTF("BIP39 mnemonic longer than the derivation buffer\n");
+        return false;
+    }
+
     memcpy(mnemonic_hash, mnemonic, mnemonic_length);
     unsigned char passphrase[BIP39_MNEMONIC_LENGTH + 4];
     mnemonic_length = bolos_ux_bip39_mnemonic_to_seed_hash_length128(
