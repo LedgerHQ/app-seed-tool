@@ -125,6 +125,30 @@ def select_in_menu(navigator, label, timeout=30):
                                   screen_change_before_first_instruction=False)
 
 
+def choose_in_flow(backend, label, timeout_clicks=None):
+    """Walk a bounded UX_FLOW to the step showing `label`, then validate it.
+
+    select_in_menu() above is Ragger's navigate_until_text(), which is right
+    for a menu list: those loop, so a click always changes the screen. The
+    verdict flows do not loop -- ux_bip39_match_flow and its neighbours in
+    src/bagl/ux_nano.c are three fixed steps -- so a right click on the last
+    one changes nothing, and navigate_until_text() cannot tell that from a
+    screen that has stopped responding. It reports the second as the first.
+
+    _click() returns whether anything moved, which is what makes the
+    difference visible here.
+    """
+    limit = timeout_clicks if timeout_clicks is not None else _MAX_CLICKS
+    for _ in range(limit):
+        if any(text.startswith(label) for text in _texts(backend)):
+            _click(backend, "both")
+            return
+        if not _click(backend, "right"):
+            break
+    raise AssertionError(
+        f"{label!r} is not on any step of this flow; last saw {_texts(backend)}")
+
+
 def confirm(backend):
     """Click through a screen that only asks to be acknowledged.
 
@@ -134,6 +158,36 @@ def confirm(backend):
     helpers below apply to it.
     """
     _click(backend, "both")
+
+
+def choose_in_carousel(backend, label):
+    """Walk a menu carousel onto `label` and validate it.
+
+    The share-count and threshold menus (UX_STEP_MENULIST, src/bagl/ux_sskr.c)
+    put several entries on the screen at once and select one of them, the same
+    shape as the letter carousel below and, for the same reason, not something
+    `select_in_menu()` can drive: navigate_until_text() finds "3" on the very
+    first screen, where "1" is the entry actually selected, and validates the
+    wrong one.
+
+    Unlike the letters these are not ordered in a way this can exploit -- "10"
+    sorts before "2" as a string -- so it only ever walks right, and stops when
+    the carousel does.
+
+    Each of these menus is preceded by an instruction step carrying no
+    carousel; a right click moves off it, which is what the first iterations do
+    while `current` is None.
+    """
+    for _ in range(_MAX_CLICKS):
+        current = _carousel_current(backend)
+        if current == label:
+            _click(backend, "both")
+            return
+        if not _click(backend, "right"):
+            raise AssertionError(
+                f"{label!r} is not offered by this menu; it stopped at "
+                f"{current!r}")
+    raise AssertionError(f"could not reach {label!r} in the menu")
 
 
 def enter_letter(backend, letter):
