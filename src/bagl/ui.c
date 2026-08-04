@@ -21,6 +21,7 @@
 
 #if defined(HAVE_BAGL)
 
+#include "common/ui_strings.h"
 #include "constants.h"
 
 //////////////////////////////////////////////////////////////////////
@@ -31,10 +32,10 @@ void screen_onboarding_bip39_restore_init(void) {
 }
 
 const char* const number_of_bip39_words_values[] = {
-    "12 words",
-    "18 words",
-    "24 words",
-    "Back",
+    UI_STR_WORDS_12,
+    UI_STR_WORDS_18,
+    UI_STR_WORDS_24,
+    UI_STR_BAGL_BIP39_LENGTH_BACK,
 };
 
 const char* number_of_bip39_words_getter(unsigned int idx) {
@@ -64,13 +65,15 @@ void number_of_bip39_words_selector(unsigned int idx) {
 }
 
 #if defined(TARGET_NANOS)
-UX_STEP_NOCB(ux_bip39_instruction_step, nn, {"Enter number", "of BIP39 words"});
+UX_STEP_NOCB(ux_bip39_instruction_step, nn,
+             {UI_STR_BAGL_BIP39_LENGTH_TITLE_L1_NANOS,
+              UI_STR_BAGL_BIP39_LENGTH_TITLE_L2_NANOS});
 #else
 UX_STEP_NOCB(ux_bip39_instruction_step, nnn,
              {
-                 "Select the number of",
-                 "words written on",
-                 "your Recovery Sheet",
+                 UI_STR_BAGL_BIP39_LENGTH_TITLE_L1,
+                 UI_STR_BAGL_BIP39_LENGTH_TITLE_L2,
+                 UI_STR_BAGL_BIP39_LENGTH_TITLE_L3,
              });
 #endif
 
@@ -89,17 +92,17 @@ void screen_onboarding_sskr_restore_init(void) {
 #if defined(TARGET_NANOS)
 UX_STEP_CB(ux_sskr_instruction_step, nn, screen_onboarding_sskr_restore_init(),
            {
-               "Enter SSKR",
-               "recovery phrase",
+               UI_STR_BAGL_SSKR_START_TITLE_L1_NANOS,
+               UI_STR_BAGL_SSKR_START_TITLE_L2_NANOS,
            });
 #else
 UX_STEP_CB(ux_sskr_instruction_step, nnn,
            G_bolos_ux_context.tool_type = TOOL_TYPE_SSKR;
            screen_onboarding_restore_word_init(RESTORE_WORD_ACTION_FIRST_WORD);
            , {
-                 "Enter first word of",
-                 "first share of SSKR",
-                 "recovery phrase",
+                 UI_STR_BAGL_SSKR_START_TITLE_L1,
+                 UI_STR_BAGL_SSKR_START_TITLE_L2,
+                 UI_STR_BAGL_SSKR_START_TITLE_L3,
              });
 #endif
 
@@ -110,25 +113,25 @@ UX_FLOW(ux_sskr_flow, &ux_sskr_instruction_step);
 UX_STEP_VALID(ux_idle_flow_1_step, pbb, ux_flow_init(0, ux_bip39_flow, NULL),
               {
                   &BIP39_ICON,
-                  "Check BIP39",
-                  "recovery phrase",
+                  UI_STR_BAGL_IDLE_BIP39_L1,
+                  UI_STR_BAGL_IDLE_BIP39_L2,
               });
 UX_STEP_VALID(ux_idle_flow_2_step, pbb, ux_flow_init(0, ux_sskr_flow, NULL),
               {
                   &SSKR_ICON,
-                  "Check SSKR",
-                  "recovery phrase",
+                  UI_STR_BAGL_IDLE_SSKR_L1,
+                  UI_STR_BAGL_IDLE_SSKR_L2,
               });
 
 UX_STEP_NOCB(ux_idle_flow_3_step, bn,
              {
-                 "Version",
+                 UI_STR_VERSION_LABEL,
                  APPVERSION,
              });
 UX_STEP_VALID(ux_idle_flow_4_step, pb, os_sched_exit(-1),
               {
                   &C_icon_dashboard_x,
-                  "Quit",
+                  UI_STR_QUIT,
               });
 UX_FLOW(ux_idle_flow, &ux_idle_flow_1_step, &ux_idle_flow_2_step,
         &ux_idle_flow_3_step, &ux_idle_flow_4_step);

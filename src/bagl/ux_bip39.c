@@ -19,14 +19,16 @@
 
 #if defined(HAVE_BAGL)
 
+#include "common/ui_strings.h"
+
 UX_STEP_NOCB(step_display_bip39, bnnn_paging,
              {
-                 .title = "BIP39 Phrase",
+                 .title = UI_STR_BIP39_PHRASE_TITLE,
                  .text = G_bolos_ux_context.words_buffer,
              });
 
 UX_STEP_CB(step_bip39_clean_exit, pb, clean_exit(0),
-           {&C_icon_dashboard_x, "Quit"});
+           {&C_icon_dashboard_x, UI_STR_QUIT});
 
 UX_FLOW(display_bip39_flow, &step_display_bip39, &step_bip39_clean_exit,
         FLOW_LOOP);
