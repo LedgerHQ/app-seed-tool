@@ -135,6 +135,24 @@ unsigned int bolos_ux_sskr_combine(unsigned char* sskr_shares_hex,
         memzero(sskr_shares_hex, sskr_shares_hex_length);
         return 0;
     }
+    // The distance from one share to the next, and the only thing that says
+    // how much of the buffer belongs to each. The count bound above constrains
+    // the divisor; nothing so far has constrained the dividend, so without
+    // this every read below is off a buffer of unknown length.
+    //
+    // bolos_ux_sskr_hex_check() derives the same guarantee from the same
+    // quotient -- a stride of at least five with a share count of at least one
+    // leaves bytes 3 and 4 inside the first share -- and that guard was never
+    // carried over here. Every path in the application reaches this function
+    // through hex_check(), which refuses a short frame first, so what this
+    // closes is the contract of the function rather than a reachable path;
+    // see tests/unit/tests/sskr_combine_frame_length.c.
+    const unsigned int stride = sskr_shares_hex_length / sskr_shares_count;
+    if (stride < 5) {
+        memzero(sskr_shares_hex, sskr_shares_hex_length);
+        return 0;
+    }
+
     // The shard length is read out of the low five bits of byte 3 below, which
     // is only a length if that byte is a CBOR byte-string header. A share is
     // one; anything else is not a share, and its low five bits mean something
@@ -143,10 +161,24 @@ unsigned int bolos_ux_sskr_combine(unsigned char* sskr_shares_hex,
         memzero(sskr_shares_hex, sskr_shares_hex_length);
         return 0;
     }
-    uint8_t sskr_share_len = sskr_shares_hex[3] & 0x1F;
-    if (sskr_share_len > 23) {
-        sskr_share_len = sskr_shares_hex[4];
+
+    // RFC 8949 section 3 gives additional information 0..23 the meaning "this
+    // is the length" and 24 "one length byte follows"; 25..31 are two-, four-
+    // and eight-byte lengths, a reserved value and the indefinite form, none
+    // of which a share may use. Refused for the same reason hex_check()
+    // refuses them: the form is what decides where the shard starts, and a
+    // reserved one carries no length this function could act on. Deriving the
+    // header length from the additional information rather than from the
+    // decoded length is what makes the two agree -- a long form declaring 21
+    // to 23 bytes put the shard at offset 4 here and at offset 5 there.
+    const unsigned int additional_info = sskr_shares_hex[3] & 0x1F;
+    if (additional_info > 24) {
+        memzero(sskr_shares_hex, sskr_shares_hex_length);
+        return 0;
     }
+    const unsigned int header_len = 4u + (additional_info == 24);
+    uint8_t sskr_share_len =
+        (additional_info == 24) ? sskr_shares_hex[4] : (uint8_t)additional_info;
 
     // The length comes from the entered data. A serialized shard is
     // SSKR_METADATA_LENGTH_BYTES plus a SSKR_MIN_STRENGTH_BYTES..
@@ -166,10 +198,26 @@ unsigned int bolos_ux_sskr_combine(unsigned char* sskr_shares_hex,
         return 0;
     }
 
+    // The declared shard has to fit in the share it was declared in.
+    // sskr_combine_shards() reads sskr_share_len bytes from each pointer built
+    // below, so on the last share that read ends at
+    // (count - 1) * stride + header_len + sskr_share_len, and the buffer only
+    // guarantees count * stride. The bound above says the length is one a
+    // shard may have, not one this frame can hold: a ten-byte buffer whose
+    // byte 3 declares 21 satisfies it and then hands sskr_combine_shards()
+    // eleven bytes it does not own.
+    //
+    // hex_check() states the same requirement as an equality, declared plus
+    // header plus the four CRC bytes being exactly the stride. Stated here as
+    // the inequality it needs, because this function never looks at the CRC
+    // and has no reason to insist a frame carry one.
+    if (sskr_share_len + header_len > stride) {
+        memzero(sskr_shares_hex, sskr_shares_hex_length);
+        return 0;
+    }
+
     for (uint8_t i = 0; i < (uint8_t)sskr_shares_count; i++) {
-        ptr_sskr_shares[i] = sskr_shares_hex +
-                             (i * sskr_shares_hex_length / sskr_shares_count) +
-                             4 + (sskr_share_len > 23);
+        ptr_sskr_shares[i] = sskr_shares_hex + (i * stride) + header_len;
     }
 
     int16_t output_len = sskr_combine_shards(ptr_sskr_shares, sskr_share_len,
