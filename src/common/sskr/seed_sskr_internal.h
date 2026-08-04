@@ -38,6 +38,16 @@
 
 #include "./group.h"
 
+// Reported by bolos_ux_sskr_size_get() for a mnemonic length this application
+// does not offer, i.e. anything but 12, 18 or 24 words.
+//
+// Its own value rather than one of the SSKR_ERROR_* codes because this is not a
+// property of a shard set -- nothing in BCR-2020-011 has an opinion on how many
+// BIP-39 words the secret came from. It sits between the two ranges already in
+// use, SSKR_ERROR_* at -1..-19 and SSS_ERROR_* at -101..-107, so a caller
+// telling the three apart by range keeps working.
+#define SSKR_ERROR_INVALID_BIP39_TYPE (-50)
+
 // Expand the flat group descriptor the UI layers hold into the array of
 // sskr_group_descriptor_t that sskr_count_shards() and sskr_generate_shards()
 // take.

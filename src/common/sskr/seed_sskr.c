@@ -19,6 +19,10 @@
 #include <os.h>
 #include <string.h>
 
+// BIP39_MNEMONIC_SIZE_12/18/24, the three lengths bolos_ux_sskr_size_get()
+// accepts below.
+#include "constants.h"
+
 #include "../bip39/common_bip39.h"
 #include "../common.h"
 #include "./common_sskr.h"
@@ -78,9 +82,33 @@ bool bolos_ux_sskr_groups_from_descriptor(const unsigned int* group_descriptor,
     return true;
 }
 
+// The three mnemonic lengths this application offers, and the only values
+// `bip39_type` may take. It is the multiplicand of every length derived from it
+// -- the secret handed to sskr_generate_shards(), the serialized shard length,
+// and through it the size of the buffer a whole set is written into -- so it is
+// worth one place that says what it may be.
+//
+// Deliberately narrow, the same way bip85_bip39_words_valid() is: BIP-39 itself
+// also defines 15 and 21, and bolos_ux_bip39_mnemonic_encode() would encode
+// either of them happily, but no screen in this application asks for one.
+static bool bolos_ux_sskr_bip39_type_valid(unsigned int bip39_type) {
+    return (bip39_type == BIP39_MNEMONIC_SIZE_12) ||
+           (bip39_type == BIP39_MNEMONIC_SIZE_18) ||
+           (bip39_type == BIP39_MNEMONIC_SIZE_24);
+}
+
 int16_t bolos_ux_sskr_size_get(uint8_t bip39_type, uint8_t groups_threshold,
                                unsigned int* group_descriptor,
                                uint8_t groups_len, uint8_t* share_len) {
+    // Before anything is derived from it. *share_len is an output the caller
+    // sizes a buffer from, so a bip39_type this function does not recognise has
+    // to leave it at zero rather than at bip39_type * 4 / 3 + 5 of something
+    // arbitrary -- which for a bip39_type above 190 wraps the uint8_t as well.
+    *share_len = 0;
+    if (!bolos_ux_sskr_bip39_type_valid(bip39_type)) {
+        return SSKR_ERROR_INVALID_BIP39_TYPE;
+    }
+
     sskr_group_descriptor_t groups[SSKR_MAX_GROUP_COUNT];
     if (!bolos_ux_sskr_groups_from_descriptor(group_descriptor, groups_len,
                                               groups, SSKR_MAX_GROUP_COUNT)) {
@@ -455,7 +483,26 @@ unsigned int bolos_ux_sskr_hex_check(unsigned char* sskr_shares_hex,
         memzero(sskr_shares_hex, sskr_shares_hex_length);
         return 0;
     }
-    const unsigned int header_len = 4u + ((sskr_shares_hex[3] & 0x1F) > 23);
+
+    // The other half of that initial byte. RFC 8949 section 3 gives additional
+    // information 0..23 the meaning "this is the length", 24 "one length byte
+    // follows", and reserves 25..31 (two/four/eight-byte length, reserved,
+    // indefinite) -- none of which a share may use, and none of which carries a
+    // length this function could act on.
+    //
+    // Until now nothing here refused them. What kept them out was a side
+    // effect one layer up: bolos_ux_sskr_entry_header_update() only writes the
+    // share count for additional information below or equal to 24, so a
+    // reserved value left it at zero, and the count-of-zero bound above
+    // refused the frame. That works, and it is not what this function is
+    // documented to do -- a caller arriving here with a count of its own would
+    // have been given a frame nothing had checked the shape of.
+    const unsigned int additional_info = sskr_shares_hex[3] & 0x1F;
+    if (additional_info > 24) {
+        memzero(sskr_shares_hex, sskr_shares_hex_length);
+        return 0;
+    }
+    const unsigned int header_len = 4u + (additional_info == 24);
     const unsigned int metadata_len = header_len + 4u;
 
     // ...and that comparison has to stay inside the share it starts from. At
@@ -464,6 +511,21 @@ unsigned int bolos_ux_sskr_hex_check(unsigned char* sskr_shares_hex,
     // folded into the bound above: metadata_len is not known until byte 3 has
     // been read, and reading byte 3 is what that bound makes safe.
     if (stride < metadata_len) {
+        memzero(sskr_shares_hex, sskr_shares_hex_length);
+        return 0;
+    }
+
+    // The declared length has to be the one the frame actually arrived in. A
+    // share is a CBOR byte string of `declared` bytes wrapped in `header_len`
+    // bytes of tag and header, followed by four bytes of CRC32, so the three
+    // add up to the stride or the frame is not the share it says it is.
+    //
+    // Reading byte 4 for the long form is in bounds: the stride bound above is
+    // strictly greater than checksum_len, so at least five bytes of the first
+    // share are present.
+    const unsigned int declared =
+        (additional_info < 24) ? additional_info : sskr_shares_hex[4];
+    if (declared + header_len + checksum_len != stride) {
         memzero(sskr_shares_hex, sskr_shares_hex_length);
         return 0;
     }

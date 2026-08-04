@@ -329,6 +329,15 @@ static void key_press_callback(const char touchedKey) {
         textToEnter[previousTextLen - 1] = '\0';
         textLen = previousTextLen - 1;
     } else {
+        // What keeps this inside textToEnter today is the keyboard mask, not
+        // the array: bolos_ux_bip39_get_keyboard_mask() disables every letter
+        // once no wordlist entry extends the prefix, and the longest BIP-39
+        // word is BIP39_MAX_WORD_LENGTH characters. That is a guard computed in
+        // another file, for another purpose, that this write happens to benefit
+        // from. The buffer's own size is the thing that has to hold here.
+        if (previousTextLen + 1 >= sizeof(textToEnter)) {
+            return;
+        }
         textToEnter[previousTextLen] = touchedKey;
         textToEnter[previousTextLen + 1] = '\0';
         textLen = previousTextLen + 1;
@@ -573,11 +582,22 @@ static void display_check_result_page(const bool result) {
     static const nbgl_icon_details_t* icons[3] = {
         &DENIED_CIRCLE_ICON, &IMPORTANT_CIRCLE_ICON, &CHECK_CIRCLE_ICON};
 
+    // The text index is 1 + tool_type * 2 + seed_match into a five-element row.
+    // TOOL_TYPE_BIP39 and TOOL_TYPE_SSKR give 1..4; TOOL_TYPE_BIP85, the third
+    // value of that enumeration (constants.h), would give 5 or 6 and read past
+    // the row. No path reaches this screen with the BIP85 tool selected -- that
+    // flow goes to display_generic_review() and never asks for a verdict -- so
+    // this is a bound on an index the screens cannot currently produce, not a
+    // fix for one they can.
+    const uint8_t text_index =
+        (tool_type == TOOL_TYPE_BIP39 || tool_type == TOOL_TYPE_SSKR)
+            ? (uint8_t)(1 + (tool_type * 2) + seed_match)
+            : 1;
+
     nbgl_pageInfoDescription_t info = {
         .centeredInfo.icon = icons[result + seed_match],
         .centeredInfo.text1 = possible_results[result][0],
-        .centeredInfo.text2 =
-            possible_results[result][1 + (tool_type * 2) + seed_match],
+        .centeredInfo.text2 = possible_results[result][text_index],
         .centeredInfo.text3 = NULL,
         .centeredInfo.style = LARGE_CASE_INFO,
         .centeredInfo.offsetY = -16,
