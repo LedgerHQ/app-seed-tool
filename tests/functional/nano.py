@@ -125,6 +125,17 @@ def select_in_menu(navigator, label, timeout=30):
                                   screen_change_before_first_instruction=False)
 
 
+def confirm(backend):
+    """Click through a screen that only asks to be acknowledged.
+
+    The SSKR flow opens on such a screen -- an instruction step whose callback
+    starts the share entry (`ux_sskr_instruction_step`, src/bagl/ui.c) -- and
+    it carries no carousel, so neither `select_in_menu()` nor the two carousel
+    helpers below apply to it.
+    """
+    _click(backend, "both")
+
+
 def enter_letter(backend, letter):
     """Move the letter carousel onto `letter` and validate it.
 

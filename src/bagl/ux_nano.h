@@ -53,8 +53,22 @@ void screen_onboarding_restore_word_display_auto_complete(void);
 
 // bolos ux context (not mandatory if redesigning a bolos ux)
 typedef struct bolos_ux_context {
-    // 12, 18 or 24 word BIP39
+    // 12, 18 or 24 word BIP39. Written by the 12/18/24 menu and by nothing
+    // else: the SSKR entry path used to store a share length here too, which
+    // made the field mean two things and left the bound on words_buffer
+    // depending on which screen had been visited last.
     unsigned int bip39_type;
+
+    // How many ByteWords one SSKR share holds, taken from the CBOR header of
+    // the first share as it is typed.
+    //
+    // Zero until the fourth word of that share has been entered, which is the
+    // earliest bolos_ux_sskr_entry_header_update() can know it -- and zero is
+    // a safe "not yet": the entry loop compares it against a step count that
+    // has already been incremented, so it never matches before the header has
+    // been read. Every share of a set has the same shape, so it is read once
+    // and kept for the shares that follow.
+    unsigned int sskr_share_word_count;
 
     // Type of tool we are using (BIP39 or SSKR)
     unsigned int tool_type;
