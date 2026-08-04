@@ -562,13 +562,24 @@ static void check_result_callback(int token __attribute__((unused)),
 
 static void display_check_result_page(const bool result) {
     static const char* possible_results[2][5] = {
-        {UI_STR_NBGL_RESULT_INVALID_TITLE, UI_STR_NBGL_RESULT_BIP39_INVALID, "",
+        {NULL, UI_STR_NBGL_RESULT_BIP39_INVALID, "",
          UI_STR_NBGL_RESULT_SSKR_INVALID, ""},
-        {UI_STR_NBGL_RESULT_VALID_TITLE, UI_STR_NBGL_RESULT_BIP39_NOMATCH,
-         UI_STR_NBGL_RESULT_BIP39_MATCH, UI_STR_NBGL_RESULT_SSKR_NOMATCH,
-         UI_STR_NBGL_RESULT_SSKR_MATCH}};
+        {NULL, UI_STR_NBGL_RESULT_BIP39_NOMATCH, UI_STR_NBGL_RESULT_BIP39_MATCH,
+         UI_STR_NBGL_RESULT_SSKR_NOMATCH, UI_STR_NBGL_RESULT_SSKR_MATCH}};
+    // Three distinct outcomes -- invalid, doesn't match, matches -- each with
+    // its own title and icon, matching what the BAGL flows
+    // (ux_bip39_invalid_flow / ux_bip39_nomatch_flow / ux_bip39_match_flow
+    // and their SSKR equivalents) already give the user.
+    static const char* const titles[3] = {UI_STR_NBGL_RESULT_INVALID_TITLE,
+                                          UI_STR_NBGL_RESULT_NOMATCH_TITLE,
+                                          UI_STR_NBGL_RESULT_VALID_TITLE};
     static const nbgl_icon_details_t* icons[3] = {
         &DENIED_CIRCLE_ICON, &IMPORTANT_CIRCLE_ICON, &CHECK_CIRCLE_ICON};
+
+    // result is false only when the phrase itself is not well formed, in
+    // which case seed_match is never set true; the sum is therefore always
+    // 0, 1 or 2, indexing the invalid / nomatch / match outcome respectively.
+    const uint8_t outcome = (uint8_t)(result + seed_match);
 
     // The text index is 1 + tool_type * 2 + seed_match into a five-element row.
     // TOOL_TYPE_BIP39 and TOOL_TYPE_SSKR give 1..4; TOOL_TYPE_BIP85, the third
@@ -583,11 +594,15 @@ static void display_check_result_page(const bool result) {
             : 1;
 
     nbgl_pageInfoDescription_t info = {
-        .centeredInfo.icon = icons[result + seed_match],
-        .centeredInfo.text1 = possible_results[result][0],
+        .centeredInfo.icon = icons[outcome],
+        .centeredInfo.text1 = titles[outcome],
         .centeredInfo.text2 = possible_results[result][text_index],
-        .centeredInfo.text3 = NULL,
-        .centeredInfo.style = LARGE_CASE_INFO,
+        // Advice only on the invalid outcome; NULL elsewhere.
+        // LARGE_CASE_GRAY_INFO is required for this to render as its own gray
+        // line -- see the comment on UI_STR_NBGL_RESULT_INVALID_ADVICE in
+        // ui_strings.h.
+        .centeredInfo.text3 = result ? NULL : UI_STR_NBGL_RESULT_INVALID_ADVICE,
+        .centeredInfo.style = LARGE_CASE_GRAY_INFO,
         .centeredInfo.offsetY = -16,
         .footerText = UI_STR_NBGL_RESULT_TAP_TO_DISMISS,
         .footerToken = CHECK_RESULT_TOKEN,

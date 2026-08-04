@@ -174,14 +174,20 @@
 /*
  * Check result / verdict
  *
- * NBGL (src/nbgl/ui.c) gives the "valid but doesn't match" and "valid and
- * matches" sub-cases the *same* title, "Valid Secret\nRecovery Phrase" --
- * only the body text differs. BAGL (src/bagl/ux_nano.c) gives them two
- * different titles, "doesn't match" vs. "is correct", on two distinct flows.
- * This is one of the two divergences that motivated this header; it is not
- * corrected here.
+ * NBGL (src/nbgl/ui.c) used to give the "valid but doesn't match" and "valid
+ * and matches" sub-cases the *same* title, "Valid Secret\nRecovery Phrase" --
+ * only the body text differed. It now gives all three outcomes their own
+ * title, matching what BAGL (src/bagl/ux_nano.c) already did with two
+ * distinct flows for "doesn't match" vs. "is correct". The wording is still
+ * not shared between the stacks -- NBGL keeps its own
+ * "<Adjective> Secret\nRecovery Phrase" template for all three (Invalid /
+ * Mismatched / Valid), rather than adopting BAGL's "<Tool> Phrase" wording.
+ * The template is deliberate: the three screens differ only in that one
+ * word, so scanning them in sequence reads as three answers to the same
+ * question rather than three differently-shaped messages.
  */
 #define UI_STR_NBGL_RESULT_INVALID_TITLE "Invalid Secret\nRecovery Phrase"
+#define UI_STR_NBGL_RESULT_NOMATCH_TITLE "Mismatched Secret\nRecovery Phrase"
 #define UI_STR_NBGL_RESULT_VALID_TITLE   "Valid Secret\nRecovery Phrase"
 #define UI_STR_NBGL_RESULT_BIP39_INVALID "The BIP39 Recovery Phrase\nyou have entered is not valid"
 #define UI_STR_NBGL_RESULT_SSKR_INVALID  "The SSKR Recovery Phrase\nyou have entered is not valid"
@@ -198,12 +204,17 @@
 #define UI_STR_NBGL_RESULT_TAP_TO_DISMISS "Tap to dismiss"
 
 /*
- * BAGL invalid-phrase advice (src/bagl/ux_nano.c), shared by the BIP39 and
- * SSKR invalid flows. NBGL's invalid-result body text above carries no such
- * advice -- the other divergence that motivated this header.
+ * Invalid-phrase advice. BAGL (src/bagl/ux_nano.c) splits it over two lines,
+ * shared by the BIP39 and SSKR invalid flows; NBGL (src/nbgl/ui.c) now
+ * carries the same advice as a third, gray line under the invalid result's
+ * body text (nbgl_pageInfoDescription_t.centeredInfo.text3, which requires
+ * LARGE_CASE_GRAY_INFO -- not the LARGE_CASE_INFO style the other verdict
+ * screens use -- to render as its own line rather than silently replacing
+ * text2's content; see nbgl_layoutAddCenteredInfo() in the SDK).
  */
-#define UI_STR_BAGL_INVALID_ADVICE_L1 "Check length,"
-#define UI_STR_BAGL_INVALID_ADVICE_L2 "order and spelling"
+#define UI_STR_NBGL_RESULT_INVALID_ADVICE "Check length, order and spelling"
+#define UI_STR_BAGL_INVALID_ADVICE_L1     "Check length,"
+#define UI_STR_BAGL_INVALID_ADVICE_L2     "order and spelling"
 
 #define UI_STR_BAGL_BIP39_INVALID_TITLE_L1 "BIP39 Recovery"
 #define UI_STR_BAGL_BIP39_INVALID_TITLE_L2 "phrase invalid"
