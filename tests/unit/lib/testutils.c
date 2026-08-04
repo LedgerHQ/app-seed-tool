@@ -47,3 +47,22 @@ uint32_t cx_crc32(const void *buf, size_t len)
 
   return crc;
 }
+
+// Host stub for the BOLOS randomness syscall, next to cx_rng_no_throw() above.
+// cx_get_random_bytes() is what seed_sskr.c uses now, because unlike the whole
+// lcx_rng.h family it returns a cx_err_t the caller can act on.
+cx_err_t cx_get_random_bytes(void *buffer, size_t len)
+{
+    for (size_t i = 0; i < len; i++) {
+        ((uint8_t *) buffer)[i] = (uint8_t) i;
+    }
+    return CX_OK;
+}
+
+bool test_rng(uint8_t *buffer, size_t len)
+{
+    for (size_t i = 0; i < len; i++) {
+        buffer[i] = (uint8_t) i;
+    }
+    return true;
+}

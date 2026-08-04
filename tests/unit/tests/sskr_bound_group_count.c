@@ -87,7 +87,7 @@ static void test_generate_shards_rejects_more_groups_than_it_can_hold(
 
     int16_t result = sskr_generate_shards(
         SSKR_MAX_GROUP_COUNT + 1, groups, SSKR_MAX_GROUP_COUNT + 1,
-        master_secret, SECRET_LEN, &shard_len, output, sizeof(output), cx_rng);
+        master_secret, SECRET_LEN, &shard_len, output, sizeof(output), test_rng);
 
     assert_int_equal(result, SSKR_ERROR_INVALID_GROUP_LENGTH);
 }
@@ -107,7 +107,7 @@ static void test_generate_shards_still_accepts_the_supported_group_count(
 
     int16_t result = sskr_generate_shards(1, groups, SSKR_MAX_GROUP_COUNT,
                                           master_secret, SECRET_LEN, &shard_len,
-                                          output, sizeof(output), cx_rng);
+                                          output, sizeof(output), test_rng);
 
     assert_int_equal(result, 2);
     assert_int_equal(shard_len, SSKR_METADATA_LENGTH_BYTES + SECRET_LEN);

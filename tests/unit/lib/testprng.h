@@ -40,6 +40,7 @@
 #ifndef TESTPRNG_H
 #define TESTPRNG_H
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -72,7 +73,7 @@ static inline uint32_t test_prng_below(uint32_t bound) {
 }
 
 /* Signature required by sss_split_secret() and sskr_generate_shards(). */
-static inline unsigned char *test_prng_fill(uint8_t *buffer, size_t len) {
+static inline bool test_prng_fill(uint8_t *buffer, size_t len) {
     size_t i = 0;
 
     while (i < len) {
@@ -82,7 +83,7 @@ static inline unsigned char *test_prng_fill(uint8_t *buffer, size_t len) {
             chunk >>= 8;
         }
     }
-    return (unsigned char *) buffer;
+    return true;
 }
 
 #endif /* TESTPRNG_H */

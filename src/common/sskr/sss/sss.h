@@ -9,6 +9,7 @@
 #define SSS_H
 
 #include <stdint.h>
+#include <stdbool.h>
 #include "sss-constants.h"
 
 #define SSS_SECRET_INDEX 255
@@ -58,7 +59,7 @@ int16_t sss_split_secret(uint8_t threshold,
                          const uint8_t *secret,
                          uint8_t secret_length,
                          uint8_t *result,
-                         unsigned char *(*random_generator)(uint8_t *, size_t) );
+                         bool (*random_generator)(uint8_t *, size_t) );
 
 /**
  * @brief Recovers a secret from Shamir's Secret Sharing (SSS) shares.

@@ -10,6 +10,7 @@
 
 #include <stdlib.h>
 #include <stdint.h>
+#include <stdbool.h>
 
 #include "sskr-constants.h"
 #include "group.h"
@@ -51,7 +52,7 @@ int16_t sskr_generate_shards(uint8_t group_threshold,
                              uint8_t *shard_len,
                              uint8_t *output,
                              uint16_t buffer_size,
-                             unsigned char *(*random_generator)(uint8_t *, size_t) );
+                             bool (*random_generator)(uint8_t *, size_t) );
 
 /**
  * @brief Combines shards to reconstruct a secret.

@@ -29,5 +29,6 @@
 #define SSS_ERROR_SECRET_TOO_SHORT      (-105)
 #define SSS_ERROR_SECRET_NOT_EVEN_LEN   (-106)
 #define SSS_ERROR_INVALID_THRESHOLD     (-107)
+#define SSS_ERROR_RNG_FAILURE           (-108)
 
 #endif /* SSS_CONSTANTS_H */

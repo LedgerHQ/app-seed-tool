@@ -63,7 +63,7 @@ static void generate_expecting(uint16_t master_secret_len, int16_t expected) {
 
     int16_t result =
         sskr_generate_shards(1, groups, 1, master_secret, master_secret_len,
-                             &shard_len, output, sizeof(output), cx_rng);
+                             &shard_len, output, sizeof(output), test_rng);
 
     assert_int_equal(result, expected);
 }
@@ -106,7 +106,7 @@ static void test_generate_rejects_undersized_output_buffer(void** state) {
     /* One byte short of what the three serialized shards need. */
     int16_t result =
         sskr_generate_shards(1, groups, 1, master_secret, sizeof(master_secret),
-                             &shard_len, output, sizeof(output) - 1, cx_rng);
+                             &shard_len, output, sizeof(output) - 1, test_rng);
 
     assert_int_equal(result, SSKR_ERROR_INSUFFICIENT_SPACE);
 }

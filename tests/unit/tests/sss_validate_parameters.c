@@ -42,7 +42,7 @@ static void split_expecting(uint8_t secret_length, int16_t expected) {
     memset(result, 0x00, sizeof(result));
 
     int16_t error = sss_split_secret(THRESHOLD, SHARE_COUNT, secret,
-                                     secret_length, result, cx_rng);
+                                     secret_length, result, test_rng);
 
     assert_int_equal(error, expected);
 }

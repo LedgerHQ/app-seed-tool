@@ -261,7 +261,7 @@ static int16_t sskr_generate_shards_internal(
     uint8_t group_threshold, const sskr_group_descriptor_t* groups,
     uint8_t groups_len, const uint8_t* master_secret,
     uint16_t master_secret_len, sskr_shard_t* shards, uint16_t shards_size,
-    unsigned char* (*random_generator)(uint8_t*, size_t)) {
+    bool (*random_generator)(uint8_t*, size_t)) {
     int16_t error = sskr_check_secret_length(master_secret_len);
     if (error) {
         return error;
@@ -276,7 +276,9 @@ static int16_t sskr_generate_shards_internal(
 
     // assign a random identifier
     uint16_t identifier = 0;
-    random_generator((uint8_t*)(&identifier), 2);
+    if (!random_generator((uint8_t*)(&identifier), 2)) {
+        return SSKR_ERROR_RNG_FAILURE;
+    }
 
     if (shards_size < total_shards) {
         return SSKR_ERROR_INSUFFICIENT_SPACE;
@@ -346,8 +348,7 @@ int16_t sskr_generate_shards(uint8_t group_threshold,
                              uint8_t groups_len, const uint8_t* master_secret,
                              uint16_t master_secret_len, uint8_t* shard_len,
                              uint8_t* output, uint16_t buffer_size,
-                             unsigned char* (*random_generator)(uint8_t*,
-                                                                size_t)) {
+                             bool (*random_generator)(uint8_t*, size_t)) {
     // shard_len is an output parameter, and the function has several early
     // rejections that never reach the assignment at the bottom. Define it
     // once, here, so that no failure path can hand back the value the caller

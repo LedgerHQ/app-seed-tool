@@ -36,6 +36,19 @@
 #error "What kind of system is this?"
 #endif
 
+// The BOLOS randomness source, with its status preserved.
+//
+// The whole lcx_rng.h family -- cx_rng(), cx_rng_no_throw(), cx_rng_u8(),
+// cx_rng_u32() -- returns void or the buffer it was handed, so none of them can
+// report a failed draw. cx_get_random_bytes() (os_random.h) is the same TRNG
+// behind a syscall that returns cx_err_t, and it exists on every SDK this
+// application targets, nanos included. Everything randomness feeds here is
+// load-bearing -- the Shamir coefficients, the digest padding and the share-set
+// identifier -- so a failed draw has to stop generation, not pass through it.
+static bool sskr_rng_bolos(uint8_t* buffer, size_t len) {
+    return cx_get_random_bytes(buffer, len) == CX_OK;
+}
+
 // Largest a full set of serialized shards can be, in bytes, and hence the
 // capacity of every share buffer handed to bolos_ux_sskr_generate(): every
 // group at its maximum member count, each shard holding a maximum-strength
@@ -204,7 +217,7 @@ unsigned int bolos_ux_sskr_generate(uint8_t groups_threshold,
     // convert seed to SSKR shares
     int16_t share_count = sskr_generate_shards(
         groups_threshold, groups, groups_len, seed, seed_len, share_len,
-        share_buffer, share_buffer_len, cx_rng);
+        share_buffer, share_buffer_len, sskr_rng_bolos);
 
     PRINTF("SSKR share count expected: %d\n", share_count_expected);
     PRINTF("SSKR share count returned: %d\n", share_count);

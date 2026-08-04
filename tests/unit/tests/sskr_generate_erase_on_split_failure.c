@@ -76,7 +76,7 @@ static void test_generate_erases_output_on_member_level_interpolation_failure(
 
     int16_t result = sskr_generate_shards(1, groups, 1, master_secret,
                                           SECRET_LEN, &share_len, share_buffer,
-                                          sizeof(share_buffer), cx_rng);
+                                          sizeof(share_buffer), test_rng);
 
     assert_int_equal(result, SSS_ERROR_INTERPOLATION_FAILURE);
     assert_int_equal(share_len, 0);
@@ -99,7 +99,7 @@ static void test_generate_erases_output_on_group_level_split_failure(
 
     int16_t result = sskr_generate_shards(0, groups, 1, master_secret,
                                           SECRET_LEN, &share_len, share_buffer,
-                                          sizeof(share_buffer), cx_rng);
+                                          sizeof(share_buffer), test_rng);
 
     assert_int_equal(result, SSS_ERROR_INVALID_THRESHOLD);
     assert_int_equal(share_len, 0);
