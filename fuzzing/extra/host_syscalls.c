@@ -15,6 +15,8 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#include "cx_errors.h"
+
 /* Declared by the SDK's ledger_assert_internals.h; defined here so a
  * LEDGER_ASSERT() firing inside any fuzzed function stops the run with a
  * non-zero status the fuzzing engine reports, rather than exiting quietly. */
@@ -32,6 +34,17 @@ void cx_rng_no_throw(uint8_t *buffer, size_t len) {
     for (size_t i = 0; i < len; i++) {
         buffer[i] = (uint8_t) i;
     }
+}
+
+/* The same filler behind the syscall seed_sskr.c actually calls. Unlike
+ * cx_rng_no_throw() above this one has a status to return, which is why it is
+ * the one share generation goes through; a host stand-in has nothing to fail
+ * at, so it always succeeds. */
+cx_err_t cx_get_random_bytes(void *buffer, size_t len) {
+    for (size_t i = 0; i < len; i++) {
+        ((uint8_t *) buffer)[i] = (uint8_t) i;
+    }
+    return CX_OK;
 }
 
 /* Constant-time comparison. The wordlist searches and the CBOR/CRC checks all

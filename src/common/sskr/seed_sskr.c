@@ -21,14 +21,13 @@
 
 // BIP39_MNEMONIC_SIZE_12/18/24, the three lengths bolos_ux_sskr_size_get()
 // accepts below.
-#include "constants.h"
-
 #include "../bip39/common_bip39.h"
 #include "../common.h"
 #include "./common_sskr.h"
 #include "./seed_rom_variables.h"
 #include "./seed_sskr_internal.h"
 #include "./sskr.h"
+#include "constants.h"
 
 // Return the CRC-32 checksum of the input buffer in network byte order (big
 // endian).
