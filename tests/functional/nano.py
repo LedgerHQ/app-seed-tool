@@ -103,6 +103,16 @@ def _title(backend):
     return min(events, key=lambda e: e["y"]).get("text", "")
 
 
+def _lines(backend):
+    """The screen's text, topmost line first.
+
+    Ordered by y rather than by the order the events arrive in, which is what
+    separates a `bnnn_paging` title from the body underneath it.
+    """
+    events = [e for e in _events(backend) if e.get("y") is not None]
+    return [e.get("text", "") for e in sorted(events, key=lambda e: e["y"])]
+
+
 def select_in_menu(navigator, label, timeout=30):
     """Walk a one-item-at-a-time list until `label` is on screen, then choose it.
 
@@ -258,6 +268,41 @@ def enter_phrase(backend, phrase):
     """Enter a whole BIP-39 phrase."""
     for word in phrase.split():
         enter_word(backend, word)
+
+
+def collect_shares(backend, limit=60):
+    """Read the generated SSKR shares off the screen, as lists of ByteWords.
+
+    Generation ends on `dynamic_flow` (src/bagl/ux_sskr.c), which shows one
+    share at a time through a `bnnn_paging` step titled "SSKR Share #N (p/q)"
+    and splits a share over as many pages as it needs. Walking right goes
+    through the pages of a share, then on to the next share, and reaches a
+    "Quit" step once the last one has been shown -- which is where this stops.
+
+    Going on past that step would not start over. The flow loops, but
+    `get_next_data()` clamps the share index instead of wrapping it, so the
+    walk comes back to the last share and stays there. The "Quit" step is
+    therefore the only honest end marker, and running out of clicks without
+    reaching it is an error rather than a reason to return a short list.
+
+    Returns one list of words per share, in share order.
+    """
+    shares = {}
+    for _ in range(limit):
+        lines = _lines(backend)
+        if not lines:
+            raise AssertionError("the screen went blank while reading shares")
+        title = lines[0]
+        if not title.startswith("SSKR Share #"):
+            # The "Quit" step, i.e. every share has been shown.
+            return [words for _, words in sorted(shares.items())]
+        index = int(title.split("#", 1)[1].split(maxsplit=1)[0])
+        shares.setdefault(index, []).extend(
+            word for line in lines[1:] for word in line.split())
+        _click(backend, "right")
+    raise AssertionError(
+        f"the share display never reached its last step; read {len(shares)} "
+        f"share(s)")
 
 
 def wait_for_lines(backend, *lines, timeout=10.0):
