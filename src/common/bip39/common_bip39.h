@@ -17,6 +17,10 @@
 
 #pragma once
 
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+
 // Hashes an over-long mnemonic down to 64 bytes in its own frame, so that the
 // pbkdf2 call in bolos_ux_bip39_mnemonic_to_seed() does not carry this one's
 // locals. Kept out of line and with external linkage for that reason -- static

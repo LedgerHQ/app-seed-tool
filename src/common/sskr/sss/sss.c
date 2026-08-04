@@ -84,6 +84,14 @@ uint8_t* sss_create_digest(const uint8_t* random_data, uint32_t rdlen,
         result[j] = buf[j];
     }
 
+    // Four of the thirty-two bytes are the digest; the other twenty-eight are
+    // the rest of an HMAC over the secret, and they were left on the stack.
+    // They are not the secret -- HMAC does not run backwards -- but every
+    // other local in this file is erased, including the digest and the
+    // coordinate arrays a few lines below, and this one had no reason to be
+    // the exception.
+    memzero(buf, sizeof(buf));
+
     return result;
 }
 

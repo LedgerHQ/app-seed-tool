@@ -16,7 +16,7 @@ jobs:
       contents: write
     steps:
       - name: Clone
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
         with:
           ref: ${{ github.event.workflow_run.head_branch }}
 
@@ -27,7 +27,7 @@ jobs:
           echo "VERSION_NAME=${HEAD_BRANCH//./_}" >> ${GITHUB_ENV}
 
       - name: Download app binaries
-        uses: dawidd6/action-download-artifact@v6
+        uses: dawidd6/action-download-artifact@bf251b5aa9c2f7eeb574a96ee720e24f801b7c11  # v6
         with:
           name: compiled_app_binaries
           path: ./bin/
@@ -40,7 +40,7 @@ jobs:
         run: ls -la ./bin/ && sudo mv ./bin/compiled_app_binaries.zip ./bin/compiled_app_binaries.${VERSION_NAME}.zip && ls -la ./bin/
 
       - name: Create Release
-        uses: ncipollo/release-action@v1
+        uses: ncipollo/release-action@339a81892b84b4eeb0f6e744e4574d79d0d9b8dd  # v1
         with:
           name: Seed Tool application for Ledger - Release ${{ env.VERSION_NUMBER }}
           artifacts: ./bin/*.zip

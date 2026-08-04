@@ -17,6 +17,10 @@
 
 #pragma once
 
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+
 // SSKR helpers
 #include "./seed_rom_variables.h"
 #include "./sskr-constants.h"

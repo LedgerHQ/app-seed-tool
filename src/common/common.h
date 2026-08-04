@@ -17,6 +17,9 @@
 
 #pragma once
 
+#include <stdbool.h>
+#include <stdint.h>
+
 #define ALPHABET_LENGTH 27
 #define KBD_LETTERS     "qwertyuiopasdfghjklzxcvbnm"
 
