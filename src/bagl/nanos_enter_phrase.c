@@ -193,8 +193,20 @@ const bagl_element_t* screen_onboarding_restore_word_keyboard_callback(
                 }
             } else {
                 // validate next letter of the word
-                G_ux.string_buffer[16 + strlen(G_ux.string_buffer + 16)] =
-                    G_ux.string_buffer[32 +
+                //
+                // The stem cannot reach the candidate letters at offset 32
+                // while the keyboard only offers letters that extend a real
+                // prefix, because no word in either list is that long. This
+                // is the same bound expressed where the write happens, so
+                // that it does not depend on the wordlist staying that shape.
+                const size_t stem_length =
+                    strlen(G_ux.string_buffer + RESTORE_STEM_OFFSET);
+                if (stem_length >= RESTORE_STEM_MAX_LENGTH) {
+                    return NULL;
+                }
+
+                G_ux.string_buffer[RESTORE_STEM_OFFSET + stem_length] =
+                    G_ux.string_buffer[RESTORE_CANDIDATES_OFFSET +
                                        G_bolos_ux_context.hslider3_current];
 
                 // continue displaying until less than X words matches the stem
@@ -395,6 +407,18 @@ void compare_recovery_phrase_and_display_result(void) {
 
 void screen_onboarding_restore_word_validate(void) {
     if (G_bolos_ux_context.tool_type == TOOL_TYPE_BIP39) {
+        // The SSKR branch below bounds its own buffer; this one did not.
+        // bolos_ux_bip39_idx_strcpy() writes a word and a terminator at
+        // words_buffer_length, and what keeps that inside words_buffer is
+        // bip39_type -- which the SSKR entry path also writes, with a share
+        // length of its own (see the loop bound in this file). The menu
+        // always resets it before a BIP-39 entry, so the two never meet
+        // today; this is the bound that does not rely on them not meeting.
+        if (G_bolos_ux_context.words_buffer_length + BIP39_MAX_WORD_LENGTH + 1 >
+            WORDS_BUFFER_MAX_SIZE_B) {
+            return;
+        }
+
         bolos_ux_bip39_idx_strcpy(
             G_bolos_ux_context.onboarding_index +
                 G_bolos_ux_context.hslider3_current,
@@ -432,6 +456,24 @@ void screen_onboarding_restore_word_validate(void) {
     G_bolos_ux_context.onboarding_step++;
 
     if (G_bolos_ux_context.tool_type == TOOL_TYPE_BIP39) {
+        // bip39_type carries two unrelated meanings. The 12/18/24 menu writes
+        // the word count here, and the SSKR entry path writes the wire length
+        // of a share -- up to SSKR_SHARE_MAX_WIRE_LENGTH -- into the same
+        // field, a few lines above. It is what bounds this loop, and through
+        // it the writes into words_buffer.
+        //
+        // The two never collide today: number_of_bip39_words_selector() always
+        // reassigns bip39_type before screen_onboarding_bip39_restore_init(),
+        // and generate_sskr() is unreachable from the SSKR flow. Both are
+        // properties of the screen graph, held nowhere near this line. If
+        // either stops holding, this stops the entry rather than letting the
+        // loop run to a share length.
+        if (G_bolos_ux_context.bip39_type != BIP39_MNEMONIC_SIZE_12 &&
+            G_bolos_ux_context.bip39_type != BIP39_MNEMONIC_SIZE_18 &&
+            G_bolos_ux_context.bip39_type != BIP39_MNEMONIC_SIZE_24) {
+            return;
+        }
+
         if (G_bolos_ux_context.onboarding_step ==
             G_bolos_ux_context.bip39_type) {
             unsigned char valid;
@@ -464,7 +506,13 @@ void screen_onboarding_restore_word_validate(void) {
                     PROCESSING_COMPARE_RECOVERY_PHRASE;
             }
         } else {
-            // add a space before next word
+            // add a space before next word, if there is room for it and for
+            // the word that follows
+            if (G_bolos_ux_context.words_buffer_length + BIP39_MAX_WORD_LENGTH +
+                    2 >
+                WORDS_BUFFER_MAX_SIZE_B) {
+                return;
+            }
             G_bolos_ux_context
                 .words_buffer[G_bolos_ux_context.words_buffer_length++] = ' ';
 

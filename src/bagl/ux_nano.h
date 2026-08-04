@@ -30,6 +30,21 @@ void bolos_ux_hslider3_set_current(unsigned int current);
 void bolos_ux_hslider3_next(void);
 void bolos_ux_hslider3_previous(void);
 
+// Layout of G_ux.string_buffer while a word is being entered, as
+// screen_onboarding_restore_word_init() describes it: display scratch at 0,
+// the stem entered so far at 16, the candidate next letters at 32.
+//
+// The stem therefore has RESTORE_STEM_MAX_LENGTH characters before its
+// terminator would land on the first candidate. What keeps it inside that
+// today is the wordlist -- the longest BIP-39 word is BIP39_MAX_WORD_LENGTH
+// characters, a ByteWord is SSKR_BYTEWORD_LENGTH, and the keyboard only offers
+// letters that extend a real prefix. That is a bound computed in another file,
+// for another purpose, that these writes happen to benefit from; the names
+// below are the buffer's own.
+#define RESTORE_STEM_OFFSET       16
+#define RESTORE_CANDIDATES_OFFSET 32
+#define RESTORE_STEM_MAX_LENGTH   (RESTORE_CANDIDATES_OFFSET - RESTORE_STEM_OFFSET - 1)
+
 // all screens
 void screen_onboarding_bip39_restore_init(void);
 void screen_onboarding_sskr_restore_init(void);
