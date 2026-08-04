@@ -306,6 +306,13 @@ unsigned int bolos_ux_bip39_to_sskr_convert(
     unsigned int bip39_type, unsigned int* group_descriptor,
     uint8_t* share_count, unsigned char* share_words_buffer,
     unsigned int* share_words_buffer_length) {
+    // Defined before anything can fail. Every early exit below already sets
+    // it, but the branch that does not run at all -- a mnemonic the decoder
+    // refuses -- used to leave the caller's count at whatever it held, and
+    // both callers keep it in a struct that outlives the call. The count is
+    // how many share screens the review then pages through.
+    *share_count = 0;
+
     // get seed from bip39 mnemonic
     uint8_t seed_len = bip39_type * 4 / 3;
     uint8_t seed_buffer[SSKR_MAX_STRENGTH_BYTES + 1];
