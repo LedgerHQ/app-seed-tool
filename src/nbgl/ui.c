@@ -180,7 +180,7 @@ static void select_recover_bip39_choice(bool bip39_rec) {
 void display_select_recover_bip39_page(void) {
     nbgl_useCaseChoice(&BIP39_ICON, UI_STR_NBGL_RECOVER_BIP39_TITLE,
                        UI_STR_NBGL_RECOVER_BIP39_DESC,
-                       UI_STR_NBGL_RECOVER_BIP39_CONFIRM, UI_STR_NBGL_DONE,
+                       UI_STR_NBGL_RECOVER_BIP39_CONFIRM, UI_STR_NBGL_CANCEL,
                        select_recover_bip39_choice);
 }
 
@@ -199,7 +199,7 @@ static void select_generate_sskr_choice(bool sskr_gen) {
 void display_select_generate_sskr_page(void) {
     nbgl_useCaseChoice(&SSKR_ICON, UI_STR_NBGL_GENERATE_SSKR_TITLE,
                        UI_STR_NBGL_GENERATE_SSKR_DESC,
-                       UI_STR_NBGL_GENERATE_SSKR_CONFIRM, UI_STR_NBGL_DONE,
+                       UI_STR_NBGL_GENERATE_SSKR_CONFIRM, UI_STR_NBGL_CANCEL,
                        select_generate_sskr_choice);
 }
 
@@ -670,7 +670,7 @@ static void display_generic_review() {
     pairs[0].item = PIC(headerText);
     pairs[0].value = PIC(reviewText);
 
-    nbgl_useCaseGenericReview(&genericContent, UI_STR_NBGL_DONE, review_done);
+    nbgl_useCaseGenericReview(&genericContent, UI_STR_NBGL_CLOSE, review_done);
 }
 
 static void review_sskr_shares_contentGetter(uint8_t index,
@@ -717,7 +717,7 @@ static void display_sskr_shares(void) {
     genericContent.contentGetterCallback = review_sskr_shares_contentGetter;
     genericContent.nbContents = sskr_sharecount_get();
 
-    nbgl_useCaseGenericReview(&genericContent, UI_STR_NBGL_DONE, review_done);
+    nbgl_useCaseGenericReview(&genericContent, UI_STR_NBGL_CLOSE, review_done);
 }
 
 static void sskr_threshold_validate(const uint8_t* thresholdentry,

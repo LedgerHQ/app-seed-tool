@@ -242,12 +242,28 @@
 #define UI_STR_NBGL_RECOVER_BIP39_DESC \
     "Choose if you wish to\nrecover the BIP39 phrase\nfrom your valid\nSSKR shares."
 #define UI_STR_NBGL_RECOVER_BIP39_CONFIRM "Recover BIP39"
-#define UI_STR_NBGL_DONE                  "Done"
+
+/*
+ * nbgl_useCaseChoice()'s reject parameter is named rejectString in
+ * lib_nbgl/include/nbgl_use_case.h; getRejectReviewText() in
+ * lib_nbgl/src/nbgl_use_case.c returns "Cancel" for this kind of
+ * offer-or-decline choice. Shared by both choice screens above and below.
+ */
+#define UI_STR_NBGL_CANCEL "Cancel"
 
 #define UI_STR_NBGL_GENERATE_SSKR_TITLE "Generate SSKR Phrase?"
 #define UI_STR_NBGL_GENERATE_SSKR_DESC \
     "Choose if you wish to\ngenerate SSKR shares from\nyour valid BIP39 phrase."
 #define UI_STR_NBGL_GENERATE_SSKR_CONFIRM "Generate SSKR"
+
+/*
+ * nbgl_useCaseGenericReview()'s reject parameter is named rejectText in
+ * lib_nbgl/include/nbgl_use_case.h; "Close" is what lib_nbgl uses for
+ * dismissing a single already-displayed page with no pending offer (e.g.
+ * info.navWithButtons.quitText in lib_nbgl/src/nbgl_use_case.c). Shared by
+ * the two generic-review screens in src/nbgl/ui.c.
+ */
+#define UI_STR_NBGL_CLOSE "Close"
 
 #define UI_STR_BAGL_GENERATE_SSKR_L1 "Generate"
 #define UI_STR_BAGL_GENERATE_SSKR_L2 "SSKR phrases"
