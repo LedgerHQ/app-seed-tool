@@ -1068,7 +1068,7 @@ target_link_libraries(test_sskr_ux_menu_nanos PUBLIC cmocka gcov testutils)
 # ui_strings.h holds only macros, so this links nothing from src/ -- compiling
 # and enumerating the header is the whole test.
 add_executable(test_ui_strings tests/ui_strings.c)
-target_include_directories(test_ui_strings PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common)
+target_include_directories(test_ui_strings PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common/sskr/sss)
 target_link_libraries(test_ui_strings PUBLIC cmocka gcov)
 # ---------------------------------------------------------------------------
 

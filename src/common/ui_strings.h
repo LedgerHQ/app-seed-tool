@@ -34,8 +34,8 @@
  * visible, in this file, rather than being hidden by code that reconciles it.
  *
  * Where the wording happens to already be byte-identical between the two
- * stacks -- "Quit" on every BAGL screen that has it, "SSKR Share #%d" on
- * both -- a single macro serves every call site.
+ * stacks -- "Quit" on every BAGL screen that has it, "12 words" on both --
+ * a single macro serves every call site.
  *
  * `#define` rather than a table of `extern const char[]`: a string literal
  * behind a macro costs nothing beyond what the literal itself costs, and the
@@ -62,7 +62,6 @@
 #define UI_STR_QUIT               "Quit"
 #define UI_STR_VERSION_LABEL      "Version"
 #define UI_STR_BIP39_PHRASE_TITLE "BIP39 Phrase"
-#define UI_STR_SSKR_SHARE_HEADER  "SSKR Share #%d"
 #define UI_STR_WORDS_12           "12 words"
 #define UI_STR_WORDS_18           "18 words"
 #define UI_STR_WORDS_24           "24 words"
@@ -269,6 +268,32 @@
 #define UI_STR_BAGL_GENERATE_SSKR_L2 "SSKR phrases"
 #define UI_STR_BAGL_RECOVER_BIP39_L1 "Recover"
 #define UI_STR_BAGL_RECOVER_BIP39_L2 "BIP39 phrase"
+
+/*
+ * The label heading each generated share -- the one the user copies onto the
+ * sheet along with the words.
+ *
+ * It now names the total as well as the index. A sheet reading "SSKR Share
+ * #2" said nothing about how many sheets the set has, so whoever finds the
+ * box later cannot tell a complete backup from a partial one, nor know how
+ * many more to look for -- and SSKR is a threshold scheme, where that count
+ * is what says whether the secret can still be rebuilt.
+ *
+ * "SSKR" stays in it. A sheet carrying dozens of four-letter words and no
+ * name for its own format cannot be recovered by anyone who no longer has
+ * this application: there is nothing to search for, so neither this app nor
+ * Gordian SeedTool nor seedtool-cli can be found from the paper alone. That
+ * this application can itself rebuild a BIP39 phrase from SSKR shares does
+ * not cover that case -- the case is precisely not having it.
+ *
+ * The two stacks need different lengths, so both forms are declared here
+ * rather than one being shortened at the call site: BAGL's bnnn_paging
+ * appends its own "(page/total)" counter to this title, and the long form
+ * plus that suffix overflows the Nano title area (seen truncated as
+ * "SSKR Share... of 3 (4/5)" under Speculos).
+ */
+#define UI_STR_NBGL_SSKR_SHARE_HEADER "SSKR share %d of %d"
+#define UI_STR_BAGL_SSKR_SHARE_HEADER "SSKR %d/%d"
 
 /*
  * SSKR share count / threshold selection

@@ -684,10 +684,12 @@ static void review_sskr_shares_contentGetter(uint8_t index,
     genericreview->content.tagValueList.wrapping = true;
     genericreview->content.tagValueList.pairs = (nbgl_layoutTagValue_t*)pairs;
 
-    SPRINTF(headerText, UI_STR_SSKR_SHARE_HEADER, index + 1);
-    // Ensure null termination
-    headerText[sskr_sharecount_get() > 9 ? sizeof(headerText) - 1
-                                         : sizeof(headerText) - 2] = '\0';
+    // SPRINTF() is snprintf() bounded by sizeof(headerText) (os_print.h), so
+    // this is already truncated and null-terminated whatever either %d
+    // expands to -- which is why the hand-written termination that used to
+    // sit here, and which assumed a one- or two-digit index, is gone.
+    SPRINTF(headerText, UI_STR_NBGL_SSKR_SHARE_HEADER, index + 1,
+            sskr_sharecount_get());
     pairs[0].item = PIC(headerText);
 
     size_t offset;

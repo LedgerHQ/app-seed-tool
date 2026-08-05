@@ -274,8 +274,8 @@ def collect_shares(backend, limit=60):
     """Read the generated SSKR shares off the screen, as lists of ByteWords.
 
     Generation ends on `dynamic_flow` (src/bagl/ux_sskr.c), which shows one
-    share at a time through a `bnnn_paging` step titled "SSKR Share #N (p/q)"
-    and splits a share over as many pages as it needs. Walking right goes
+    share at a time through a `bnnn_paging` step titled "SSKR N/M (p/q)" and
+    splits a share over as many pages as it needs. Walking right goes
     through the pages of a share, then on to the next share, and reaches a
     "Quit" step once the last one has been shown -- which is where this stops.
 
@@ -293,10 +293,11 @@ def collect_shares(backend, limit=60):
         if not lines:
             raise AssertionError("the screen went blank while reading shares")
         title = lines[0]
-        if not title.startswith("SSKR Share #"):
+        if not title.startswith("SSKR "):
             # The "Quit" step, i.e. every share has been shown.
             return [words for _, words in sorted(shares.items())]
-        index = int(title.split("#", 1)[1].split(maxsplit=1)[0])
+        # "SSKR 2/3 (1/5)" -> 2
+        index = int(title.split(None, 1)[1].split("/", 1)[0])
         shares.setdefault(index, []).extend(
             word for line in lines[1:] for word in line.split())
         _click(backend, "right")
