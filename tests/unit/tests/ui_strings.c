@@ -4,7 +4,7 @@
  * into any unit target, so this is the only net any of these strings gets
  * other than the functional tests under Speculos.
  *
- * Two things are checked:
+ * Three things are checked:
  *
  *   - every string is non-empty. A macro whose value became "" by accident
  *     (a bad merge, a copy-paste that dropped the literal) is otherwise
@@ -12,9 +12,14 @@
  *
  *   - every BAGL fragment destined for a fixed (non-wrapping) Nano layout
  *     fits the real pixel budget of that layout. NN/NNN/PBB/PNN/PB/BN steps
- *     do not wrap or crop -- unlike BNNN_PAGING, which the dynamic word/share
- *     buffers use and which this test does not need to bound. A string that
- *     does not fit is silently clipped at runtime; nothing else catches it.
+ *     do not wrap or crop. A string that does not fit is silently clipped at
+ *     runtime; nothing else catches it. The BNNN_PAGING *body* is excluded --
+ *     it wraps, so it cannot clip;
+ *
+ *   - the SSKR share label fits the BNNN_PAGING *title*, which does clip. It
+ *     is checked on its own, at the end of this file, because what reaches
+ *     the screen is the macro plus a page counter the widget appends and the
+ *     string does not contain.
  *
  * Each entry below is `ENTRY(UI_STR_X)`, which expands to `{"UI_STR_X",
  * UI_STR_X}` -- the name and the header's own macro, not a retyped copy of
@@ -29,8 +34,10 @@
 #include <setjmp.h>
 #include <cmocka.h>
 #include <string.h>
+#include <stdio.h>
 
 #include "ui_strings.h"
+#include "sss-constants.h"
 
 #define ENTRY(name) \
     { #name, name }
@@ -48,7 +55,8 @@ static const struct {
     ENTRY(UI_STR_QUIT),
     ENTRY(UI_STR_VERSION_LABEL),
     ENTRY(UI_STR_BIP39_PHRASE_TITLE),
-    ENTRY(UI_STR_SSKR_SHARE_HEADER),
+    ENTRY(UI_STR_NBGL_SSKR_SHARE_HEADER),
+    ENTRY(UI_STR_BAGL_SSKR_SHARE_HEADER),
     ENTRY(UI_STR_WORDS_12),
     ENTRY(UI_STR_WORDS_18),
     ENTRY(UI_STR_WORDS_24),
@@ -360,10 +368,59 @@ static void test_nano_fixed_layout_strings_fit_their_budget(void **state) {
     }
 }
 
+/*
+ * The SSKR share label fits the Nano title line once the paging widget has
+ * added its own page counter.
+ *
+ * This one is not in the table above, and cannot be: that table measures a
+ * macro on its own, and what reaches the screen here is the macro *plus* a
+ * "(page/total)" counter that bnnn_paging appends at display time and that
+ * the string itself knows nothing about. Measuring the macro alone would
+ * report 68px against a 114px line and call it comfortable, while the drawn
+ * title is 108px.
+ *
+ * It is worth measuring rather than trusting, because a bnnn_paging title
+ * does not wrap -- it clips, silently. The longer label first tried for this
+ * screen did exactly that, and only a screenshot revealed it
+ * ("SSKR Share... of 3 (4/5)" under Speculos).
+ *
+ * The worst case is built from the real bounds, not from placeholder digits:
+ *
+ *   - shares: SSS_MAX_SHARE_COUNT, the count the generation menu is capped
+ *     to (16, or 10 under TARGET_NANOS);
+ *   - pages: a share is at most SSKR_SHARE_MAX_WIRE_LENGTH (46) ByteWords;
+ *     the widest four-letter word in this font leaves room for two per
+ *     114px line, and the 128x32 Nano S shows one such line per page
+ *     (UX_LAYOUT_PAGING_LINE_COUNT), so 23 pages bounds every device.
+ *
+ * Using "99" for both, as expand_worst_case() would, gives 116px and fails a
+ * layout that is actually fine: 99 shares cannot be generated.
+ */
+#define NANO_PIXEL_PER_LINE     114
+#define SSKR_MAX_PAGES_PER_SHARE 23
+
+static void test_sskr_share_label_fits_the_nano_title_line(void **state) {
+    (void) state;
+
+    char title[64];
+    snprintf(title, sizeof(title), UI_STR_BAGL_SSKR_SHARE_HEADER " (%d/%d)",
+             SSS_MAX_SHARE_COUNT, SSS_MAX_SHARE_COUNT, SSKR_MAX_PAGES_PER_SHARE,
+             SSKR_MAX_PAGES_PER_SHARE);
+
+    /* a bnnn_paging title is drawn in the bold font */
+    unsigned int width = text_width_px(title, true);
+    if (width > NANO_PIXEL_PER_LINE) {
+        fail_msg("the widest SSKR share title (\"%s\") is %upx, over the %upx a "
+                 "Nano line holds -- bnnn_paging would clip it with no warning",
+                 title, width, NANO_PIXEL_PER_LINE);
+    }
+}
+
 int main(void) {
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(test_every_string_is_non_empty),
         cmocka_unit_test(test_nano_fixed_layout_strings_fit_their_budget),
+        cmocka_unit_test(test_sskr_share_label_fits_the_nano_title_line),
     };
     return cmocka_run_group_tests(tests, NULL, NULL);
 }

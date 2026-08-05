@@ -35,8 +35,9 @@ bool get_next_data(bool share_step) {
                                   G_bolos_ux_context.sskr_share_count,
                                   G_bolos_ux_context.sskr_share_index - 1,
                                   &offset, &length)) {
-        SPRINTF(G_bolos_ux_context.string_buffer, UI_STR_SSKR_SHARE_HEADER,
-                G_bolos_ux_context.sskr_share_index);
+        SPRINTF(G_bolos_ux_context.string_buffer, UI_STR_BAGL_SSKR_SHARE_HEADER,
+                G_bolos_ux_context.sskr_share_index,
+                G_bolos_ux_context.sskr_share_count);
         memcpy(G_bolos_ux_context.words_buffer,
                G_bolos_ux_context.sskr_words_buffer + offset, length);
 

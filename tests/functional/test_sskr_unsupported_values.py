@@ -102,7 +102,7 @@ def all_eink_unsupported_values(backend, device):
     backend.wait_for_text_on_screen("Enter threshold value", 5)
     keypad.write("1")
     keypad.enter()
-    backend.wait_for_text_on_screen("SSKR Share", 5)
+    backend.wait_for_text_on_screen("SSKR share", 5)
     backend.wait_for_text_on_screen("tuna next keep gyro", 1)
     review.exit()
     backend.wait_for_text_on_screen("Seed Tool", 5)
