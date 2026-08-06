@@ -31,6 +31,7 @@
 #include <nbgl_use_case.h>
 
 #include "../common/bip39/common_bip39.h"
+#include "../common/bip85/common_bip85.h"
 #include "../common/sskr/common_sskr.h"
 #include "../common/ui_strings.h"
 #include "../ui.h"
@@ -48,6 +49,36 @@ static nbgl_layout_t* layout = 0;
 static char headerText[HEADER_SIZE] = {0};
 static char reviewText[(SSKR_SHARES_MAX_LENGTH / 16) + 1] = {0};
 
+/*
+ * Two of the four keypads name a bound that is only known at display time --
+ * the threshold's maximum is the share count just entered, the password
+ * length's pair depends on which application was chosen -- so their titles are
+ * composed rather than declared.
+ *
+ * This buffer cannot live on the stack of the function that fills it.
+ * nbgl_layoutAddKeypadContent() stores the pointer it is handed
+ * (`textArea->text = title`, lib_nbgl/src/nbgl_layout_keypad.c) and the title
+ * area is redrawn while the keypad is up, so the text has to outlive the call.
+ *
+ * The size is taken from the formats themselves rather than counted by hand:
+ * every `%d` below stands for a value of at most two digits, and `%d` is
+ * itself two characters wide, so a composed title is never longer than its own
+ * format literal. The two-digit half of that premise is not assumed: the
+ * _Static_asserts further down check it against the constants that supply the
+ * values, and tests/unit/tests/ui_strings.c checks that each format still
+ * takes exactly the arguments its call site passes.
+ *
+ * One buffer, not two: the SSKR generation flow and the BIP85 password flow
+ * are reached from different branches of the tool menu and neither keypad is
+ * on screen while the other is.
+ */
+#define KEYPAD_TITLE_SIZE                               \
+    (sizeof(UI_STR_NBGL_SSKR_THRESHOLD_TITLE) >         \
+             sizeof(UI_STR_NBGL_BIP85_PWD_LENGTH_TITLE) \
+         ? sizeof(UI_STR_NBGL_SSKR_THRESHOLD_TITLE)     \
+         : sizeof(UI_STR_NBGL_BIP85_PWD_LENGTH_TITLE))
+static char keypadTitle[KEYPAD_TITLE_SIZE] = {0};
+
 unsigned int tool_type;
 
 static void display_home_page(void);
@@ -59,6 +90,7 @@ static void display_sskr_select_numshares_page(void);
 static void display_sskr_select_threshold_page(void);
 static void display_bip85_select_app_page(void);
 static void display_bip85_select_index_page(void);
+static void display_bip85_select_password_length_page(void);
 
 /*
  * Utils
@@ -72,6 +104,11 @@ static void reset_globals() {
     memzero(buttonTexts, sizeof(buttonTexts[0]) * NB_MAX_SUGGESTION_BUTTONS);
     memzero(headerText, sizeof(headerText));
     memzero(reviewText, sizeof(reviewText));
+    // No secret in it -- a share count and a length range, never a word or a
+    // share. Cleared anyway because headerText, one line up, carries the same
+    // class of thing ("SSKR share 2 of 3") and is cleared: leaving one of the
+    // two behind would make the rule here look like a judgement call.
+    memzero(keypadTitle, sizeof(keypadTitle));
 }
 
 static void on_quit(void) { os_sched_exit(-1); }
@@ -623,6 +660,31 @@ enum __attribute__((packed)) sskr_gen {
     SSKR_GEN_BACK_BUTTON_TOKEN = FIRST_USER_TOKEN
 };
 
+// UI_STR_NBGL_SSKR_NUMSHARES_TITLE and its error message both spell out 16 as
+// the number of shares this screen accepts. The bound the validator below
+// applies is SSS_MAX_SHARE_COUNT, which is 16 on every target that links this
+// file -- it is 10 only under TARGET_NANOS, which is BAGL and never compiles
+// it. Asserting the two agree is what stops a label from promising a share
+// count the Shamir layer would refuse.
+_Static_assert(SSS_MAX_SHARE_COUNT == 16,
+               "the SSKR share-count screen spells its upper bound out in "
+               "UI_STR_NBGL_SSKR_NUMSHARES_TITLE and its error message; "
+               "both have to be changed with SSS_MAX_SHARE_COUNT");
+
+// The threshold title composes SSS_MAX_SHARE_COUNT into a "%d" whose width the
+// keypad title buffer is sized on. Two digits is what that sizing assumes.
+_Static_assert(SSS_MAX_SHARE_COUNT <= 99,
+               "the composed threshold title assumes a two-digit share count");
+
+// The smallest threshold this screen accepts, and the one its title announces.
+// A threshold of 1 over more than one share means any single share rebuilds
+// the secret; sskr_threshold_validate() refuses that, so the floor is 2 as
+// soon as there is more than one share. Read by the title and by the check,
+// which is what stops the screen promising a value the check would reject.
+static uint8_t sskr_threshold_min(void) {
+    return sskr_sharenum_get() > 1 ? 2 : 1;
+}
+
 static void sskr_sharenum_validate(const uint8_t* sharenumentry,
                                    uint8_t length) {
     // Code to validate the entered shares number
@@ -635,11 +697,14 @@ static void sskr_sharenum_validate(const uint8_t* sharenumentry,
 
     PRINTF("Number of shares entered is '%d'\n", sskr_sharenum_get());
 
-    if (sskr_sharenum_get() > 0 && sskr_sharenum_get() <= 16) {
+    if (sskr_sharenum_get() > 0 && sskr_sharenum_get() <= SSS_MAX_SHARE_COUNT) {
         display_sskr_select_threshold_page();
     } else {
+        // Back to this keypad, not to the "Generate SSKR Phrase?" offer that
+        // opens the flow: the only thing wrong is the number that was just
+        // typed, and it is the only thing worth asking for again.
         nbgl_useCaseStatus(UI_STR_NBGL_SSKR_NUMSHARES_RANGE_ERROR, false,
-                           display_select_generate_sskr_page);
+                           display_sskr_select_numshares_page);
     }
 }
 
@@ -734,25 +799,54 @@ static void sskr_threshold_validate(const uint8_t* thresholdentry,
 
     PRINTF("Threshold value entered is '%d'\n", sskr_threshold_get());
 
+    // All three send the user back to this same keypad rather than to the
+    // "Generate SSKR Phrase?" offer at the head of the flow. The share count
+    // entered on the previous screen is valid, was accepted, and is not what
+    // is being corrected -- returning to the offer threw it away and made it
+    // be typed again before the threshold could be fixed. Nothing on this path
+    // resets it: reset_globals() and sskr_shares_reset() are reached only from
+    // display_home_page(), review_done() and the check flow, none of which any
+    // of these three branches goes through.
     if (sskr_threshold_get() < 1) {
         nbgl_useCaseStatus(UI_STR_NBGL_SSKR_THRESHOLD_ZERO_ERROR, false,
-                           display_select_generate_sskr_page);
+                           display_sskr_select_threshold_page);
     } else if (sskr_threshold_get() > sskr_sharenum_get()) {
         nbgl_useCaseStatus(UI_STR_NBGL_SSKR_THRESHOLD_RANGE_ERROR, false,
-                           display_select_generate_sskr_page);
-    } else if (sskr_threshold_get() == 1 && sskr_sharenum_get() > 1) {
+                           display_sskr_select_threshold_page);
+    } else if (sskr_threshold_get() < sskr_threshold_min()) {
+        // Below the floor is 1-of-m, and only that: the branch above has
+        // already taken everything under 1, and sskr_threshold_min() is 1
+        // whenever a threshold of 1 is legitimate. Written against the floor
+        // rather than against `== 1 && sharenum > 1` so that the value the
+        // title announces and the value this rejects are the same call.
         nbgl_useCaseStatus(UI_STR_NBGL_SSKR_THRESHOLD_ONE_OF_M_ERROR, false,
-                           display_select_generate_sskr_page);
+                           display_sskr_select_threshold_page);
     } else {
         display_sskr_shares();
     }
 }
 
 void display_sskr_select_threshold_page() {
+    // Neither bound is a constant, so the title is composed here from the two
+    // calls sskr_threshold_validate() makes above. The upper bound is the
+    // share count entered on the previous screen; the lower one is 2 as soon
+    // as there is more than one share, because a threshold of 1 over several
+    // shares is 1-of-m and is refused -- announcing (1 - N) there would have
+    // promised a value the next screen rejects.
+    //
+    // snprintf()'s return value is not read: the buffer is sized on the
+    // format itself and the _Static_asserts above bound every argument to two
+    // digits, so there is nothing for a check to find. (It would find it if
+    // there were: on the three SDKs that compile this file snprintf() returns
+    // the length it would have needed. The nanos SDK returns 0 from every exit
+    // and documents it, but never compiles this file.)
+    snprintf(keypadTitle, sizeof(keypadTitle), UI_STR_NBGL_SSKR_THRESHOLD_TITLE,
+             sskr_threshold_min(), sskr_sharenum_get());
+
     // Draw the keypad
-    nbgl_useCaseKeypad(
-        UI_STR_NBGL_SSKR_THRESHOLD_TITLE, 1, SSKR_MAX_NUMBER_LENGTH, false,
-        false, sskr_threshold_validate, display_sskr_select_numshares_page);
+    nbgl_useCaseKeypad(keypadTitle, 1, SSKR_MAX_NUMBER_LENGTH, false, false,
+                       sskr_threshold_validate,
+                       display_sskr_select_numshares_page);
 }
 
 enum __attribute__((packed)) select_bip85_app {
@@ -831,8 +925,14 @@ static void bip85_index_validate(const uint8_t* indexentry, uint8_t length) {
                 break;
         }
     } else {
+        // Back to the index keypad. The screen this used to return to,
+        // display_bip39_select_phrase_length_page(), is neither the field at
+        // fault nor even on the password branches of this flow. As the comment
+        // above says, this branch is unreachable from the keypad; the callback
+        // is corrected so that the guard, if it ever does fire, lands where
+        // the other five now do.
         nbgl_useCaseStatus(UI_STR_NBGL_BIP85_INDEX_RANGE_ERROR, false,
-                           display_bip39_select_phrase_length_page);
+                           display_bip85_select_index_page);
     }
 }
 
@@ -841,6 +941,41 @@ void display_bip85_select_index_page() {
     nbgl_useCaseKeypad(UI_STR_NBGL_BIP85_INDEX_TITLE, 1,
                        BIP85_INDEX_MAX_NUMBER_LENGTH, false, false,
                        bip85_index_validate, display_bip85_select_app_page);
+}
+
+// The password lengths this screen accepts, per application. Same values as
+// bip85_pwd_base64_len_valid() and bip85_pwd_base85_len_valid()
+// (src/common/bip85/seed_bip85.c), which guard the derivation itself; these
+// are the screen's own copy, named here so that the title announcing them, the
+// branch applying them and the error message quoting them all read one pair of
+// numbers rather than three sets of literals.
+#define BIP85_PWD_BASE64_LENGTH_MIN 20
+#define BIP85_PWD_BASE64_LENGTH_MAX (BASE64_ENCODE_LENGTH - 2)
+#define BIP85_PWD_BASE85_LENGTH_MIN 10
+#define BIP85_PWD_BASE85_LENGTH_MAX BASE85_ENCODE_LENGTH
+
+// Same two-digit assumption the keypad title buffer is sized on. All four,
+// not just the maxima: the title composes the minimum through a "%d" of the
+// same width, and a three-digit minimum would truncate the title silently
+// while leaving an assertion on the maxima alone perfectly happy.
+_Static_assert(BIP85_PWD_BASE64_LENGTH_MIN <= 99 &&
+                   BIP85_PWD_BASE64_LENGTH_MAX <= 99 &&
+                   BIP85_PWD_BASE85_LENGTH_MIN <= 99 &&
+                   BIP85_PWD_BASE85_LENGTH_MAX <= 99,
+               "the composed password-length title assumes two-digit bounds");
+
+static void bip85_password_length_bounds(uint8_t* min, uint8_t* max) {
+    // Base85 is the else rather than a third case because this screen is only
+    // ever reached from the two password buttons or from its own refusal --
+    // bip85_type_get() is BIP85_APP_PWD_BASE64 or BIP85_APP_PWD_BASE85 here,
+    // never BIP85_APP_BIP39, which has no length to choose and no keypad.
+    if (bip85_type_get() == BIP85_APP_PWD_BASE64) {
+        *min = BIP85_PWD_BASE64_LENGTH_MIN;
+        *max = BIP85_PWD_BASE64_LENGTH_MAX;
+    } else {
+        *min = BIP85_PWD_BASE85_LENGTH_MIN;
+        *max = BIP85_PWD_BASE85_LENGTH_MAX;
+    }
 }
 
 static void bip85_password_length_validate(const uint8_t* lengthentry,
@@ -854,11 +989,22 @@ static void bip85_password_length_validate(const uint8_t* lengthentry,
     }
     PRINTF("BIP85 password length entered is '%d'\n", bip85_length_get());
 
-    uint8_t password_length_min =
-        bip85_type_get() == BIP85_APP_PWD_BASE64 ? 20 : 10;
-    uint8_t password_length_max =
-        bip85_type_get() == BIP85_APP_PWD_BASE64 ? 86 : 80;
-    char message[50] = {0};
+    uint8_t password_length_min;
+    uint8_t password_length_max;
+    bip85_password_length_bounds(&password_length_min, &password_length_max);
+
+    // static for the same reason keypadTitle is, and it is the same mistake:
+    // nbgl_useCaseStatus() keeps the pointer rather than the text
+    // (`info.centeredInfo.text1 = message`, lib_nbgl/src/nbgl_use_case.c),
+    // nbgl_layoutAddCenteredInfo() stores it in the text area, and the status
+    // page stays up for three seconds after this function has returned. The
+    // first draw is synchronous and reads a live frame; any redraw after that
+    // -- nbgl_screenRedraw() walks the whole object tree, and the UX layer
+    // calls it on a system redisplay -- would read a stack frame the event
+    // loop has since reused. This is the only status message in the file that
+    // is composed rather than a literal, so it is the only one that had the
+    // problem.
+    static char message[50] = {0};
 
     if ((bip85_length_get() >= password_length_min) &&
         (bip85_length_get() <= password_length_max)) {
@@ -867,14 +1013,27 @@ static void bip85_password_length_validate(const uint8_t* lengthentry,
         snprintf(message, sizeof(message),
                  UI_STR_NBGL_BIP85_PWD_LENGTH_RANGE_ERROR, password_length_min,
                  password_length_max);
+        // Back to this keypad rather than to the application menu: the chosen
+        // application is what decides the bounds, it was not the mistake, and
+        // re-choosing it was the price of correcting a length.
         nbgl_useCaseStatus((const char*)message, false,
-                           display_bip85_select_app_page);
+                           display_bip85_select_password_length_page);
     }
 }
 
 void display_bip85_select_password_length_page() {
+    // Both bounds depend on the application chosen on the previous screen, so
+    // the title is composed here from the same helper the validator above
+    // reads. Return value unused, as on the threshold title.
+    uint8_t password_length_min;
+    uint8_t password_length_max;
+    bip85_password_length_bounds(&password_length_min, &password_length_max);
+    snprintf(keypadTitle, sizeof(keypadTitle),
+             UI_STR_NBGL_BIP85_PWD_LENGTH_TITLE, password_length_min,
+             password_length_max);
+
     // Draw the keypad
-    nbgl_useCaseKeypad(UI_STR_NBGL_BIP85_PWD_LENGTH_TITLE, 1, 2, false, false,
+    nbgl_useCaseKeypad(keypadTitle, 1, 2, false, false,
                        bip85_password_length_validate,
                        display_bip85_select_app_page);
 }

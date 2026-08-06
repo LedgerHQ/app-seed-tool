@@ -8,6 +8,17 @@ from ragger.firmware.touch.layouts import CenteredFooter, LetterOnlyKeyboard, Su
 from keypad import Keypad
 from genericlayout import GenericLayout
 
+# The threshold keypad names the values it accepts. Its upper bound is the
+# share count entered on the screen before it, so this string is also the
+# evidence that the count survived a refusal. Its lower bound is 2, not 1:
+# a threshold of 1 over three shares is the 1-of-m case the app refuses, and
+# a title reading (1 - 3) would be promising it.
+#
+# Escaped, because wait_for_text_on_screen() passes its argument to re.match():
+# unescaped parentheses are a group, and "(2 - 3)" would match a screen reading
+# "Enter threshold value 2 - 3", which is not what the device draws.
+THRESHOLD_TITLE_3_SHARES = r"Enter threshold value \(2 - 3\)"
+
 @fixture(scope='session')
 def set_seed():
     # Seed taken from https://github.com/BlockchainCommons/crypto-commons/blob/master/Docs/sskr-test-vector.md#128-bit-seed
@@ -39,70 +50,57 @@ def all_eink_unsupported_values(backend, device):
     backend.wait_for_text_on_screen("Generate SSKR", 5)
     choice.confirm()
 
-    # Test invalid sharenum values
+    # An out-of-range share count is refused and asked for again, on the keypad
+    # that asked for it. Each refusal is waited for on its own: the status page
+    # does not carry the keypad title, so reaching the title afterwards is a
+    # screen change and not the screen we were already on.
     backend.wait_for_text_on_screen("Enter number of SSKR shares", 5)
+    # The range on its own line, matched whole. This title carries a
+    # hand-placed line break for the same reason the password one does, and a
+    # layout that wrapped inside the range would draw "to generate (1 - " and
+    # "16)" as two events, so this assertion is what keeps the break where it
+    # was put. The other three ranges are matched whole for the same reason.
+    backend.wait_for_text_on_screen(r"to generate \(1 - 16\)", 1)
     keypad.write("0")
     keypad.enter()
-    # Test cannot catch transient (3s) status page fast enough but
-    # if unsupported values are entered and app does not crash it
-    # will display status and then return to "Generate SSKR" screen
-#    backend.wait_for_text_on_screen("between", 3)
-    backend.wait_for_text_on_screen("Generate SSKR", 5)
-    choice.confirm()
-    backend.wait_for_text_on_screen("Enter number of SSKR shares", 5)
+    backend.wait_for_text_on_screen("Number of SSKR", 5)
+    backend.wait_for_text_on_screen("Enter number of SSKR shares", 10)
     keypad.write("17")
     keypad.enter()
-    # Test cannot catch transient (3s) status page fast enough but
-    # if unsupported values are entered and app does not crash it
-    # will display status and then return to "Generate SSKR" screen
-#    backend.wait_for_text_on_screen("between", 3)
-    backend.wait_for_text_on_screen("Generate SSKR", 5)
-    choice.confirm()
+    backend.wait_for_text_on_screen("Number of SSKR", 5)
+    backend.wait_for_text_on_screen("Enter number of SSKR shares", 10)
 
-    # Test invalid threshold values
-    backend.wait_for_text_on_screen("Enter number of SSKR shares", 5)
+    # From here the share count is entered exactly once, and the rest of the
+    # test never types it again. Everything below depends on it still being 3.
     keypad.write("3")
     keypad.enter()
-    backend.wait_for_text_on_screen("Enter threshold value", 5)
+    backend.wait_for_text_on_screen(THRESHOLD_TITLE_3_SHARES, 5)
+
+    # Each of the three threshold refusals comes back to the threshold keypad,
+    # still announcing (1 - 3).
     keypad.write("0")
     keypad.enter()
-    # Test cannot catch transient (3s) status page fast enough but
-    # if unsupported values are entered and app does not crash it
-    # will display status and then return to "Generate SSKR" screen
-#    backend.wait_for_text_on_screen("cannot", 3)
-    backend.wait_for_text_on_screen("Generate SSKR", 5)
-    choice.confirm()
-    backend.wait_for_text_on_screen("Enter number of SSKR shares", 5)
-    keypad.write("3")
-    keypad.enter()
-    backend.wait_for_text_on_screen("Enter threshold value", 5)
+    backend.wait_for_text_on_screen("Threshold value", 5)
+    backend.wait_for_text_on_screen(THRESHOLD_TITLE_3_SHARES, 10)
+
     keypad.write("4")
     keypad.enter()
-    # Test cannot catch transient (3s) status page fast enough but
-    # if unsupported values are entered and app does not crash it
-    # will display status and then return to "Generate SSKR" screen
-#    backend.wait_for_text_on_screen("cannot", 3)
-    backend.wait_for_text_on_screen("Generate SSKR", 5)
-    choice.confirm()
-    backend.wait_for_text_on_screen("Enter number of SSKR shares", 5)
-    keypad.write("3")
-    keypad.enter()
-    backend.wait_for_text_on_screen("Enter threshold value", 5)
+    backend.wait_for_text_on_screen("Threshold value", 5)
+    backend.wait_for_text_on_screen(THRESHOLD_TITLE_3_SHARES, 10)
+
     keypad.write("1")
     keypad.enter()
-    # Test cannot catch transient (3s) status page fast enough but
-    # if unsupported values are entered and app does not crash it
-    # will display status and then return to "Generate SSKR" screen
-#    backend.wait_for_text_on_screen("not supported", 3)
-    backend.wait_for_text_on_screen("Generate SSKR", 5)
-    choice.confirm()
-    backend.wait_for_text_on_screen("Enter number of SSKR shares", 5)
-    keypad.write("1")
+    backend.wait_for_text_on_screen("1-of-m shares", 5)
+    backend.wait_for_text_on_screen(THRESHOLD_TITLE_3_SHARES, 10)
+
+    # And a threshold this one does accept generates a 2-of-3 straight away.
+    # This is what the three refusals above cost before: each of them returned
+    # to the "Generate SSKR Phrase?" offer, so reaching this point meant typing
+    # the share count three more times. The share label naming 3 is the proof
+    # that the count entered once is the count that was used.
+    keypad.write("2")
     keypad.enter()
-    backend.wait_for_text_on_screen("Enter threshold value", 5)
-    keypad.write("1")
-    keypad.enter()
-    backend.wait_for_text_on_screen("SSKR share", 5)
+    backend.wait_for_text_on_screen("SSKR share 1 of 3", 5)
     backend.wait_for_text_on_screen("tuna next keep gyro", 1)
     review.exit()
     backend.wait_for_text_on_screen("Seed Tool", 5)

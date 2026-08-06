@@ -27,10 +27,23 @@ def all_eink_bip85_pwd_base64(backend, device):
     backend.wait_for_text_on_screen("Which BIP85", 5)
     genericbuttons.choose(2)
     backend.wait_for_text_on_screen("Enter password length", 5)
+    # The keypad names the range this application accepts, on its own line --
+    # escaped because wait_for_text_on_screen() matches with re.match(). Base85
+    # is 10 to 80; the two are not interchangeable, which is why the title is
+    # composed per application rather than declared once.
+    backend.wait_for_text_on_screen(r"\(20 - 86\)", 1)
+    # A length outside that range comes back to this keypad, not to the
+    # application menu: the application chosen is what decides the bounds and
+    # was never the mistake.
+    keypad.write("5")
+    keypad.enter()
+    backend.wait_for_text_on_screen("BIP85 password", 5)
+    backend.wait_for_text_on_screen("Enter password length", 10)
     keypad.write("2")
     keypad.write("1")
     keypad.enter()
     backend.wait_for_text_on_screen("Enter index", 5)
+    backend.wait_for_text_on_screen(r"Enter index \(0 - 9,999,999\)", 1)
     keypad.write("0")
     keypad.enter()
     backend.wait_for_text_on_screen("Base64 Password", 5)

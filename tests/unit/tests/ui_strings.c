@@ -33,10 +33,12 @@
 #include <stddef.h>
 #include <setjmp.h>
 #include <cmocka.h>
+#include <stdbool.h>
 #include <string.h>
 #include <stdio.h>
 
 #include "ui_strings.h"
+#include "constants.h"
 #include "sss-constants.h"
 
 #define ENTRY(name) \
@@ -416,11 +418,144 @@ static void test_sskr_share_label_fits_the_nano_title_line(void **state) {
     }
 }
 
+/*
+ * Four of the entry screens name, in their own title, the range of values
+ * they accept. A title that announces a bound the code does not apply is
+ * worse than a title with no bound at all: it is read as a promise.
+ *
+ * Two of the four carry the bound as a literal, because nothing about it
+ * varies -- and a literal is exactly what drifts. Both are checked here
+ * against the constant that actually decides the bound:
+ *
+ *   - the SSKR share count against SSS_MAX_SHARE_COUNT, which is what
+ *     sskr_sharenum_validate() compares against and what the Shamir layer
+ *     refuses to exceed;
+ *   - the BIP85 index against the keypad's own digit cap,
+ *     BIP85_INDEX_MAX_NUMBER_LENGTH. Raising that cap to eight digits without
+ *     touching the strings would leave two screens announcing a ceiling a
+ *     million short of the one the keypad accepts.
+ *
+ * The number is looked for as digits, with any thousands separators dropped
+ * first, so that "9,999,999" and "9999999" are the same claim.
+ *
+ * It is matched as a whole run of digits, not as a substring. A substring
+ * search passes on exactly the half of the problem that matters: lower the
+ * keypad cap to six digits and "999999" is still found inside the title's
+ * "9999999", so a title promising ten times what the keypad accepts would go
+ * through. Comparing whole runs fails in both directions.
+ */
+static void strip_commas(const char *in, char *out, size_t out_size) {
+    size_t o = 0;
+    for (size_t i = 0; in[i] != '\0' && o + 1 < out_size; i++) {
+        if (in[i] != ',') {
+            out[o++] = in[i];
+        }
+    }
+    out[o] = '\0';
+}
+
+static bool has_digit_run(const char *text, const char *bound) {
+    size_t bound_len = strlen(bound);
+    for (size_t i = 0; text[i] != '\0';) {
+        if (text[i] < '0' || text[i] > '9') {
+            i++;
+            continue;
+        }
+        size_t start = i;
+        while (text[i] >= '0' && text[i] <= '9') {
+            i++;
+        }
+        size_t run_len = i - start;
+        if (run_len == bound_len && strncmp(text + start, bound, bound_len) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static void assert_announces(const char *name, const char *value, const char *bound) {
+    char plain[256];
+    strip_commas(value, plain, sizeof(plain));
+    if (!has_digit_run(plain, bound)) {
+        fail_msg("%s (\"%s\") does not name %s, the bound the code applies", name, value, bound);
+    }
+}
+
+static void test_announced_bounds_are_the_applied_ones(void **state) {
+    (void) state;
+
+    char bound[32];
+
+    snprintf(bound, sizeof(bound), "%d", SSS_MAX_SHARE_COUNT);
+    assert_announces("UI_STR_NBGL_SSKR_NUMSHARES_TITLE", UI_STR_NBGL_SSKR_NUMSHARES_TITLE, bound);
+    assert_announces("UI_STR_NBGL_SSKR_NUMSHARES_RANGE_ERROR",
+                     UI_STR_NBGL_SSKR_NUMSHARES_RANGE_ERROR, bound);
+
+    /* the largest value BIP85_INDEX_MAX_NUMBER_LENGTH digits can spell */
+    unsigned long index_max = 1;
+    for (int i = 0; i < BIP85_INDEX_MAX_NUMBER_LENGTH; i++) {
+        index_max *= 10;
+    }
+    snprintf(bound, sizeof(bound), "%lu", index_max - 1);
+    assert_announces("UI_STR_NBGL_BIP85_INDEX_TITLE", UI_STR_NBGL_BIP85_INDEX_TITLE, bound);
+    assert_announces("UI_STR_NBGL_BIP85_INDEX_RANGE_ERROR", UI_STR_NBGL_BIP85_INDEX_RANGE_ERROR,
+                     bound);
+}
+
+/*
+ * The other two carry their bounds as "%d", filled in at display time -- the
+ * threshold's maximum is the share count just entered, the password length's
+ * pair depends on the chosen application. Nothing here can check the values,
+ * which only exist at runtime; what it can check is that each format still
+ * takes exactly the arguments its call site passes.
+ *
+ * Both failure modes are real and neither is loud. A title reworded without
+ * its "%d" drops the bound the screen was changed to show, and nothing warns.
+ * A title that gains one reads an argument that was never pushed.
+ */
+static size_t count_conversions(const char *format) {
+    size_t n = 0;
+    for (size_t i = 0; format[i] != '\0'; i++) {
+        if (format[i] == '%' && format[i + 1] == 'd') {
+            n++;
+            i++;
+        }
+    }
+    return n;
+}
+
+static void test_composed_titles_take_the_arguments_passed_to_them(void **state) {
+    (void) state;
+
+    static const struct {
+        const char *name;
+        const char *value;
+        size_t expected;
+    } k_composed[] = {
+        /* display_sskr_select_threshold_page(): the floor, then the share count */
+        {"UI_STR_NBGL_SSKR_THRESHOLD_TITLE", UI_STR_NBGL_SSKR_THRESHOLD_TITLE, 2},
+        /* display_bip85_select_password_length_page(): minimum, maximum */
+        {"UI_STR_NBGL_BIP85_PWD_LENGTH_TITLE", UI_STR_NBGL_BIP85_PWD_LENGTH_TITLE, 2},
+        /* bip85_password_length_validate(): the same pair */
+        {"UI_STR_NBGL_BIP85_PWD_LENGTH_RANGE_ERROR", UI_STR_NBGL_BIP85_PWD_LENGTH_RANGE_ERROR, 2},
+    };
+
+    for (size_t i = 0; i < sizeof(k_composed) / sizeof(k_composed[0]); i++) {
+        size_t found = count_conversions(k_composed[i].value);
+        if (found != k_composed[i].expected) {
+            fail_msg("%s (\"%s\") takes %zu \"%%d\", but its call site passes %zu",
+                     k_composed[i].name, k_composed[i].value, found, k_composed[i].expected);
+        }
+    }
+}
+
 int main(void) {
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(test_every_string_is_non_empty),
         cmocka_unit_test(test_nano_fixed_layout_strings_fit_their_budget),
         cmocka_unit_test(test_sskr_share_label_fits_the_nano_title_line),
+        cmocka_unit_test(test_announced_bounds_are_the_applied_ones),
+        cmocka_unit_test(test_composed_titles_take_the_arguments_passed_to_them),
     };
     return cmocka_run_group_tests(tests, NULL, NULL);
 }
