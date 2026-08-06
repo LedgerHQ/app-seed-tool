@@ -27,6 +27,10 @@ def all_eink_bip85_pwd_base85(backend, device):
     backend.wait_for_text_on_screen("Which BIP85", 5)
     genericbuttons.choose(3)
     backend.wait_for_text_on_screen("Enter password length", 5)
+    # Base85 accepts 10 to 80, where Base64 accepts 20 to 86. Asserting the
+    # range here and in test_bip85_pwd_base64.py is what keeps the composed
+    # title honest per application rather than merely present.
+    backend.wait_for_text_on_screen(r"\(10 - 80\)", 1)
     keypad.write("1")
     keypad.write("2")
     keypad.enter()

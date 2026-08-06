@@ -298,12 +298,33 @@
 /*
  * SSKR share count / threshold selection
  */
+/*
+ * The 16 spelled out in these two is SSS_MAX_SHARE_COUNT on every target that
+ * links NBGL. It stays a literal here -- nothing composed at runtime, since
+ * nothing about it varies -- and src/nbgl/ui.c static-asserts that the bound
+ * it applies is still that number, so the two cannot drift apart in silence.
+ */
 #define UI_STR_NBGL_SSKR_NUMSHARES_TITLE       "Enter number of SSKR shares\nto generate (1 - 16)"
 #define UI_STR_NBGL_SSKR_NUMSHARES_RANGE_ERROR "Number of SSKR shares must be between 1 and 16"
 #define UI_STR_BAGL_SSKR_NUMSHARES_TITLE_L1    "Select number"
 #define UI_STR_BAGL_SSKR_NUMSHARES_TITLE_L2    "of shares"
 
-#define UI_STR_NBGL_SSKR_THRESHOLD_TITLE      "Enter threshold value"
+/*
+ * Neither bound of the threshold keypad is a constant, so the title is a
+ * format composed at display time rather than a literal. The upper `%d` is
+ * the share count the user entered on the previous screen. The lower one is
+ * 2 as soon as there is more than one share: a threshold of 1 over several
+ * shares is the 1-of-m case refused below, so a title reading `(1 - N)` there
+ * would promise a value the next screen rejects. Both are the same calls the
+ * validator makes, so the screen cannot announce a range the code does not
+ * accept.
+ *
+ * Each `%d` here stands for a value of at most two digits, and `%d` is itself
+ * two characters wide, so the composed title is never longer than this format
+ * literal. src/nbgl/ui.c sizes its title buffer on that, and static-asserts
+ * the two-digit half of it against the constants themselves.
+ */
+#define UI_STR_NBGL_SSKR_THRESHOLD_TITLE      "Enter threshold value (%d - %d)"
 #define UI_STR_NBGL_SSKR_THRESHOLD_ZERO_ERROR "Threshold value cannot be 0"
 #define UI_STR_NBGL_SSKR_THRESHOLD_RANGE_ERROR \
     "Threshold value cannot be greater than number of shares"
@@ -327,8 +348,27 @@
 #define UI_STR_NBGL_BIP85_BASE64_HEADER "Base64 Password (Index #%d)"
 #define UI_STR_NBGL_BIP85_BASE85_HEADER "Base85 Password (Index #%d)"
 
-#define UI_STR_NBGL_BIP85_INDEX_TITLE       "Enter index"
+/*
+ * The bound in the title is the keypad's own digit cap
+ * (BIP85_INDEX_MAX_NUMBER_LENGTH, seven digits), which is what the person
+ * typing can actually reach -- the same number, and for the same reason, as
+ * the error message beside it. See the comment on bip85_index_validate() in
+ * src/nbgl/ui.c for why the 31-bit derivation bound it also checks is a
+ * different number on purpose.
+ */
+#define UI_STR_NBGL_BIP85_INDEX_TITLE       "Enter index (0 - 9,999,999)"
 #define UI_STR_NBGL_BIP85_INDEX_RANGE_ERROR "BIP85 index must be between 0 and 9,999,999"
 
-#define UI_STR_NBGL_BIP85_PWD_LENGTH_TITLE       "Enter password length"
+/*
+ * Both bounds depend on which password application was chosen, so the title
+ * is composed at display time from the same two values the validator applies,
+ * exactly as the error message beside it already was. Same two-digit argument
+ * for the buffer sizing as UI_STR_NBGL_SSKR_THRESHOLD_TITLE above.
+ *
+ * The line break is placed rather than left to the layout: without it the
+ * keypad title wraps inside the range itself, and all three touch devices
+ * drew "(20 - " on one line and "86)" on the next. A bound split across a
+ * line break is the one thing this title exists not to do.
+ */
+#define UI_STR_NBGL_BIP85_PWD_LENGTH_TITLE       "Enter password length\n(%d - %d)"
 #define UI_STR_NBGL_BIP85_PWD_LENGTH_RANGE_ERROR "BIP85 password length must be between %d and %d"
