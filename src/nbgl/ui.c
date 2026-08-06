@@ -90,6 +90,7 @@ static void display_sskr_select_numshares_page(void);
 static void display_sskr_select_threshold_page(void);
 static void display_bip85_select_app_page(void);
 static void display_bip85_select_index_page(void);
+static void display_bip85_select_password_length_page(void);
 
 /*
  * Utils
@@ -699,8 +700,11 @@ static void sskr_sharenum_validate(const uint8_t* sharenumentry,
     if (sskr_sharenum_get() > 0 && sskr_sharenum_get() <= SSS_MAX_SHARE_COUNT) {
         display_sskr_select_threshold_page();
     } else {
+        // Back to this keypad, not to the "Generate SSKR Phrase?" offer that
+        // opens the flow: the only thing wrong is the number that was just
+        // typed, and it is the only thing worth asking for again.
         nbgl_useCaseStatus(UI_STR_NBGL_SSKR_NUMSHARES_RANGE_ERROR, false,
-                           display_select_generate_sskr_page);
+                           display_sskr_select_numshares_page);
     }
 }
 
@@ -795,12 +799,20 @@ static void sskr_threshold_validate(const uint8_t* thresholdentry,
 
     PRINTF("Threshold value entered is '%d'\n", sskr_threshold_get());
 
+    // All three send the user back to this same keypad rather than to the
+    // "Generate SSKR Phrase?" offer at the head of the flow. The share count
+    // entered on the previous screen is valid, was accepted, and is not what
+    // is being corrected -- returning to the offer threw it away and made it
+    // be typed again before the threshold could be fixed. Nothing on this path
+    // resets it: reset_globals() and sskr_shares_reset() are reached only from
+    // display_home_page(), review_done() and the check flow, none of which any
+    // of these three branches goes through.
     if (sskr_threshold_get() < 1) {
         nbgl_useCaseStatus(UI_STR_NBGL_SSKR_THRESHOLD_ZERO_ERROR, false,
-                           display_select_generate_sskr_page);
+                           display_sskr_select_threshold_page);
     } else if (sskr_threshold_get() > sskr_sharenum_get()) {
         nbgl_useCaseStatus(UI_STR_NBGL_SSKR_THRESHOLD_RANGE_ERROR, false,
-                           display_select_generate_sskr_page);
+                           display_sskr_select_threshold_page);
     } else if (sskr_threshold_get() < sskr_threshold_min()) {
         // Below the floor is 1-of-m, and only that: the branch above has
         // already taken everything under 1, and sskr_threshold_min() is 1
@@ -808,7 +820,7 @@ static void sskr_threshold_validate(const uint8_t* thresholdentry,
         // rather than against `== 1 && sharenum > 1` so that the value the
         // title announces and the value this rejects are the same call.
         nbgl_useCaseStatus(UI_STR_NBGL_SSKR_THRESHOLD_ONE_OF_M_ERROR, false,
-                           display_select_generate_sskr_page);
+                           display_sskr_select_threshold_page);
     } else {
         display_sskr_shares();
     }
@@ -913,8 +925,14 @@ static void bip85_index_validate(const uint8_t* indexentry, uint8_t length) {
                 break;
         }
     } else {
+        // Back to the index keypad. The screen this used to return to,
+        // display_bip39_select_phrase_length_page(), is neither the field at
+        // fault nor even on the password branches of this flow. As the comment
+        // above says, this branch is unreachable from the keypad; the callback
+        // is corrected so that the guard, if it ever does fire, lands where
+        // the other five now do.
         nbgl_useCaseStatus(UI_STR_NBGL_BIP85_INDEX_RANGE_ERROR, false,
-                           display_bip39_select_phrase_length_page);
+                           display_bip85_select_index_page);
     }
 }
 
@@ -995,8 +1013,11 @@ static void bip85_password_length_validate(const uint8_t* lengthentry,
         snprintf(message, sizeof(message),
                  UI_STR_NBGL_BIP85_PWD_LENGTH_RANGE_ERROR, password_length_min,
                  password_length_max);
+        // Back to this keypad rather than to the application menu: the chosen
+        // application is what decides the bounds, it was not the mistake, and
+        // re-choosing it was the price of correcting a length.
         nbgl_useCaseStatus((const char*)message, false,
-                           display_bip85_select_app_page);
+                           display_bip85_select_password_length_page);
     }
 }
 
