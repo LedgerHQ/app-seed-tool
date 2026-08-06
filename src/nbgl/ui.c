@@ -81,9 +81,33 @@ static char keypadTitle[KEYPAD_TITLE_SIZE] = {0};
 
 unsigned int tool_type;
 
+/*
+ * What the user picked from the menu. tool_type says which of the three kinds
+ * of data is being entered and is what compare_recovery_phrase() dispatches
+ * on; this says what it is being entered for, which the tool cannot express:
+ * checking a phrase and backing one up are both TOOL_TYPE_BIP39.
+ *
+ * Defaulted to the first entry so that no screen reads it unset. Every path
+ * to a screen that consults it goes through select_menu_callback(), which
+ * writes it.
+ *
+ * volatile, and for one reason: the bound in display_check_result_page()
+ * disappears without it. Every write to this variable in this file is a
+ * constant between 0 and 3 and the variable is static, so the compiler proves
+ * `user_intent < USER_INTENT_NB` and folds the check away -- measured: _etext
+ * was byte-identical on all three touch targets with the bound present and
+ * with it removed. What the bound is there for is a byte that changed without
+ * anyone writing it, which is exactly the case that proof excludes. Same
+ * reason `checkpoints` is volatile in compare_recovery_phrase_finish()
+ * (src/common/common_seed.c).
+ */
+static volatile user_intent_e user_intent = USER_INTENT_CHECK;
+
 static void display_home_page(void);
+static void display_select_menu_page(void);
 static void display_check_keyboard_page(void);
 static void display_check_result_page(const bool result);
+static void display_backup_explain_page(void);
 static void display_bip39_select_phrase_length_page(void);
 static void display_generic_review(void);
 static void display_sskr_select_numshares_page(void);
@@ -114,85 +138,122 @@ static void reset_globals() {
 static void on_quit(void) { os_sched_exit(-1); }
 
 /*
- * Select tool type, BIP39 or SSKR
+ * The menu: one entry per intention
  */
-enum __attribute__((packed)) select_tool {
-    SELECT_TOOL_ICON_INDEX = 0,
-    SELECT_TOOL_TEXT_INDEX,
-    SELECT_TOOL_BIP39_INDEX,
-    SELECT_TOOL_SSKR_INDEX,
-    SELECT_TOOL_BIP85_INDEX,
-    SELECT_TOOL_BACK_BUTTON_INDEX,
-    SELECT_TOOL_NB_CHILDREN
+enum __attribute__((packed)) select_menu {
+    SELECT_MENU_TEXT_INDEX = 0,
+    /*
+     * generic_screen_configure_buttons() stacks its buttons upwards from the
+     * bottom of the screen, so the first button child is the *last* line the
+     * user reads. These four are declared in that order -- bottom entry
+     * first -- and named for the intention they carry rather than for where
+     * they sit, which is how the reading order stays Check, Generate,
+     * Recover, Derive from the top without any of the code below depending
+     * on knowing that.
+     */
+    SELECT_MENU_DERIVE_INDEX,
+    SELECT_MENU_RECOVER_INDEX,
+    SELECT_MENU_BACKUP_INDEX,
+    SELECT_MENU_CHECK_INDEX,
+    SELECT_MENU_BACK_BUTTON_INDEX,
+    SELECT_MENU_NB_CHILDREN
 };
 
-static const char* toolType[] = {UI_STR_NBGL_TOOL_BIP39, UI_STR_NBGL_TOOL_SSKR,
-                                 UI_STR_NBGL_TOOL_BIP85};
-static void select_tool_callback(nbgl_obj_t* obj, nbgl_touchType_t eventType) {
+// One button per intention. Asserted against the enumeration rather than
+// counted by hand, because this number is what nbgl_objPoolGetArray() below
+// writes into consecutive children: a value smaller than the run of button
+// indices leaves an unallocated child, a larger one runs into the back
+// button.
+#define SELECT_MENU_NB_BUTTONS 4
+_Static_assert(SELECT_MENU_BACK_BUTTON_INDEX - SELECT_MENU_DERIVE_INDEX ==
+                   SELECT_MENU_NB_BUTTONS,
+               "the menu allocates SELECT_MENU_NB_BUTTONS buttons into the "
+               "children between SELECT_MENU_DERIVE_INDEX and the back "
+               "button; adding an entry means changing both");
+_Static_assert(USER_INTENT_NB == SELECT_MENU_NB_BUTTONS,
+               "the menu shows one entry per intention");
+
+static void select_menu_callback(nbgl_obj_t* obj, nbgl_touchType_t eventType) {
     nbgl_obj_t** screenChildren = nbgl_screenGetElements(0);
     if (eventType != TOUCHED) {
         return;
     }
     io_seproxyhal_play_tune(TUNE_TAP_CASUAL);
     nbgl_layoutRelease(layout);
-    if (obj == screenChildren[SELECT_TOOL_BIP39_INDEX]) {
+    // Each entry sets both: the intention, and the kind of data the screens
+    // it leads to will be handed. Checking a phrase and backing one up are
+    // the same tool and different intentions, which is the whole reason the
+    // two are separate variables.
+    if (obj == screenChildren[SELECT_MENU_CHECK_INDEX]) {
+        user_intent = USER_INTENT_CHECK;
         tool_type = TOOL_TYPE_BIP39;
         display_bip39_select_phrase_length_page();
-    } else if (obj == screenChildren[SELECT_TOOL_SSKR_INDEX]) {
+    } else if (obj == screenChildren[SELECT_MENU_BACKUP_INDEX]) {
+        user_intent = USER_INTENT_BACKUP;
+        tool_type = TOOL_TYPE_BIP39;
+        display_backup_explain_page();
+    } else if (obj == screenChildren[SELECT_MENU_RECOVER_INDEX]) {
+        user_intent = USER_INTENT_RECOVER;
         tool_type = TOOL_TYPE_SSKR;
         display_check_keyboard_page();
-    } else if (obj == screenChildren[SELECT_TOOL_BIP85_INDEX]) {
+    } else if (obj == screenChildren[SELECT_MENU_DERIVE_INDEX]) {
+        user_intent = USER_INTENT_DERIVE;
         tool_type = TOOL_TYPE_BIP85;
         display_bip85_select_app_page();
-    } else if (obj == screenChildren[SELECT_TOOL_BACK_BUTTON_INDEX]) {
+    } else if (obj == screenChildren[SELECT_MENU_BACK_BUTTON_INDEX]) {
         display_home_page();
         return;
     }
 }
 
-static void display_select_tool_page(void) {
+static void display_select_menu_page(void) {
     nbgl_obj_t** screenChildren;
 
     // From top to bottom:
-    // <return back arrow> + <icon> + <text> + <3 buttons>
-    nbgl_screenSet(&screenChildren, SELECT_TOOL_NB_CHILDREN, NULL,
-                   (nbgl_touchCallback_t)&select_tool_callback);
+    // <return back arrow> + <text> + <4 buttons>
+    //
+    // No icon, where the three-entry menu had the application's. Two reasons,
+    // both checked rather than preferred:
+    //
+    //   - there is no room. On apex_p a button is 56px on a 400px screen and
+    //     the stack starts BORDER_MARGIN from the bottom, so the fourth one
+    //     occupies y=136 to 192, and the icon and the title together ran from
+    //     74 to 200. The title alone, hung under the back button, ends well
+    //     above it;
+    //   - the icons this repository has name formats -- icon_bip39,
+    //     icon_sskr, icon_bip85 -- while these entries name intentions.
+    //     Generate and Recover would both have taken icon_sskr, which is
+    //     exactly what the previous menu did to its BIP85 entry: it wore the
+    //     SSKR icon, so two of three buttons were illustrated identically.
+    //
+    // No emphasised button either. The black button of an NBGL screen is its
+    // primary action, and these four are peers.
+    nbgl_screenSet(&screenChildren, SELECT_MENU_NB_CHILDREN, NULL,
+                   (nbgl_touchCallback_t)&select_menu_callback);
 
-    screenChildren[SELECT_TOOL_ICON_INDEX] =
-        (nbgl_obj_t*)generic_screen_set_icon(&ICON_APP_HOME);
-    screenChildren[SELECT_TOOL_TEXT_INDEX] =
-        (nbgl_obj_t*)generic_screen_set_title(
-            screenChildren[SELECT_TOOL_ICON_INDEX]);
-    ((nbgl_text_area_t*)screenChildren[SELECT_TOOL_TEXT_INDEX])->text =
-        UI_STR_NBGL_SELECT_TOOL_TITLE;
-    // create nb words buttons
+    screenChildren[SELECT_MENU_TEXT_INDEX] =
+        (nbgl_obj_t*)generic_screen_set_top_title();
+    ((nbgl_text_area_t*)screenChildren[SELECT_MENU_TEXT_INDEX])->text =
+        UI_STR_NBGL_MENU_TITLE;
+
     nbgl_objPoolGetArray(
-        BUTTON, ARRAYLEN(toolType), 0,
-        (nbgl_obj_t**)&screenChildren[SELECT_TOOL_BIP39_INDEX]);
+        BUTTON, SELECT_MENU_NB_BUTTONS, 0,
+        (nbgl_obj_t**)&screenChildren[SELECT_MENU_DERIVE_INDEX]);
     generic_screen_configure_buttons(
-        (nbgl_button_t**)&screenChildren[SELECT_TOOL_BIP39_INDEX],
-        ARRAYLEN(toolType));
-    ((nbgl_button_t*)screenChildren[SELECT_TOOL_BIP39_INDEX])->text =
-        toolType[0];
-    ((nbgl_button_t*)screenChildren[SELECT_TOOL_BIP39_INDEX])->icon =
-        &BIP39_ICON_SMALL;
-    ((nbgl_button_t*)screenChildren[SELECT_TOOL_SSKR_INDEX])->text =
-        toolType[1];
-    ((nbgl_button_t*)screenChildren[SELECT_TOOL_SSKR_INDEX])->icon =
-        &SSKR_ICON_SMALL;
-    ((nbgl_button_t*)screenChildren[SELECT_TOOL_SSKR_INDEX])->borderColor =
-        BLACK;
-    ((nbgl_button_t*)screenChildren[SELECT_TOOL_SSKR_INDEX])->innerColor =
-        BLACK;
-    ((nbgl_button_t*)screenChildren[SELECT_TOOL_SSKR_INDEX])->foregroundColor =
-        WHITE;
-    ((nbgl_button_t*)screenChildren[SELECT_TOOL_BIP85_INDEX])->text =
-        toolType[2];
-    ((nbgl_button_t*)screenChildren[SELECT_TOOL_BIP85_INDEX])->icon =
-        &SSKR_ICON_SMALL;
+        (nbgl_button_t**)&screenChildren[SELECT_MENU_DERIVE_INDEX],
+        SELECT_MENU_NB_BUTTONS);
+
+    ((nbgl_button_t*)screenChildren[SELECT_MENU_CHECK_INDEX])->text =
+        UI_STR_NBGL_MENU_CHECK;
+    ((nbgl_button_t*)screenChildren[SELECT_MENU_BACKUP_INDEX])->text =
+        UI_STR_NBGL_MENU_BACKUP;
+    ((nbgl_button_t*)screenChildren[SELECT_MENU_RECOVER_INDEX])->text =
+        UI_STR_NBGL_MENU_RECOVER;
+    ((nbgl_button_t*)screenChildren[SELECT_MENU_DERIVE_INDEX])->text =
+        UI_STR_NBGL_MENU_DERIVE;
 
     // create back button
-    screenChildren[SELECT_TOOL_BACK_BUTTON_INDEX] =
+    screenChildren[SELECT_MENU_BACK_BUTTON_INDEX] =
         (nbgl_obj_t*)generic_screen_set_back_button();
 
     nbgl_screenRedraw();
@@ -222,22 +283,34 @@ void display_select_recover_bip39_page(void) {
 }
 
 /*
- * Select Generate SSKR
+ * Backing up: why the phrase is asked for first
+ *
+ * The one screen this change adds to the path the user walks. "Generate
+ * backup shares" leads here, and here explains why an application running on
+ * a device that already holds the phrase is about to ask for twenty-four
+ * words -- compare_recovery_phrase() gets a seed back from the device, never
+ * the words, so the words have to come from the person.
+ *
+ * It takes the place of "Generate SSKR Phrase?", which used to sit *after*
+ * the verdict and ask whether to do the thing the user had not asked for.
+ * Declining still lands on the home page, and still through
+ * display_home_page(), which is what calls reset_globals(); nothing is entered
+ * yet at this point.
  */
-static void select_generate_sskr_choice(bool sskr_gen) {
+static void backup_explain_choice(bool proceed) {
     nbgl_layoutRelease(layout);
-    if (sskr_gen) {
-        display_sskr_select_numshares_page();
+    if (proceed) {
+        display_bip39_select_phrase_length_page();
     } else {
         display_home_page();
     }
 }
 
-void display_select_generate_sskr_page(void) {
-    nbgl_useCaseChoice(&SSKR_ICON, UI_STR_NBGL_GENERATE_SSKR_TITLE,
-                       UI_STR_NBGL_GENERATE_SSKR_DESC,
-                       UI_STR_NBGL_GENERATE_SSKR_CONFIRM, UI_STR_NBGL_CANCEL,
-                       select_generate_sskr_choice);
+static void display_backup_explain_page(void) {
+    nbgl_useCaseChoice(&SSKR_ICON, UI_STR_NBGL_BACKUP_EXPLAIN_TITLE,
+                       UI_STR_NBGL_BACKUP_EXPLAIN_DESC,
+                       UI_STR_NBGL_BACKUP_EXPLAIN_CONFIRM, UI_STR_NBGL_CANCEL,
+                       backup_explain_choice);
 }
 
 /*
@@ -274,18 +347,53 @@ static void select_bip39_phrase_length_callback(nbgl_obj_t* obj,
         bip39_mnemonic_final_size_set(BIP39_MNEMONIC_SIZE_24);
     } else if (obj ==
                screenChildren[SELECT_BIP39_PHRASE_LENGTH_BACK_BUTTON_INDEX]) {
-        if (tool_type == TOOL_TYPE_BIP85) {
-            display_bip85_select_app_page();
-        } else {
-            display_select_tool_page();
+        // Back goes to whatever asked for this screen, which is now three
+        // different things. Written on the intention rather than on the tool
+        // because Check and Backup share the tool and do not share a caller.
+        switch (user_intent) {
+            case USER_INTENT_DERIVE:
+                display_bip85_select_app_page();
+                break;
+            case USER_INTENT_BACKUP:
+                display_backup_explain_page();
+                break;
+            case USER_INTENT_CHECK:
+            case USER_INTENT_RECOVER:
+            case USER_INTENT_NB:
+                // Recover enters ByteWords and never chooses a BIP-39 length;
+                // it is grouped with Check so that this switch stays
+                // exhaustive and a new intention is a -Wswitch diagnostic
+                // rather than a silent fall onto someone else's back button.
+                display_select_menu_page();
+                break;
         }
         return;
     }
-    if (tool_type == TOOL_TYPE_BIP85) {
+    if (user_intent == USER_INTENT_DERIVE) {
         display_bip85_select_index_page();
     } else {
         display_check_keyboard_page();
     }
+}
+
+// Three intentions reach the length screen and two questions are asked on it.
+// Check and Backup both type in a phrase that already exists, so both ask how
+// long it is; Derive asks how long a phrase to produce. The ternary that used
+// to do this had two branches because it had two callers.
+static const char* bip39_length_title(void) {
+    switch (user_intent) {
+        case USER_INTENT_CHECK:
+        case USER_INTENT_BACKUP:
+            return UI_STR_NBGL_BIP39_LENGTH_TITLE_CHECK;
+        case USER_INTENT_DERIVE:
+            return UI_STR_NBGL_BIP39_LENGTH_TITLE_DERIVE;
+        case USER_INTENT_RECOVER:
+        case USER_INTENT_NB:
+            break;
+    }
+    // Recover does not come here; the question it would be asked is still the
+    // one about a phrase being typed in, not one being produced.
+    return UI_STR_NBGL_BIP39_LENGTH_TITLE_CHECK;
 }
 
 static void display_bip39_select_phrase_length_page(void) {
@@ -303,9 +411,7 @@ static void display_bip39_select_phrase_length_page(void) {
         (nbgl_obj_t*)generic_screen_set_title(
             screenChildren[SELECT_BIP39_PHRASE_LENGTH_ICON_INDEX]);
     ((nbgl_text_area_t*)screenChildren[SELECT_BIP39_PHRASE_LENGTH_TEXT_INDEX])
-        ->text = tool_type == TOOL_TYPE_BIP39
-                     ? UI_STR_NBGL_BIP39_LENGTH_TITLE_CHECK
-                     : UI_STR_NBGL_BIP39_LENGTH_TITLE_DERIVE;
+        ->text = bip39_length_title();
     // create nb words buttons
     nbgl_objPoolGetArray(BUTTON, ARRAYLEN(bip39_passphraseLength), 0,
                          (nbgl_obj_t**)&screenChildren
@@ -471,7 +577,7 @@ static void sskr_keyboard_dispatcher(const int token, uint8_t index) {
             display_check_keyboard_page();
         } else {
             sskr_shares_reset();
-            display_select_tool_page();
+            display_select_menu_page();
         }
     } else if (token >= CHECK_FIRST_SUGGESTION_TOKEN) {
         // The length only, as above: these are the ByteWords of the shares.
@@ -554,7 +660,7 @@ static void display_home_page() {
     reset_globals();
 
     nbgl_homeAction_t action = {.text = UI_STR_NBGL_HOME_ACTION,
-                                .callback = PIC(display_select_tool_page)};
+                                .callback = PIC(display_select_menu_page)};
 
     nbgl_useCaseHomeAndSettings(APPNAME, &ICON_APP_HOME,
                                 UI_STR_NBGL_HOME_DESCRIPTION, INIT_HOME_PAGE,
@@ -586,31 +692,87 @@ static void display_home_page() {
  */
 static void check_result_callback(int token __attribute__((unused)),
                                   uint8_t index __attribute__((unused))) {
-    if (tool_type == TOOL_TYPE_BIP39 && bip39_mnemonic_check(&seed_match) &&
-        seed_match) {
-        display_select_generate_sskr_page();
-    } else if (tool_type == TOOL_TYPE_SSKR && sskr_shares_check(&seed_match)) {
-        display_select_recover_bip39_page();
-    } else {
-        reset_globals();
-        display_home_page();
+    // Where the verdict leads, per intention. Only the two flows that have
+    // somewhere to go re-run the check; the others fall through to the home
+    // page below. Written as a switch with no default so that a fifth
+    // intention has to say here what it does after a verdict, rather than
+    // inheriting "go home" from a branch nobody wrote for it.
+    switch (user_intent) {
+        case USER_INTENT_BACKUP:
+            if (bip39_mnemonic_check(&seed_match) && seed_match) {
+                display_sskr_select_numshares_page();
+                return;
+            }
+            break;
+        case USER_INTENT_RECOVER:
+            if (sskr_shares_check(&seed_match)) {
+                display_select_recover_bip39_page();
+                return;
+            }
+            break;
+        case USER_INTENT_CHECK:
+        case USER_INTENT_DERIVE:
+        case USER_INTENT_NB:
+            // Check ends here -- that is what makes it a destination. Derive
+            // never reaches this screen at all.
+            break;
     }
+    reset_globals();
+    display_home_page();
 }
 
+// The three answers this screen gives. An index into the tables below, and
+// nothing else: what used to sit here was 1 + tool_type * 2 + seed_match into
+// a five-element row, an arithmetic on an enumeration value that a fourth
+// tool type would have walked off the end of, guarded by a test naming the
+// two values that were safe.
+enum __attribute__((packed)) verdict_outcome {
+    OUTCOME_INVALID = 0,
+    OUTCOME_NOMATCH,
+    OUTCOME_MATCH,
+    OUTCOME_NB
+};
+
+/*
+ * What the verdict says, per intention and per outcome.
+ *
+ * Two intentions enter a BIP-39 phrase and read different things here: the
+ * check flow ends on this screen, the backup flow passes through it, and
+ * "doesn't match the one present on this Ledger device" is a complete answer
+ * only to the first. The row is the wording, the column is the answer.
+ *
+ * USER_INTENT_DERIVE has no row. The BIP85 flow goes to
+ * display_generic_review() and never asks for a verdict, so there is nothing
+ * true to put there; leaving it NULL means that a path which did arrive here
+ * with it would draw a title over an empty body -- visibly wrong on screen --
+ * instead of borrowing a sentence about a phrase it never compared.
+ */
+_Static_assert(USER_INTENT_NB == 4,
+               "verdict_body[] has one row per intention and the backup row "
+               "does not say what the check row says on the same tool; a new "
+               "intention needs a decision here, not a default row");
+static const char* const verdict_body[USER_INTENT_NB][OUTCOME_NB] = {
+    [USER_INTENT_CHECK] = {UI_STR_NBGL_RESULT_BIP39_INVALID,
+                           UI_STR_NBGL_RESULT_BIP39_NOMATCH,
+                           UI_STR_NBGL_RESULT_BIP39_MATCH},
+    [USER_INTENT_BACKUP] = {UI_STR_NBGL_RESULT_BIP39_INVALID,
+                            UI_STR_NBGL_RESULT_BACKUP_NOMATCH,
+                            UI_STR_NBGL_RESULT_BACKUP_MATCH},
+    [USER_INTENT_RECOVER] = {UI_STR_NBGL_RESULT_SSKR_INVALID,
+                             UI_STR_NBGL_RESULT_SSKR_NOMATCH,
+                             UI_STR_NBGL_RESULT_SSKR_MATCH},
+};
+
 static void display_check_result_page(const bool result) {
-    static const char* possible_results[2][5] = {
-        {NULL, UI_STR_NBGL_RESULT_BIP39_INVALID, "",
-         UI_STR_NBGL_RESULT_SSKR_INVALID, ""},
-        {NULL, UI_STR_NBGL_RESULT_BIP39_NOMATCH, UI_STR_NBGL_RESULT_BIP39_MATCH,
-         UI_STR_NBGL_RESULT_SSKR_NOMATCH, UI_STR_NBGL_RESULT_SSKR_MATCH}};
     // Three distinct outcomes -- invalid, doesn't match, matches -- each with
     // its own title and icon, matching what the BAGL flows
-    // (ux_bip39_invalid_flow / ux_bip39_nomatch_flow / ux_bip39_match_flow
-    // and their SSKR equivalents) already give the user.
-    static const char* const titles[3] = {UI_STR_NBGL_RESULT_INVALID_TITLE,
-                                          UI_STR_NBGL_RESULT_NOMATCH_TITLE,
-                                          UI_STR_NBGL_RESULT_VALID_TITLE};
-    static const nbgl_icon_details_t* icons[3] = {
+    // (ux_bip39_invalid_flow / ux_bip39_check_nomatch_flow /
+    // ux_bip39_check_match_flow and their SSKR equivalents) already give the
+    // user.
+    static const char* const titles[OUTCOME_NB] = {
+        UI_STR_NBGL_RESULT_INVALID_TITLE, UI_STR_NBGL_RESULT_NOMATCH_TITLE,
+        UI_STR_NBGL_RESULT_VALID_TITLE};
+    static const nbgl_icon_details_t* const icons[OUTCOME_NB] = {
         &DENIED_CIRCLE_ICON, &IMPORTANT_CIRCLE_ICON, &CHECK_CIRCLE_ICON};
 
     // result is false only when the phrase itself is not well formed, in
@@ -618,22 +780,29 @@ static void display_check_result_page(const bool result) {
     // 0, 1 or 2, indexing the invalid / nomatch / match outcome respectively.
     const uint8_t outcome = (uint8_t)(result + seed_match);
 
-    // The text index is 1 + tool_type * 2 + seed_match into a five-element row.
-    // TOOL_TYPE_BIP39 and TOOL_TYPE_SSKR give 1..4; TOOL_TYPE_BIP85, the third
-    // value of that enumeration (constants.h), would give 5 or 6 and read past
-    // the row. No path reaches this screen with the BIP85 tool selected -- that
-    // flow goes to display_generic_review() and never asks for a verdict -- so
-    // this is a bound on an index the screens cannot currently produce, not a
-    // fix for one they can.
-    const uint8_t text_index =
-        (tool_type == TOOL_TYPE_BIP39 || tool_type == TOOL_TYPE_SSKR)
-            ? (uint8_t)(1 + (tool_type * 2) + seed_match)
-            : 1;
+    // The row index, bounded at run time and not only at compile time.
+    //
+    // The static assertion on verdict_body[] says a new intention has to be
+    // given a row. It says nothing about a byte that is not an intention at
+    // all: user_intent is a packed enum, one byte of static RAM, and this is
+    // the only array in this file indexed by it. USER_INTENT_NB is itself out
+    // of range and is a case label in three switches, so it is a value the
+    // code already handles rather than one nothing can hold.
+    //
+    // The arithmetic this table replaced carried such a bound -- it clamped
+    // to 1 for any tool_type outside the two it named -- and dropping it in
+    // exchange for compile-time assertions would be a step back in a file
+    // whose verdict is deliberately hardened against a single fault
+    // (compare_recovery_phrase_finish(), src/common/common_seed.c). Out of
+    // range reads as a check, which is the flow that ends here and shows the
+    // least.
+    const user_intent_e wording =
+        (user_intent < USER_INTENT_NB) ? user_intent : USER_INTENT_CHECK;
 
     nbgl_pageInfoDescription_t info = {
         .centeredInfo.icon = icons[outcome],
         .centeredInfo.text1 = titles[outcome],
-        .centeredInfo.text2 = possible_results[result][text_index],
+        .centeredInfo.text2 = verdict_body[wording][outcome],
         // Advice only on the invalid outcome; NULL elsewhere.
         // LARGE_CASE_GRAY_INFO is required for this to render as its own gray
         // line -- see the comment on UI_STR_NBGL_RESULT_INVALID_ADVICE in
@@ -641,7 +810,13 @@ static void display_check_result_page(const bool result) {
         .centeredInfo.text3 = result ? NULL : UI_STR_NBGL_RESULT_INVALID_ADVICE,
         .centeredInfo.style = LARGE_CASE_GRAY_INFO,
         .centeredInfo.offsetY = -16,
-        .footerText = UI_STR_NBGL_RESULT_TAP_TO_DISMISS,
+        // Only one of the six screens this draws continues rather than ends:
+        // a phrase that matched, in the backup flow. A failure in that flow
+        // is still a full stop, and still says so.
+        .footerText =
+            (user_intent == USER_INTENT_BACKUP && outcome == OUTCOME_MATCH)
+                ? UI_STR_NBGL_RESULT_TAP_TO_CONTINUE
+                : UI_STR_NBGL_RESULT_TAP_TO_DISMISS,
         .footerToken = CHECK_RESULT_TOKEN,
         .bottomButtonStyle = NO_BUTTON_STYLE,
         .tapActionText = NULL,
@@ -700,19 +875,24 @@ static void sskr_sharenum_validate(const uint8_t* sharenumentry,
     if (sskr_sharenum_get() > 0 && sskr_sharenum_get() <= SSS_MAX_SHARE_COUNT) {
         display_sskr_select_threshold_page();
     } else {
-        // Back to this keypad, not to the "Generate SSKR Phrase?" offer that
-        // opens the flow: the only thing wrong is the number that was just
-        // typed, and it is the only thing worth asking for again.
+        // Back to this keypad, not to the head of the flow: the only thing
+        // wrong is the number that was just typed, and it is the only thing
+        // worth asking for again.
         nbgl_useCaseStatus(UI_STR_NBGL_SSKR_NUMSHARES_RANGE_ERROR, false,
                            display_sskr_select_numshares_page);
     }
 }
 
 void display_sskr_select_numshares_page() {
-    // Draw the keypad
-    nbgl_useCaseKeypad(
-        UI_STR_NBGL_SSKR_NUMSHARES_TITLE, 1, SSKR_MAX_NUMBER_LENGTH, false,
-        false, sskr_sharenum_validate, display_select_generate_sskr_page);
+    // The back arrow leaves for the home page rather than for the screen
+    // before, which is the verdict on a phrase that has just been typed and
+    // cannot be usefully drawn again. Leaving is also the only thing worth
+    // doing at that point, and display_home_page() calls reset_globals(): the
+    // phrase in RAM is erased in one gesture, where the "Generate SSKR
+    // Phrase?" offer this used to return to took two.
+    nbgl_useCaseKeypad(UI_STR_NBGL_SSKR_NUMSHARES_TITLE, 1,
+                       SSKR_MAX_NUMBER_LENGTH, false, false,
+                       sskr_sharenum_validate, display_home_page);
 }
 
 static void review_done(void) {
@@ -800,13 +980,13 @@ static void sskr_threshold_validate(const uint8_t* thresholdentry,
     PRINTF("Threshold value entered is '%d'\n", sskr_threshold_get());
 
     // All three send the user back to this same keypad rather than to the
-    // "Generate SSKR Phrase?" offer at the head of the flow. The share count
-    // entered on the previous screen is valid, was accepted, and is not what
-    // is being corrected -- returning to the offer threw it away and made it
-    // be typed again before the threshold could be fixed. Nothing on this path
-    // resets it: reset_globals() and sskr_shares_reset() are reached only from
-    // display_home_page(), review_done() and the check flow, none of which any
-    // of these three branches goes through.
+    // head of the flow. The share count entered on the previous screen is
+    // valid, was accepted, and is not what is being corrected -- returning to
+    // the head threw it away and made it be typed again before the threshold
+    // could be fixed. Nothing on this path resets it: reset_globals() and
+    // sskr_shares_reset() are reached only from display_home_page(),
+    // review_done() and the check flow, none of which any of these three
+    // branches goes through.
     if (sskr_threshold_get() < 1) {
         nbgl_useCaseStatus(UI_STR_NBGL_SSKR_THRESHOLD_ZERO_ERROR, false,
                            display_sskr_select_threshold_page);
@@ -1058,7 +1238,7 @@ static void select_bip85_app_callback(nbgl_obj_t* obj,
         bip85_type_set(BIP85_APP_PWD_BASE85);
         display_bip85_select_password_length_page();
     } else if (obj == screenChildren[SELECT_BIP85_APP_BACK_BUTTON_INDEX]) {
-        display_select_tool_page();
+        display_select_menu_page();
         return;
     } else {
         display_home_page();

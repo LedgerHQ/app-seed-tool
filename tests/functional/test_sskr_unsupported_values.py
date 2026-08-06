@@ -6,7 +6,7 @@ from ragger.conftest import configuration
 from ragger.firmware.touch.use_cases import UseCaseHomeExt, UseCaseViewDetails, UseCaseChoice
 from ragger.firmware.touch.layouts import CenteredFooter, LetterOnlyKeyboard, Suggestions, ChoiceList
 from keypad import Keypad
-from genericlayout import GenericLayout
+from genericlayout import GenericLayout, MENU_BACKUP
 
 # The threshold keypad names the values it accepts. Its upper bound is the
 # share count entered on the screen before it, so this string is also the
@@ -34,10 +34,16 @@ def all_eink_unsupported_values(backend, device):
     choice = UseCaseChoice(backend, device)
     genericbuttons = GenericLayout(backend, device)
 
+    # Reached from the menu entry, not from a verdict that happened to offer
+    # it. The verdict is still crossed on the way -- the phrase has to be the
+    # device's before it can be split -- but it is now a step of a flow the
+    # user asked for rather than the only door into it.
     backend.wait_for_text_on_screen("Seed Tool", 10)
     home_page.action()
-    backend.wait_for_text_on_screen("BIP39 Check", 5)
-    genericbuttons.choose(1)
+    backend.wait_for_text_on_screen("Generate backup shares", 5)
+    genericbuttons.choose(MENU_BACKUP)
+    backend.wait_for_text_on_screen("Enter your recovery", 5)
+    choice.confirm()
     backend.wait_for_text_on_screen("12 words", 5)
     genericbuttons.choose(1)
     backend.wait_for_text_on_screen("Enter word", 5)
@@ -47,8 +53,6 @@ def all_eink_unsupported_values(backend, device):
     backend.wait_for_text_on_screen("Valid Secret", 5)
     backend.wait_for_text_on_screen("Recovery Phrase", 1)
     check_result.tap()
-    backend.wait_for_text_on_screen("Generate SSKR", 5)
-    choice.confirm()
 
     # An out-of-range share count is refused and asked for again, on the keypad
     # that asked for it. Each refusal is waited for on its own: the status page
@@ -95,9 +99,9 @@ def all_eink_unsupported_values(backend, device):
 
     # And a threshold this one does accept generates a 2-of-3 straight away.
     # This is what the three refusals above cost before: each of them returned
-    # to the "Generate SSKR Phrase?" offer, so reaching this point meant typing
-    # the share count three more times. The share label naming 3 is the proof
-    # that the count entered once is the count that was used.
+    # to the head of the flow, so reaching this point meant typing the share
+    # count three more times. The share label naming 3 is the proof that the
+    # count entered once is the count that was used.
     keypad.write("2")
     keypad.enter()
     backend.wait_for_text_on_screen("SSKR share 1 of 3", 5)

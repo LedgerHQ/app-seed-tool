@@ -7,7 +7,7 @@ from ragger.conftest import configuration
 from ragger.firmware.touch.use_cases import UseCaseHomeExt, UseCaseViewDetails, UseCaseChoice
 from ragger.firmware.touch.layouts import CenteredFooter, LetterOnlyKeyboard, Suggestions, ChoiceList
 from keypad import Keypad
-from genericlayout import GenericLayout
+from genericlayout import GenericLayout, MENU_RECOVER
 
 @fixture(scope='session')
 def set_seed():
@@ -1237,8 +1237,8 @@ def all_eink_sskr_256bit(backend, device):
 
     backend.wait_for_text_on_screen("Seed Tool", 10)
     home_page.action()
-    backend.wait_for_text_on_screen("SSKR Check", 5)
-    genericbuttons.choose(2)
+    backend.wait_for_text_on_screen("Recover from backup", 5)
+    genericbuttons.choose(MENU_RECOVER)
     backend.wait_for_text_on_screen("Enter Share 1 Word 1", 5)
     for shard in sskr_shards:
         for word in shard.split():

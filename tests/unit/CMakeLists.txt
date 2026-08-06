@@ -1070,6 +1070,11 @@ target_link_libraries(test_sskr_ux_menu_nanos PUBLIC cmocka gcov testutils)
 add_executable(test_ui_strings tests/ui_strings.c)
 target_include_directories(test_ui_strings PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common/sskr/sss)
 target_link_libraries(test_ui_strings PUBLIC cmocka gcov)
+# The header is read as a file as well as included as one: the test counts the
+# macros it declares and holds that count against the table that is supposed
+# to name them all. See test_the_table_names_every_macro_of_the_header().
+target_compile_definitions(test_ui_strings PRIVATE
+    UI_STRINGS_HEADER_PATH="${CMAKE_CURRENT_SOURCE_DIR}/../../src/common/ui_strings.h")
 # ---------------------------------------------------------------------------
 
 # Register every executable this file builds, instead of repeating their names
