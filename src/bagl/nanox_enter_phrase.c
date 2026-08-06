@@ -80,9 +80,7 @@ const bagl_element_t screen_onboarding_restore_word_select_elements[] = {
 UX_STEP_NOCB(ux_load_step, pn, {&C_icon_loader_14px, UI_STR_BAGL_PROCESSING});
 UX_FLOW(ux_load_flow, &ux_load_step);
 
-extern const ux_flow_step_t* const ux_bip39_match_flow;
 extern const ux_flow_step_t* const ux_sskr_match_flow;
-extern const ux_flow_step_t* const ux_bip39_nomatch_flow;
 extern const ux_flow_step_t* const ux_sskr_nomatch_flow;
 extern const ux_flow_step_t* const ux_bip39_invalid_flow;
 extern const ux_flow_step_t* const ux_sskr_invalid_flow;
@@ -472,11 +470,14 @@ void screen_onboarding_restore_word_validate(void) {
                 // Against VERDICT_MATCH, not "not zero": every other value,
                 // corrupted or not, is a mismatch. See common.h.
                 if (compare_recovery_phrase(&reconstructed) == VERDICT_MATCH) {
-                    ux_flow_init(0, &ux_bip39_match_flow, NULL);
+                    // Two flows behind this call, chosen on the intention:
+                    // checking ends on the verdict, splitting goes on to the
+                    // share count. See ux_bip39_match_display() in ux_nano.c.
+                    ux_bip39_match_display();
                 } else {
                     memzero(G_bolos_ux_context.words_buffer,
                             G_bolos_ux_context.words_buffer_length);
-                    ux_flow_init(0, &ux_bip39_nomatch_flow, NULL);
+                    ux_bip39_nomatch_display();
                 }
             }
         } else {

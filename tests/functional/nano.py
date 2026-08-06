@@ -127,7 +127,7 @@ def select_in_menu(navigator, label, timeout=30):
     `screen_change_before_first_instruction` has to be off, as it is at every
     call site in this repository: the entry the caller is after is often
     already displayed when this is called -- the home screen opens on
-    "Check BIP39" -- and waiting for a screen change that nobody is going to
+    "Check phrase" -- and waiting for a screen change that nobody is going to
     cause times out.
     """
     navigator.navigate_until_text(NavInsID.RIGHT_CLICK, [NavInsID.BOTH_CLICK],
@@ -140,10 +140,11 @@ def choose_in_flow(backend, label, timeout_clicks=None):
 
     select_in_menu() above is Ragger's navigate_until_text(), which is right
     for a menu list: those loop, so a click always changes the screen. The
-    verdict flows do not loop -- ux_bip39_match_flow and its neighbours in
-    src/bagl/ux_nano.c are three fixed steps -- so a right click on the last
-    one changes nothing, and navigate_until_text() cannot tell that from a
-    screen that has stopped responding. It reports the second as the first.
+    verdict flows do not loop -- ux_bip39_check_match_flow and its neighbours
+    in src/bagl/ux_nano.c are two or three fixed steps -- so a right click on
+    the last one changes nothing, and navigate_until_text() cannot tell that
+    from a screen that has stopped responding. It reports the second as the
+    first.
 
     _click() returns whether anything moved, which is what makes the
     difference visible here.

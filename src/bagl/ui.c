@@ -84,6 +84,42 @@ UX_FLOW(ux_bip39_flow, &ux_bip39_instruction_step, &ux_bip39_menu_step);
 
 //////////////////////////////////////////////////////////////////////
 
+/*
+ * Splitting a phrase starts by explaining why the phrase is being asked for.
+ *
+ * Same reason as on the touch stack: compare_recovery_phrase()
+ * (src/common/common_seed.c) gets a seed back from the device and never the
+ * words, so the words have to come from the person -- and being asked to type
+ * twenty-four of them into a device that already holds them is the moment
+ * that needs saying. It needs saying more here than there, not less: on a
+ * Nano those words are entered one letter at a time with two buttons.
+ *
+ * nanos shows two lines, which is why the first two are a complete sentence
+ * on their own; the taller Nanos add the third.
+ */
+#if defined(TARGET_NANOS)
+UX_STEP_NOCB(ux_backup_explain_step, nn,
+             {
+                 UI_STR_BAGL_BACKUP_EXPLAIN_L1,
+                 UI_STR_BAGL_BACKUP_EXPLAIN_L2,
+             });
+#else
+UX_STEP_NOCB(ux_backup_explain_step, nnn,
+             {
+                 UI_STR_BAGL_BACKUP_EXPLAIN_L1,
+                 UI_STR_BAGL_BACKUP_EXPLAIN_L2,
+                 UI_STR_BAGL_BACKUP_EXPLAIN_L3,
+             });
+#endif
+
+// The length menu and its instruction are the same two steps the check flow
+// uses -- the question they ask is the same one, and the intention already
+// recorded is what makes the difference later.
+UX_FLOW(ux_backup_flow, &ux_backup_explain_step, &ux_bip39_instruction_step,
+        &ux_bip39_menu_step);
+
+//////////////////////////////////////////////////////////////////////
+
 void screen_onboarding_sskr_restore_init(void) {
     G_bolos_ux_context.tool_type = TOOL_TYPE_SSKR;
     screen_onboarding_restore_word_init(RESTORE_WORD_ACTION_FIRST_WORD);
@@ -110,31 +146,60 @@ UX_FLOW(ux_sskr_flow, &ux_sskr_instruction_step);
 
 //////////////////////////////////////////////////////////////////////
 
-UX_STEP_VALID(ux_idle_flow_1_step, pbb, ux_flow_init(0, ux_bip39_flow, NULL),
+/*
+ * The idle menu: one entry per intention, as on the touch stack, minus the
+ * one that has nowhere to go.
+ *
+ * Three, not four. BIP-85 has no BAGL screen on any Nano, so a fourth entry
+ * would lead nowhere; the two stacks do not have the same menu and this is
+ * where they differ.
+ *
+ * Each entry records what the user came to do before starting the flow. That
+ * is the whole reason the field exists: the first two both end up entering a
+ * BIP-39 phrase and are both TOOL_TYPE_BIP39, and without it the verdict
+ * cannot tell which of the two it is answering.
+ *
+ * The icon names the format the entry produces rather than the one it
+ * consumes, which is what keeps the last two apart: splitting arrives at SSKR
+ * shares, restoring arrives at a BIP-39 phrase.
+ */
+UX_STEP_VALID(ux_idle_flow_1_step, pbb,
+              G_bolos_ux_context.user_intent = USER_INTENT_CHECK;
+              ux_flow_init(0, ux_bip39_flow, NULL),
               {
                   &BIP39_ICON,
-                  UI_STR_BAGL_IDLE_BIP39_L1,
-                  UI_STR_BAGL_IDLE_BIP39_L2,
+                  UI_STR_BAGL_IDLE_CHECK_L1,
+                  UI_STR_BAGL_IDLE_CHECK_L2,
               });
-UX_STEP_VALID(ux_idle_flow_2_step, pbb, ux_flow_init(0, ux_sskr_flow, NULL),
+UX_STEP_VALID(ux_idle_flow_2_step, pbb,
+              G_bolos_ux_context.user_intent = USER_INTENT_BACKUP;
+              ux_flow_init(0, ux_backup_flow, NULL),
               {
                   &SSKR_ICON,
-                  UI_STR_BAGL_IDLE_SSKR_L1,
-                  UI_STR_BAGL_IDLE_SSKR_L2,
+                  UI_STR_BAGL_IDLE_BACKUP_L1,
+                  UI_STR_BAGL_IDLE_BACKUP_L2,
+              });
+UX_STEP_VALID(ux_idle_flow_3_step, pbb,
+              G_bolos_ux_context.user_intent = USER_INTENT_RECOVER;
+              ux_flow_init(0, ux_sskr_flow, NULL),
+              {
+                  &BIP39_ICON,
+                  UI_STR_BAGL_IDLE_RECOVER_L1,
+                  UI_STR_BAGL_IDLE_RECOVER_L2,
               });
 
-UX_STEP_NOCB(ux_idle_flow_3_step, bn,
+UX_STEP_NOCB(ux_idle_flow_4_step, bn,
              {
                  UI_STR_VERSION_LABEL,
                  APPVERSION,
              });
-UX_STEP_VALID(ux_idle_flow_4_step, pb, os_sched_exit(-1),
+UX_STEP_VALID(ux_idle_flow_5_step, pb, os_sched_exit(-1),
               {
                   &C_icon_dashboard_x,
                   UI_STR_QUIT,
               });
 UX_FLOW(ux_idle_flow, &ux_idle_flow_1_step, &ux_idle_flow_2_step,
-        &ux_idle_flow_3_step, &ux_idle_flow_4_step);
+        &ux_idle_flow_3_step, &ux_idle_flow_4_step, &ux_idle_flow_5_step);
 
 void ui_idle_init(void) {
     memzero(G_bolos_ux_context.words_buffer,
@@ -146,6 +211,11 @@ void ui_idle_init(void) {
     G_bolos_ux_context.words_buffer_length = 0;
     G_bolos_ux_context.sskr_words_buffer_length = 0;
     G_bolos_ux_context.sskr_share_index = 0;
+    // Back to the first entry, so that no flow started from this menu reads
+    // what the previous one left behind. Every entry writes it again on the
+    // way out, so this only matters for the value read before any entry has
+    // been picked.
+    G_bolos_ux_context.user_intent = USER_INTENT_CHECK;
 
     // reserve a display stack slot if none yet
     if (G_ux.stack_count == 0) {

@@ -69,10 +69,15 @@ static const struct {
     ENTRY(UI_STR_NBGL_MENU_RECOVER),
     ENTRY(UI_STR_NBGL_MENU_DERIVE),
     ENTRY(UI_STR_NBGL_MENU_TITLE),
-    ENTRY(UI_STR_BAGL_IDLE_BIP39_L1),
-    ENTRY(UI_STR_BAGL_IDLE_BIP39_L2),
-    ENTRY(UI_STR_BAGL_IDLE_SSKR_L1),
-    ENTRY(UI_STR_BAGL_IDLE_SSKR_L2),
+    ENTRY(UI_STR_BAGL_IDLE_CHECK_L1),
+    ENTRY(UI_STR_BAGL_IDLE_CHECK_L2),
+    ENTRY(UI_STR_BAGL_IDLE_BACKUP_L1),
+    ENTRY(UI_STR_BAGL_IDLE_BACKUP_L2),
+    ENTRY(UI_STR_BAGL_IDLE_RECOVER_L1),
+    ENTRY(UI_STR_BAGL_IDLE_RECOVER_L2),
+    ENTRY(UI_STR_BAGL_BACKUP_EXPLAIN_L1),
+    ENTRY(UI_STR_BAGL_BACKUP_EXPLAIN_L2),
+    ENTRY(UI_STR_BAGL_BACKUP_EXPLAIN_L3),
     ENTRY(UI_STR_NBGL_HOME_DESCRIPTION),
     ENTRY(UI_STR_NBGL_HOME_ACTION),
     ENTRY(UI_STR_NBGL_HOME_COPYRIGHT),
@@ -127,6 +132,8 @@ static const struct {
     ENTRY(UI_STR_BAGL_BIP39_REENTER_PHRASE),
     ENTRY(UI_STR_BAGL_BIP39_NOMATCH_TITLE_L2),
     ENTRY(UI_STR_BAGL_BIP39_MATCH_TITLE_L2),
+    ENTRY(UI_STR_BAGL_BACKUP_NOMATCH_L1),
+    ENTRY(UI_STR_BAGL_BACKUP_NOMATCH_L2),
     ENTRY(UI_STR_BAGL_SSKR_INVALID_TITLE_L1),
     ENTRY(UI_STR_BAGL_SSKR_INVALID_TITLE_L2),
     ENTRY(UI_STR_BAGL_SSKR_REENTER_SHARES),
@@ -231,12 +238,16 @@ static const unsigned char k_nanos_char_width_bold[96] = {
  * the tighter 87px in the bold font -- the more conservative of the two
  * combinations -- rather than guessed at a wider or lighter one.
  *
- * Two strings fail the bound below and are deliberately not asserted:
- * "recovery phrase" (UI_STR_BAGL_IDLE_BIP39_L2 / _SSKR_L2, 93px bold, PBB) and
- * "BIP39 Recovery" (UI_STR_BAGL_BIP39_INVALID_TITLE_L1, 90px bold, PBB), both
- * 3-6px over the 87px PBB budget on nanos. Both predate this header, and
- * neither is changed here. They are recorded rather than silently passed, so
- * the gap this test cannot close is visible beside the strings it does check.
+ * One string still fails the bound below and is deliberately not asserted:
+ * "BIP39 Recovery" (UI_STR_BAGL_BIP39_INVALID_TITLE_L1), 90px bold against
+ * the 87px PBB budget on nanos. It predates this header and no change since
+ * has touched that screen's wording.
+ *
+ * There were two. The other was "recovery phrase", 93px, which the two idle
+ * entries used to end on; the three entries that replaced them were written
+ * against this budget and are asserted below like everything else. Recording
+ * the gap here rather than only in a PR body is what made it visible enough
+ * to close when those lines were next rewritten.
  */
 #define BOUND_WIDE           116
 #define BOUND_TIGHT          87
@@ -255,10 +266,24 @@ static const struct {
     BOUNDED(UI_STR_WORDS_18, BOUND_WIDE, true),
     BOUNDED(UI_STR_WORDS_24, BOUND_WIDE, true),
     BOUNDED(UI_STR_BAGL_PROCESSING, BOUND_WIDE, true),
-    BOUNDED(UI_STR_BAGL_IDLE_BIP39_L1, BOUND_TIGHT, true),
-    /* IDLE_BIP39_L2 ("recovery phrase") -- see the file comment above. */
-    BOUNDED(UI_STR_BAGL_IDLE_SSKR_L1, BOUND_TIGHT, true),
-    /* IDLE_SSKR_L2 ("recovery phrase") -- see the file comment above. */
+    /*
+     * All six idle-menu fragments, both lines of each. The two entries these
+     * replaced ended on "recovery phrase", 93px against an 87px box, and were
+     * recorded above as unassertable rather than asserted; the three that
+     * took their place were written to the budget and are held to it.
+     */
+    BOUNDED(UI_STR_BAGL_IDLE_CHECK_L1, BOUND_TIGHT, true),
+    BOUNDED(UI_STR_BAGL_IDLE_CHECK_L2, BOUND_TIGHT, true),
+    BOUNDED(UI_STR_BAGL_IDLE_BACKUP_L1, BOUND_TIGHT, true),
+    BOUNDED(UI_STR_BAGL_IDLE_BACKUP_L2, BOUND_TIGHT, true),
+    BOUNDED(UI_STR_BAGL_IDLE_RECOVER_L1, BOUND_TIGHT, true),
+    BOUNDED(UI_STR_BAGL_IDLE_RECOVER_L2, BOUND_TIGHT, true),
+    /* nn steps, so the wide box and the regular font. */
+    BOUNDED(UI_STR_BAGL_BACKUP_EXPLAIN_L1, BOUND_WIDE, false),
+    BOUNDED(UI_STR_BAGL_BACKUP_EXPLAIN_L2, BOUND_WIDE, false),
+    BOUNDED(UI_STR_BAGL_BACKUP_EXPLAIN_L3, BOUND_WIDE, false),
+    BOUNDED(UI_STR_BAGL_BACKUP_NOMATCH_L1, BOUND_WIDE, false),
+    BOUNDED(UI_STR_BAGL_BACKUP_NOMATCH_L2, BOUND_WIDE, false),
     BOUNDED(UI_STR_BAGL_BIP39_LENGTH_TITLE_L1_NANOS, BOUND_WIDE, false),
     BOUNDED(UI_STR_BAGL_BIP39_LENGTH_TITLE_L2_NANOS, BOUND_WIDE, false),
     BOUNDED(UI_STR_BAGL_BIP39_LENGTH_TITLE_L1, BOUND_WIDE, false),

@@ -129,14 +129,48 @@
 #define UI_STR_NBGL_MENU_TITLE "What do you want\nto do?"
 
 /*
- * BAGL: the equivalent two entries on the Nano idle menu
- * (src/bagl/ui.c). BAGL's idle menu has no third entry for BIP85 -- that
- * flow has no BAGL screens at all, on any Nano.
+ * BAGL: the same intentions on the Nano idle menu (src/bagl/ui.c).
+ *
+ * Three, not four, and this is the one place the two stacks genuinely differ
+ * rather than merely word things differently: BIP-85 has no BAGL screen at
+ * all, on any Nano, so there is nothing for a fourth entry to lead to. The
+ * three that are here are the same three intentions, in the same order.
+ *
+ * They read shorter than the touch labels, and not by preference. A pbb step
+ * draws its two lines in an icon-flanked box that is 87px wide on the 128x32
+ * Nano S, and that box does not wrap -- it clips, silently.
+ * tests/unit/tests/ui_strings.c measures all six of these against it.
+ *
+ * The two entries these replace ended on "recovery phrase", which is 93px and
+ * had therefore always been over that budget -- one of the two strings that
+ * test recorded as failing rather than asserting, and so one of the two it
+ * could say nothing about. Rewriting these lines was the occasion to stop
+ * shipping it.
+ *
+ * The last two say, word for word, what the touch buttons say: "Generate" +
+ * "backup shares" is 53px + 82px, "Recover" + "from backup" is 47px + 72px,
+ * and both pairs clear the budget. Only the first entry has to differ --
+ * "Check recovery" alone is 88px -- and what it does with the room is worth
+ * more than the consistency it loses: "Check phrase" / "on this Ledger" says
+ * what the phrase is checked against, which is the one thing the touch
+ * button has no room to say.
  */
-#define UI_STR_BAGL_IDLE_BIP39_L1 "Check BIP39"
-#define UI_STR_BAGL_IDLE_BIP39_L2 "recovery phrase"
-#define UI_STR_BAGL_IDLE_SSKR_L1  "Check SSKR"
-#define UI_STR_BAGL_IDLE_SSKR_L2  "recovery phrase"
+#define UI_STR_BAGL_IDLE_CHECK_L1   "Check phrase"
+#define UI_STR_BAGL_IDLE_CHECK_L2   "on this Ledger"
+#define UI_STR_BAGL_IDLE_BACKUP_L1  "Generate"
+#define UI_STR_BAGL_IDLE_BACKUP_L2  "backup shares"
+#define UI_STR_BAGL_IDLE_RECOVER_L1 "Recover"
+#define UI_STR_BAGL_IDLE_RECOVER_L2 "from backup"
+
+/*
+ * The Nano form of the screen that says why the phrase is asked for. Same
+ * reason as UI_STR_NBGL_BACKUP_EXPLAIN_DESC further down, cut for a step that
+ * does not wrap: the first two lines are a complete sentence and are all a
+ * nanos nn step shows, and the taller Nanos get the third.
+ */
+#define UI_STR_BAGL_BACKUP_EXPLAIN_L1 "This Ledger cannot"
+#define UI_STR_BAGL_BACKUP_EXPLAIN_L2 "show you its phrase."
+#define UI_STR_BAGL_BACKUP_EXPLAIN_L3 "Enter it to split it."
 
 /* NBGL home screen description and action (src/nbgl/ui.c). */
 #define UI_STR_NBGL_HOME_DESCRIPTION \
@@ -290,6 +324,16 @@
 #define UI_STR_BAGL_BIP39_REENTER_PHRASE   "Re-enter phrase"
 #define UI_STR_BAGL_BIP39_NOMATCH_TITLE_L2 "doesn't match"
 #define UI_STR_BAGL_BIP39_MATCH_TITLE_L2   "is correct"
+
+/*
+ * What the mismatch adds when the phrase was being backed up rather than
+ * checked -- the Nano's two lines of what UI_STR_NBGL_RESULT_BACKUP_NOMATCH
+ * says in one sentence on the touch screens. It follows the "doesn't match"
+ * title as its own step, the way the invalid advice above already does,
+ * because a pbb title has no room for it.
+ */
+#define UI_STR_BAGL_BACKUP_NOMATCH_L1 "It would not restore"
+#define UI_STR_BAGL_BACKUP_NOMATCH_L2 "this Ledger"
 
 #define UI_STR_BAGL_SSKR_INVALID_TITLE_L1 "SSKR Recovery"
 #define UI_STR_BAGL_SSKR_INVALID_TITLE_L2 "phrase invalid"

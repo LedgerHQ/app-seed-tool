@@ -176,7 +176,20 @@ UX_STEP_NOCB(ux_bip39_nomatch_step_1, pbb,
              {&C_icon_warning, UI_STR_BIP39_PHRASE_TITLE,
               UI_STR_BAGL_BIP39_NOMATCH_TITLE_L2});
 
-UX_FLOW(ux_bip39_nomatch_flow, &ux_bip39_nomatch_step_1, &ux_return_step);
+// What the mismatch means when the phrase was on its way to being split. The
+// title above answers "is this my phrase?"; this answers "can I back it up?",
+// which is the question that was actually asked, and the two are not the same
+// answer. Its own step for the same reason ux_invalid_step_2 is one: a pbb
+// title has two short lines and no room for a sentence.
+UX_STEP_NOCB(ux_backup_nomatch_step_2, nn,
+             {
+                 UI_STR_BAGL_BACKUP_NOMATCH_L1,
+                 UI_STR_BAGL_BACKUP_NOMATCH_L2,
+             });
+
+UX_FLOW(ux_bip39_check_nomatch_flow, &ux_bip39_nomatch_step_1, &ux_return_step);
+UX_FLOW(ux_bip39_backup_nomatch_flow, &ux_bip39_nomatch_step_1,
+        &ux_backup_nomatch_step_2, &ux_return_step);
 
 UX_STEP_NOCB(ux_bip39_match_step_1, pbb,
              {&C_icon_validate_14, UI_STR_BIP39_PHRASE_TITLE,
@@ -185,8 +198,56 @@ UX_STEP_CB(ux_bip39_recover_step_1, pbb, set_sskr_descriptor_values();
            , {&SSKR_ICON, UI_STR_BAGL_GENERATE_SSKR_L1,
               UI_STR_BAGL_GENERATE_SSKR_L2});
 
-UX_FLOW(ux_bip39_match_flow, &ux_bip39_match_step_1, &ux_quit_step,
-        &ux_bip39_recover_step_1);
+// Checking ends on the verdict; that is what makes it a destination. The step
+// offering to generate shares is gone from this flow -- it was the only way
+// in before, and it is now an entry of the idle menu, where it says what it
+// is. ux_return_step takes its place so that the flow still has a way back to
+// that menu rather than only a way out of the application.
+UX_FLOW(ux_bip39_check_match_flow, &ux_bip39_match_step_1, &ux_quit_step,
+        &ux_return_step);
+
+// Splitting passes through it: verdict, a way out, the press that starts the
+// generation, and a way back to the menu.
+//
+// The first three steps are what this file already had. The fourth is new,
+// and it is the same step the check flow above gained: without it the only
+// exit from a successful backup verdict is ux_quit_step, which erases but
+// closes the application, so someone who changed their mind had to leave
+// rather than go back. That was true before this change too; it is worth
+// less defending than fixing.
+UX_FLOW(ux_bip39_backup_match_flow, &ux_bip39_match_step_1, &ux_quit_step,
+        &ux_bip39_recover_step_1, &ux_return_step);
+
+/*
+ * The same guarantee the touch stack gets from its tables, stated where a
+ * Nano build will see it.
+ *
+ * src/nbgl/ui.c is not compiled into any Nano target, so its static
+ * assertions say nothing here: a fifth intention added for the touch menu
+ * breaks that build and leaves this one silent, and the two functions below
+ * would send the new value down the check flow through their `else` -- the
+ * safe answer, arrived at by accident.
+ */
+_Static_assert(USER_INTENT_NB == 4,
+               "the two functions below choose a flow on the intention, and "
+               "everything they do not name takes the check flow; a new "
+               "intention needs a decision here, not an else branch");
+
+void ux_bip39_match_display(void) {
+    if (G_bolos_ux_context.user_intent == USER_INTENT_BACKUP) {
+        ux_flow_init(0, ux_bip39_backup_match_flow, NULL);
+    } else {
+        ux_flow_init(0, ux_bip39_check_match_flow, NULL);
+    }
+}
+
+void ux_bip39_nomatch_display(void) {
+    if (G_bolos_ux_context.user_intent == USER_INTENT_BACKUP) {
+        ux_flow_init(0, ux_bip39_backup_nomatch_flow, NULL);
+    } else {
+        ux_flow_init(0, ux_bip39_check_nomatch_flow, NULL);
+    }
+}
 
 UX_STEP_NOCB(ux_sskr_invalid_step_1, pbb,
              {&C_icon_crossmark, UI_STR_BAGL_SSKR_INVALID_TITLE_L1,

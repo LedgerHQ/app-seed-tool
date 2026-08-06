@@ -71,9 +71,7 @@ const bagl_element_t screen_onboarding_restore_word_select_elements[] = {
 
 void screen_onboarding_restore_word_display_auto_complete(void);
 
-extern const ux_flow_step_t* const ux_bip39_match_flow;
 extern const ux_flow_step_t* const ux_sskr_match_flow;
-extern const ux_flow_step_t* const ux_bip39_nomatch_flow;
 extern const ux_flow_step_t* const ux_sskr_nomatch_flow;
 extern const ux_flow_step_t* const ux_bip39_invalid_flow;
 extern const ux_flow_step_t* const ux_sskr_invalid_flow;
@@ -397,13 +395,33 @@ void compare_recovery_phrase_and_display_result(void) {
         // invalid rather than as a seed mismatch
         ux_flow_init(0, &ux_sskr_invalid_flow, NULL);
     } else if (match) {
-        (G_bolos_ux_context.tool_type == TOOL_TYPE_BIP39)
-            ? ux_flow_init(0, &ux_bip39_match_flow, NULL)
-            : ux_flow_init(0, &ux_sskr_match_flow, NULL);
+        if (G_bolos_ux_context.tool_type == TOOL_TYPE_BIP39) {
+            // Two flows behind this call, chosen on the intention: checking
+            // ends on the verdict, splitting goes on to the share count. See
+            // ux_bip39_match_display() in ux_nano.c.
+            ux_bip39_match_display();
+        } else {
+            ux_flow_init(0, &ux_sskr_match_flow, NULL);
+        }
     } else {
-        (G_bolos_ux_context.tool_type == TOOL_TYPE_BIP39)
-            ? ux_flow_init(0, &ux_bip39_nomatch_flow, NULL)
-            : ux_flow_init(0, &ux_sskr_nomatch_flow, NULL);
+        if (G_bolos_ux_context.tool_type == TOOL_TYPE_BIP39) {
+            // Erased here, as nanox_enter_phrase.c already did on this same
+            // branch and this file did not. Nothing downstream of a BIP-39
+            // mismatch reads the phrase again -- only a match leads anywhere
+            // that does -- so it has no reason to outlive the verdict, and
+            // the backup flow now puts one more screen between this point
+            // and the erasure ui_idle_init() performs on the way out.
+            //
+            // Only this branch. The SSKR one below keeps words_buffer,
+            // because that is where bolos_ux_sskr_to_seed_convert() left the
+            // reconstructed phrase and recover_bip39() displays it from the
+            // mismatch flow.
+            memzero(G_bolos_ux_context.words_buffer,
+                    G_bolos_ux_context.words_buffer_length);
+            ux_bip39_nomatch_display();
+        } else {
+            ux_flow_init(0, &ux_sskr_nomatch_flow, NULL);
+        }
     }
 }
 

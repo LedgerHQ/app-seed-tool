@@ -64,7 +64,7 @@ def set_seed():
 
 
 def _two_button_check(backend, navigator, phrase, first_line, second_line):
-    nano.select_in_menu(navigator, "Check BIP39")
+    nano.select_in_menu(navigator, "Check phrase")
     nano.select_in_menu(navigator, "12 words")
     nano.enter_phrase(backend, phrase)
     nano.wait_for_lines(backend, first_line, second_line)

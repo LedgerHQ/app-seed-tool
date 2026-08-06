@@ -63,14 +63,15 @@ def test_sskr_generate_two_button(device, backend, navigator, set_seed):
     if device.type not in (DeviceType.NANOX, DeviceType.NANOSP):
         skip("Two-button devices only; the touch path is covered elsewhere")
 
-    nano.select_in_menu(navigator, "Check BIP39")
+    nano.select_in_menu(navigator, "Generate")
     nano.select_in_menu(navigator, "12 words")
     nano.enter_phrase(backend, DEVICE_PHRASE)
 
     # The phrase is the device's, so the verdict is a match -- and only the
-    # match flow offers to generate shares (ux_bip39_match_flow,
-    # src/bagl/ux_nano.c). Asserting it here is what makes the rest of this
-    # test mean "generation from a verified phrase" rather than "generation".
+    # match flow carries on to the generation
+    # (ux_bip39_backup_match_flow, src/bagl/ux_nano.c). Asserting it here is
+    # what makes the rest of this test mean "generation from a verified
+    # phrase" rather than "generation".
     nano.wait_for_lines(backend, "BIP39 Phrase", "is correct")
 
     nano.choose_in_flow(backend, "Generate")

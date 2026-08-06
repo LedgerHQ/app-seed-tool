@@ -69,7 +69,7 @@ def test_sskr_duplicate_share_is_refused_as_invalid(device, backend, navigator,
     if device.type not in (DeviceType.NANOX, DeviceType.NANOSP):
         skip("Two-button devices only; the touch path is covered elsewhere")
 
-    nano.select_in_menu(navigator, "Check SSKR")
+    nano.select_in_menu(navigator, "Recover")
     nano.confirm(backend)
 
     for _ in range(2):

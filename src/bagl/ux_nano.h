@@ -20,6 +20,8 @@
 #include <ux.h>
 #include "ui.h"
 #include "../common/common.h"
+// user_intent_e, stored in the context below and shared with the touch stack
+#include "constants.h"
 
 #if defined(HAVE_BAGL)
 
@@ -72,6 +74,14 @@ typedef struct bolos_ux_context {
 
     // Type of tool we are using (BIP39 or SSKR)
     unsigned int tool_type;
+
+    // Which entry of the idle menu the user picked. Not the same thing as the
+    // tool: checking a phrase and splitting one into shares both enter a
+    // BIP-39 phrase, so both are TOOL_TYPE_BIP39, and only this tells the
+    // verdict flow which of the two it is ending. Written by the idle menu
+    // and by ui_idle_init(), read by ux_bip39_match_display() and
+    // ux_bip39_nomatch_display() in src/bagl/ux_nano.c.
+    user_intent_e user_intent;
 
     // State of the dynamic display
     unsigned int current_state;
@@ -140,6 +150,14 @@ void screen_common_keyboard_init(unsigned int stack_slot,
 
 void set_sskr_descriptor_values(void);
 void recover_bip39(void);
+
+// The BIP-39 verdict, in whichever form the intention calls for. Two flows
+// per outcome, and the choice between them lives next to the flows in
+// src/bagl/ux_nano.c rather than at the call sites: nanos_enter_phrase.c and
+// nanox_enter_phrase.c both reach the verdict, by different routes, and a
+// copy of this decision in each is a third thing to keep in step.
+void ux_bip39_match_display(void);
+void ux_bip39_nomatch_display(void);
 
 #include "common/bip39/common_bip39.h"
 #include "common/sskr/common_sskr.h"
