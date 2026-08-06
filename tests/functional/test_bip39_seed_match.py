@@ -41,7 +41,7 @@ from ledgered.devices import DeviceType
 from ragger.conftest import configuration
 from ragger.firmware.touch.use_cases import UseCaseHomeExt
 from ragger.firmware.touch.layouts import LetterOnlyKeyboard, Suggestions
-from genericlayout import GenericLayout
+from genericlayout import GenericLayout, MENU_CHECK
 import nano
 
 # Same seed as the other functional tests.
@@ -64,7 +64,7 @@ def set_seed():
 
 
 def _two_button_check(backend, navigator, phrase, first_line, second_line):
-    nano.select_in_menu(navigator, "Check BIP39")
+    nano.select_in_menu(navigator, "Check phrase")
     nano.select_in_menu(navigator, "12 words")
     nano.enter_phrase(backend, phrase)
     nano.wait_for_lines(backend, first_line, second_line)
@@ -78,8 +78,8 @@ def _touch_check(backend, device, phrase, title, verdict):
 
     backend.wait_for_text_on_screen("Seed Tool", 10)
     home_page.action()
-    backend.wait_for_text_on_screen("BIP39 Check", 5)
-    genericbuttons.choose(1)
+    backend.wait_for_text_on_screen("Check recovery phrase", 5)
+    genericbuttons.choose(MENU_CHECK)
     backend.wait_for_text_on_screen("12 words", 5)
     genericbuttons.choose(1)
     backend.wait_for_text_on_screen("Enter word", 5)

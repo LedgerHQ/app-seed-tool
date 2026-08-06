@@ -78,36 +78,116 @@
  * Home / tool selection
  */
 
-/* NBGL: three buttons on the "select a tool" screen (src/nbgl/ui.c). */
-#define UI_STR_NBGL_TOOL_BIP39        "BIP39 Check"
-#define UI_STR_NBGL_TOOL_SSKR         "SSKR Check"
-#define UI_STR_NBGL_TOOL_BIP85        "BIP85 Generate"
-#define UI_STR_NBGL_SELECT_TOOL_TITLE "Select the tool\nyou wish to use"
+/*
+ * NBGL: the four buttons of the menu (src/nbgl/ui.c), one per intention.
+ *
+ * They used to name formats -- "BIP39 Check", "SSKR Check", "BIP85 Generate"
+ * -- and generating a backup was not among them: it was only offered after a
+ * check had succeeded, so someone who came to back up a phrase found nothing
+ * that matched what they came for. These name what the user wants instead,
+ * and the two things worth the most in a backup tool are the two that gained
+ * an entry.
+ *
+ * "backup" rather than "SSKR" on the two middle entries: someone who does not
+ * know what SSKR is has to be able to find the function. The term itself
+ * stays inside the flow, and above all on the paper the user copies down --
+ * see UI_STR_NBGL_SSKR_SHARE_HEADER below.
+ *
+ * The Recover entry says "from backup" and not "from backup shares", which is
+ * both shorter and, on reflection, the better half to drop. Measured first:
+ * the longer form is 268px in a 268px button on apex_p -- not clipped, but
+ * with no margin at all, which is the state just before clipping and
+ * indistinguishable from it on a screenshot. And "shares" is the format's
+ * word while "backup" is the word of someone holding the paper, which is who
+ * this entry is for.
+ */
+#define UI_STR_NBGL_MENU_CHECK   "Check recovery phrase"
+#define UI_STR_NBGL_MENU_BACKUP  "Generate backup shares"
+#define UI_STR_NBGL_MENU_RECOVER "Recover from backup"
+#define UI_STR_NBGL_MENU_DERIVE  "Derive with BIP85"
+/*
+ * The break is placed rather than left to the layout. The text area this is
+ * drawn in breaks on characters because generic_screen_set_top_title()
+ * (src/nbgl/layout_generic_screen.c) leaves `wrapping` clear, as every title
+ * in that file does; without the break Stax drew "What do you want to d" and
+ * "o?". Setting the field would wrap on words instead -- the break is kept
+ * because these two halves are chosen rather than discovered.
+ *
+ * Nothing under it, though two of the four entries would be the better for a
+ * line of their own -- "Check recovery phrase" does not say what it is
+ * checked against, and "Derive with BIP85" says nothing to someone who does
+ * not already know. There is no room on any of the three screens. Between the
+ * back button and the fourth entry Flex has 96px, of which a single title
+ * line takes 44; a subtitle wrapped to two lines was measured under Speculos
+ * drawing its second line *under the first button*, which does not clip it,
+ * it deletes it. One line would fit, and one line is 26 characters on apex_p.
+ *
+ * The list component that carries a subtitle per entry does not fit either:
+ * nbgl_layoutAddTouchableBar() makes an entry 94px on apex_p with a one-line
+ * subtitle, and four of them come to 376px against 340px of usable height.
+ */
+#define UI_STR_NBGL_MENU_TITLE "What do you want\nto do?"
 
 /*
- * BAGL: the equivalent two entries on the Nano idle menu
- * (src/bagl/ui.c). BAGL's idle menu has no third entry for BIP85 -- that
- * flow has no BAGL screens at all, on any Nano.
+ * BAGL: the same intentions on the Nano idle menu (src/bagl/ui.c).
+ *
+ * Three, not four, and this is the one place the two stacks genuinely differ
+ * rather than merely word things differently: BIP-85 has no BAGL screen at
+ * all, on any Nano, so there is nothing for a fourth entry to lead to. The
+ * three that are here are the same three intentions, in the same order.
+ *
+ * They read shorter than the touch labels, and not by preference. A pbb step
+ * draws its two lines in an icon-flanked box that is 87px wide on the 128x32
+ * Nano S, and that box does not wrap -- it clips, silently.
+ * tests/unit/tests/ui_strings.c measures all six of these against it.
+ *
+ * The two entries these replace ended on "recovery phrase", which is 93px and
+ * had therefore always been over that budget -- one of the two strings that
+ * test recorded as failing rather than asserting, and so one of the two it
+ * could say nothing about. Rewriting these lines was the occasion to stop
+ * shipping it.
+ *
+ * The last two say, word for word, what the touch buttons say: "Generate" +
+ * "backup shares" is 53px + 82px, "Recover" + "from backup" is 47px + 72px,
+ * and both pairs clear the budget. Only the first entry has to differ --
+ * "Check recovery" alone is 88px -- and what it does with the room is worth
+ * more than the consistency it loses: "Check phrase" / "on this Ledger" says
+ * what the phrase is checked against, which is the one thing the touch
+ * button has no room to say.
  */
-#define UI_STR_BAGL_IDLE_BIP39_L1 "Check BIP39"
-#define UI_STR_BAGL_IDLE_BIP39_L2 "recovery phrase"
-#define UI_STR_BAGL_IDLE_SSKR_L1  "Check SSKR"
-#define UI_STR_BAGL_IDLE_SSKR_L2  "recovery phrase"
+#define UI_STR_BAGL_IDLE_CHECK_L1   "Check phrase"
+#define UI_STR_BAGL_IDLE_CHECK_L2   "on this Ledger"
+#define UI_STR_BAGL_IDLE_BACKUP_L1  "Generate"
+#define UI_STR_BAGL_IDLE_BACKUP_L2  "backup shares"
+#define UI_STR_BAGL_IDLE_RECOVER_L1 "Recover"
+#define UI_STR_BAGL_IDLE_RECOVER_L2 "from backup"
+
+/*
+ * The Nano form of the screen that says why the phrase is asked for. Same
+ * reason as UI_STR_NBGL_BACKUP_EXPLAIN_DESC further down, cut for a step that
+ * does not wrap: the first two lines are a complete sentence and are all a
+ * nanos nn step shows, and the taller Nanos get the third.
+ */
+#define UI_STR_BAGL_BACKUP_EXPLAIN_L1 "This Ledger cannot"
+#define UI_STR_BAGL_BACKUP_EXPLAIN_L2 "show you its phrase."
+#define UI_STR_BAGL_BACKUP_EXPLAIN_L3 "Enter it to split it."
 
 /* NBGL home screen description and action (src/nbgl/ui.c). */
 #define UI_STR_NBGL_HOME_DESCRIPTION \
     "This Ledger application\nprovides some useful seed\nmanagement utilities."
-#define UI_STR_NBGL_HOME_ACTION    "Select Tool"
+#define UI_STR_NBGL_HOME_ACTION    "Select an action"
 #define UI_STR_NBGL_HOME_COPYRIGHT "(c) 2018-2026 Ledger"
 
 /*
  * BIP39 phrase length selection
  *
- * display_bip39_select_phrase_length_page() (src/nbgl/ui.c) serves two
- * different callers, distinguished by tool_type: checking an existing phrase
- * and generating a new one. BAGL has one screen for the same choice
- * (src/bagl/ui.c), worded for the Check flow only, and split 2 lines on
- * nanos, 3 lines on nanox/nanos+.
+ * display_bip39_select_phrase_length_page() (src/nbgl/ui.c) serves three of
+ * the four intentions, and only two titles: checking a phrase and backing one
+ * up ask the same question -- how long is the phrase you are about to type --
+ * so they read the same title, while deriving asks how long a phrase to
+ * produce, which is a different question. BAGL has one screen for the same
+ * choice (src/bagl/ui.c), worded for the Check flow only, and split 2 lines
+ * on nanos, 3 lines on nanox/nanos+.
  */
 #define UI_STR_NBGL_BIP39_LENGTH_TITLE_CHECK    "How long is your\nBIP39 Recovery\nPhrase?"
 #define UI_STR_NBGL_BIP39_LENGTH_TITLE_DERIVE   "Length of BIP39\nphrase to\ngenerate?"
@@ -203,6 +283,30 @@
 #define UI_STR_NBGL_RESULT_TAP_TO_DISMISS "Tap to dismiss"
 
 /*
+ * The same three outcomes, read on the way to generating a backup.
+ *
+ * The verdict is a destination when the user came to check a phrase and a
+ * step on the way when they came to back one up, and a failure does not mean
+ * the same thing in the two. "Doesn't match the one present on this Ledger
+ * device" is a complete answer to "is this my phrase?"; it is only half of
+ * one to "can I back this up?", where what matters is that the shares about
+ * to be written down would restore something this device cannot.
+ *
+ * The invalid outcome is not repeated here: a phrase that is not well formed
+ * is not well formed for either purpose, and UI_STR_NBGL_RESULT_BIP39_INVALID
+ * above says so in both flows, advice line included.
+ *
+ * The footer changes with it. A screen that continues cannot be labelled "Tap
+ * to dismiss" -- and only the match continues, so the failures above keep the
+ * dismissal.
+ */
+#define UI_STR_NBGL_RESULT_BACKUP_NOMATCH \
+    "You would be backing up\na phrase this Ledger\ncannot recover."
+#define UI_STR_NBGL_RESULT_BACKUP_MATCH \
+    "This is the recovery phrase\non this Ledger device.\nIt can be split into shares."
+#define UI_STR_NBGL_RESULT_TAP_TO_CONTINUE "Tap to continue"
+
+/*
  * Invalid-phrase advice. BAGL (src/bagl/ux_nano.c) splits it over two lines,
  * shared by the BIP39 and SSKR invalid flows; NBGL (src/nbgl/ui.c) now
  * carries the same advice as a third, gray line under the invalid result's
@@ -221,6 +325,16 @@
 #define UI_STR_BAGL_BIP39_NOMATCH_TITLE_L2 "doesn't match"
 #define UI_STR_BAGL_BIP39_MATCH_TITLE_L2   "is correct"
 
+/*
+ * What the mismatch adds when the phrase was being backed up rather than
+ * checked -- the Nano's two lines of what UI_STR_NBGL_RESULT_BACKUP_NOMATCH
+ * says in one sentence on the touch screens. It follows the "doesn't match"
+ * title as its own step, the way the invalid advice above already does,
+ * because a pbb title has no room for it.
+ */
+#define UI_STR_BAGL_BACKUP_NOMATCH_L1 "It would not restore"
+#define UI_STR_BAGL_BACKUP_NOMATCH_L2 "this Ledger"
+
 #define UI_STR_BAGL_SSKR_INVALID_TITLE_L1 "SSKR Recovery"
 #define UI_STR_BAGL_SSKR_INVALID_TITLE_L2 "phrase invalid"
 #define UI_STR_BAGL_SSKR_REENTER_SHARES   "Re-enter shares"
@@ -230,8 +344,14 @@
 #define UI_STR_BAGL_SSKR_MATCH_TITLE_L2   "is correct"
 
 /*
- * Recover BIP39 from SSKR / Generate SSKR from BIP39 -- the two choice
- * screens offered right after a successful verdict.
+ * Recover BIP39 from SSKR -- the screen between a successful verdict on a set
+ * of shares and the phrase they rebuild.
+ *
+ * It is the only thing standing in front of a revealed recovery phrase, so it
+ * stays even though the user chose "Recover from backup shares" from the menu
+ * and has already said what they want. The screen that used to sit opposite
+ * it, "Generate SSKR Phrase?", does not: nothing secret is on screen there,
+ * and it now duplicates a menu entry.
  *
  * NBGL asks with a title + description + two buttons (src/nbgl/ui.c); BAGL
  * folds the same choice into the verdict flow's own steps
@@ -250,10 +370,36 @@
  */
 #define UI_STR_NBGL_CANCEL "Cancel"
 
-#define UI_STR_NBGL_GENERATE_SSKR_TITLE "Generate SSKR Phrase?"
-#define UI_STR_NBGL_GENERATE_SSKR_DESC \
-    "Choose if you wish to\ngenerate SSKR shares from\nyour valid BIP39 phrase."
-#define UI_STR_NBGL_GENERATE_SSKR_CONFIRM "Generate SSKR"
+/*
+ * Backing up: why the phrase is asked for before anything is split.
+ *
+ * This screen exists because the question it answers had no answer on screen
+ * at all. Someone who picks "Generate backup shares" is immediately asked to
+ * type twenty-four words into a device that already holds them, and nothing
+ * said why.
+ *
+ * The reason is verifiable rather than reassuring: compare_recovery_phrase()
+ * (src/common/common_seed.c) derives a seed from what is typed and compares
+ * it with one derived from the device. What the device gives back is a seed,
+ * never the words -- so the words have to come from the person, and the
+ * shares are built from those words.
+ *
+ * The confirmation button names the next screen rather than the SDK's generic
+ * wording, as the two other choice screens in this application already do.
+ *
+ * No line breaks in the body, unlike the keypad titles further down. Those
+ * are drawn in a text area that breaks on characters, so a break has to be
+ * placed by hand or a range gets cut in half; nbgl_useCaseChoice() wraps this
+ * one on word boundaries on its own, and hand-placed breaks only fought with
+ * it -- Stax drew "This Ledger cannot read back" and then "the" alone on the
+ * next line, because the break was put after a word that no longer fitted.
+ */
+#define UI_STR_NBGL_BACKUP_EXPLAIN_TITLE "Enter your recovery phrase"
+#define UI_STR_NBGL_BACKUP_EXPLAIN_DESC                                  \
+    "This Ledger cannot read back the recovery phrase it holds. Enter "  \
+    "it, and it will be checked against this device before it is split " \
+    "into SSKR shares."
+#define UI_STR_NBGL_BACKUP_EXPLAIN_CONFIRM "Enter recovery phrase"
 
 /*
  * nbgl_useCaseGenericReview()'s reject parameter is named rejectText in

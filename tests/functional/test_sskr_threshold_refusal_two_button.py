@@ -54,7 +54,7 @@ def test_sskr_threshold_of_one_is_refused(device, backend, navigator, set_seed):
 
     # Generation is only reachable through a phrase the device agrees with,
     # so the phrase below is the one it was seeded with.
-    nano.select_in_menu(navigator, "Check BIP39")
+    nano.select_in_menu(navigator, "Generate")
     nano.select_in_menu(navigator, "12 words")
     nano.enter_phrase(backend, DEVICE_PHRASE)
     nano.wait_for_lines(backend, "BIP39 Phrase", "is correct")

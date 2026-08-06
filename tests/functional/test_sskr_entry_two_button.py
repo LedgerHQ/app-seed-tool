@@ -53,7 +53,7 @@ def test_sskr_entry_two_button(device, backend, navigator, set_seed):
     if device.type not in (DeviceType.NANOX, DeviceType.NANOSP):
         skip("Two-button devices only; the touch path is covered elsewhere")
 
-    nano.select_in_menu(navigator, "Check SSKR")
+    nano.select_in_menu(navigator, "Recover")
     # The SSKR flow opens on an instruction screen whose callback starts the
     # entry; the BIP-39 flow reaches the keyboard through its word-count menu
     # instead, which is why the other two-button test needs no equivalent.

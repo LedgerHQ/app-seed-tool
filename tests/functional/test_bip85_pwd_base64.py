@@ -6,7 +6,7 @@ from ragger.conftest import configuration
 from ragger.firmware.touch.use_cases import UseCaseHomeExt, UseCaseViewDetails
 from ragger.firmware.touch.layouts import ChoiceList
 from keypad import Keypad
-from genericlayout import GenericLayout
+from genericlayout import GenericLayout, MENU_DERIVE
 
 @fixture(scope='session')
 def set_seed():
@@ -22,8 +22,8 @@ def all_eink_bip85_pwd_base64(backend, device):
 
     backend.wait_for_text_on_screen("Seed Tool", 10)
     home_page.action()
-    backend.wait_for_text_on_screen("BIP85 Generate", 5)
-    genericbuttons.choose(3)
+    backend.wait_for_text_on_screen("Derive with BIP85", 5)
+    genericbuttons.choose(MENU_DERIVE)
     backend.wait_for_text_on_screen("Which BIP85", 5)
     genericbuttons.choose(2)
     backend.wait_for_text_on_screen("Enter password length", 5)

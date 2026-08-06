@@ -62,6 +62,42 @@ nbgl_text_area_t* generic_screen_set_title(nbgl_obj_t* align_to) {
     return textArea;
 }
 
+/*
+ * A title for a screen that has no icon to hang it from.
+ *
+ * generic_screen_set_title() above aligns BOTTOM_MIDDLE to the icon it is
+ * given; with no icon there is nothing to align to, and BOTTOM_MIDDLE against
+ * a NULL alignTo is the bottom of the screen -- under the buttons. This one
+ * hangs from the top instead, clear of the back button, whose height the SDK
+ * names (BACK_BUTTON_HEADER_HEIGHT: 88 on Stax, 96 on Flex, 60 on Apex).
+ *
+ * `wrapping` is left unset here, as generic_screen_set_title() above also
+ * leaves it. That is a decision and not an oversight, and it is why every
+ * title in this file carries a hand-placed "\n": with the field clear the
+ * text area breaks on characters, so a title that overflows is cut mid-word;
+ * setting it would break on words instead. Placed breaks are kept because
+ * these titles are short and their two halves are chosen, not discovered --
+ * but a caller that reads "the area wraps on characters" should know it is
+ * reading this line, not a property of the widget.
+ */
+nbgl_text_area_t* generic_screen_set_top_title(void) {
+    nbgl_text_area_t* textArea =
+        (nbgl_text_area_t*)nbgl_objPoolGet(TEXT_AREA, 0);
+    textArea->textColor = BLACK;
+    textArea->text = "";
+    textArea->textAlignment = CENTER;
+    textArea->fontId = LARGE_MEDIUM_FONT;
+    textArea->obj.area.width = SCREEN_WIDTH - 2 * BORDER_MARGIN;
+    textArea->obj.area.height =
+        nbgl_getTextHeight(textArea->fontId, textArea->text);
+    textArea->style = NO_STYLE;
+    textArea->obj.alignment = TOP_MIDDLE;
+    textArea->obj.alignTo = NULL;
+    textArea->obj.alignmentMarginX = 0;
+    textArea->obj.alignmentMarginY = BACK_BUTTON_HEADER_HEIGHT;
+    return textArea;
+}
+
 void generic_screen_configure_buttons(nbgl_button_t** buttons,
                                       const size_t size) {
     nbgl_button_t* button;

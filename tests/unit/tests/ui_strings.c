@@ -36,6 +36,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include <stdio.h>
+#include <ctype.h>
 
 #include "ui_strings.h"
 #include "constants.h"
@@ -63,14 +64,20 @@ static const struct {
     ENTRY(UI_STR_WORDS_18),
     ENTRY(UI_STR_WORDS_24),
     ENTRY(UI_STR_BAGL_PROCESSING),
-    ENTRY(UI_STR_NBGL_TOOL_BIP39),
-    ENTRY(UI_STR_NBGL_TOOL_SSKR),
-    ENTRY(UI_STR_NBGL_TOOL_BIP85),
-    ENTRY(UI_STR_NBGL_SELECT_TOOL_TITLE),
-    ENTRY(UI_STR_BAGL_IDLE_BIP39_L1),
-    ENTRY(UI_STR_BAGL_IDLE_BIP39_L2),
-    ENTRY(UI_STR_BAGL_IDLE_SSKR_L1),
-    ENTRY(UI_STR_BAGL_IDLE_SSKR_L2),
+    ENTRY(UI_STR_NBGL_MENU_CHECK),
+    ENTRY(UI_STR_NBGL_MENU_BACKUP),
+    ENTRY(UI_STR_NBGL_MENU_RECOVER),
+    ENTRY(UI_STR_NBGL_MENU_DERIVE),
+    ENTRY(UI_STR_NBGL_MENU_TITLE),
+    ENTRY(UI_STR_BAGL_IDLE_CHECK_L1),
+    ENTRY(UI_STR_BAGL_IDLE_CHECK_L2),
+    ENTRY(UI_STR_BAGL_IDLE_BACKUP_L1),
+    ENTRY(UI_STR_BAGL_IDLE_BACKUP_L2),
+    ENTRY(UI_STR_BAGL_IDLE_RECOVER_L1),
+    ENTRY(UI_STR_BAGL_IDLE_RECOVER_L2),
+    ENTRY(UI_STR_BAGL_BACKUP_EXPLAIN_L1),
+    ENTRY(UI_STR_BAGL_BACKUP_EXPLAIN_L2),
+    ENTRY(UI_STR_BAGL_BACKUP_EXPLAIN_L3),
     ENTRY(UI_STR_NBGL_HOME_DESCRIPTION),
     ENTRY(UI_STR_NBGL_HOME_ACTION),
     ENTRY(UI_STR_NBGL_HOME_COPYRIGHT),
@@ -114,6 +121,9 @@ static const struct {
     ENTRY(UI_STR_NBGL_RESULT_SSKR_NOMATCH),
     ENTRY(UI_STR_NBGL_RESULT_SSKR_MATCH),
     ENTRY(UI_STR_NBGL_RESULT_TAP_TO_DISMISS),
+    ENTRY(UI_STR_NBGL_RESULT_BACKUP_NOMATCH),
+    ENTRY(UI_STR_NBGL_RESULT_BACKUP_MATCH),
+    ENTRY(UI_STR_NBGL_RESULT_TAP_TO_CONTINUE),
     ENTRY(UI_STR_NBGL_RESULT_INVALID_ADVICE),
     ENTRY(UI_STR_BAGL_INVALID_ADVICE_L1),
     ENTRY(UI_STR_BAGL_INVALID_ADVICE_L2),
@@ -122,6 +132,8 @@ static const struct {
     ENTRY(UI_STR_BAGL_BIP39_REENTER_PHRASE),
     ENTRY(UI_STR_BAGL_BIP39_NOMATCH_TITLE_L2),
     ENTRY(UI_STR_BAGL_BIP39_MATCH_TITLE_L2),
+    ENTRY(UI_STR_BAGL_BACKUP_NOMATCH_L1),
+    ENTRY(UI_STR_BAGL_BACKUP_NOMATCH_L2),
     ENTRY(UI_STR_BAGL_SSKR_INVALID_TITLE_L1),
     ENTRY(UI_STR_BAGL_SSKR_INVALID_TITLE_L2),
     ENTRY(UI_STR_BAGL_SSKR_REENTER_SHARES),
@@ -133,9 +145,9 @@ static const struct {
     ENTRY(UI_STR_NBGL_RECOVER_BIP39_DESC),
     ENTRY(UI_STR_NBGL_RECOVER_BIP39_CONFIRM),
     ENTRY(UI_STR_NBGL_CANCEL),
-    ENTRY(UI_STR_NBGL_GENERATE_SSKR_TITLE),
-    ENTRY(UI_STR_NBGL_GENERATE_SSKR_DESC),
-    ENTRY(UI_STR_NBGL_GENERATE_SSKR_CONFIRM),
+    ENTRY(UI_STR_NBGL_BACKUP_EXPLAIN_TITLE),
+    ENTRY(UI_STR_NBGL_BACKUP_EXPLAIN_DESC),
+    ENTRY(UI_STR_NBGL_BACKUP_EXPLAIN_CONFIRM),
     ENTRY(UI_STR_NBGL_CLOSE),
     ENTRY(UI_STR_BAGL_GENERATE_SSKR_L1),
     ENTRY(UI_STR_BAGL_GENERATE_SSKR_L2),
@@ -226,14 +238,16 @@ static const unsigned char k_nanos_char_width_bold[96] = {
  * the tighter 87px in the bold font -- the more conservative of the two
  * combinations -- rather than guessed at a wider or lighter one.
  *
- * Two strings fail the bound below and are deliberately not asserted:
- * "recovery phrase" (UI_STR_BAGL_IDLE_BIP39_L2 / _SSKR_L2, 93px bold, PBB) and
- * "BIP39 Recovery" (UI_STR_BAGL_BIP39_INVALID_TITLE_L1, 90px bold, PBB), both
- * 3-6px over the 87px PBB budget on nanos. Both predate this header --
- * nothing here changed either word -- and this lot does not change wording
- * (see the PR body). They are recorded here, not silently passed, so the
- * gap this test cannot close is visible in the same place as the strings it
- * does check, rather than only in the PR body.
+ * One string still fails the bound below and is deliberately not asserted:
+ * "BIP39 Recovery" (UI_STR_BAGL_BIP39_INVALID_TITLE_L1), 90px bold against
+ * the 87px PBB budget on nanos. It predates this header and no change since
+ * has touched that screen's wording.
+ *
+ * There were two. The other was "recovery phrase", 93px, which the two idle
+ * entries used to end on; the three entries that replaced them were written
+ * against this budget and are asserted below like everything else. Recording
+ * the gap here rather than only in a PR body is what made it visible enough
+ * to close when those lines were next rewritten.
  */
 #define BOUND_WIDE           116
 #define BOUND_TIGHT          87
@@ -252,10 +266,24 @@ static const struct {
     BOUNDED(UI_STR_WORDS_18, BOUND_WIDE, true),
     BOUNDED(UI_STR_WORDS_24, BOUND_WIDE, true),
     BOUNDED(UI_STR_BAGL_PROCESSING, BOUND_WIDE, true),
-    BOUNDED(UI_STR_BAGL_IDLE_BIP39_L1, BOUND_TIGHT, true),
-    /* IDLE_BIP39_L2 ("recovery phrase") -- see the file comment above. */
-    BOUNDED(UI_STR_BAGL_IDLE_SSKR_L1, BOUND_TIGHT, true),
-    /* IDLE_SSKR_L2 ("recovery phrase") -- see the file comment above. */
+    /*
+     * All six idle-menu fragments, both lines of each. The two entries these
+     * replaced ended on "recovery phrase", 93px against an 87px box, and were
+     * recorded above as unassertable rather than asserted; the three that
+     * took their place were written to the budget and are held to it.
+     */
+    BOUNDED(UI_STR_BAGL_IDLE_CHECK_L1, BOUND_TIGHT, true),
+    BOUNDED(UI_STR_BAGL_IDLE_CHECK_L2, BOUND_TIGHT, true),
+    BOUNDED(UI_STR_BAGL_IDLE_BACKUP_L1, BOUND_TIGHT, true),
+    BOUNDED(UI_STR_BAGL_IDLE_BACKUP_L2, BOUND_TIGHT, true),
+    BOUNDED(UI_STR_BAGL_IDLE_RECOVER_L1, BOUND_TIGHT, true),
+    BOUNDED(UI_STR_BAGL_IDLE_RECOVER_L2, BOUND_TIGHT, true),
+    /* nn steps, so the wide box and the regular font. */
+    BOUNDED(UI_STR_BAGL_BACKUP_EXPLAIN_L1, BOUND_WIDE, false),
+    BOUNDED(UI_STR_BAGL_BACKUP_EXPLAIN_L2, BOUND_WIDE, false),
+    BOUNDED(UI_STR_BAGL_BACKUP_EXPLAIN_L3, BOUND_WIDE, false),
+    BOUNDED(UI_STR_BAGL_BACKUP_NOMATCH_L1, BOUND_WIDE, false),
+    BOUNDED(UI_STR_BAGL_BACKUP_NOMATCH_L2, BOUND_WIDE, false),
     BOUNDED(UI_STR_BAGL_BIP39_LENGTH_TITLE_L1_NANOS, BOUND_WIDE, false),
     BOUNDED(UI_STR_BAGL_BIP39_LENGTH_TITLE_L2_NANOS, BOUND_WIDE, false),
     BOUNDED(UI_STR_BAGL_BIP39_LENGTH_TITLE_L1, BOUND_WIDE, false),
@@ -549,9 +577,106 @@ static void test_composed_titles_take_the_arguments_passed_to_them(void **state)
     }
 }
 
+/*
+ * The table at the top of this file names every macro of ui_strings.h -- and
+ * until now, nothing said so.
+ *
+ * A *renamed* or *removed* macro has always been caught, and loudly: ENTRY()
+ * expands to the macro itself, so the compiler refuses the file. An *added*
+ * one was the silent half. Nothing linked the header to the table, so a macro
+ * declared in the header and never listed here was checked by none of the
+ * four tests above -- not for being empty, not for fitting a Nano line -- and
+ * the suite stayed green. Six macros were added by the change that added this
+ * test, which is why it is being added now rather than being noted as a gap.
+ *
+ * Read from the header itself, at the path CMake hands over, rather than
+ * compared against a number kept up to date by hand: a hand-kept count is the
+ * same class of thing as a hand-kept list, and would drift the same way.
+ *
+ * Names, not a count. Comparing cardinalities passes on a header that gains
+ * two macros while the table lists one of them twice -- the totals agree and
+ * one macro is still checked by nothing. Each declared name is looked for in
+ * the table by name, and the table is checked for repeats, so both halves
+ * fail loudly. One "#define" line per macro, including the multi-line ones: a
+ * value continued with a backslash still has exactly one.
+ */
+#ifndef UI_STRINGS_HEADER_PATH
+#error "UI_STRINGS_HEADER_PATH must name src/common/ui_strings.h"
+#endif
+
+#define MACRO_PREFIX "#define UI_STR_"
+
+static bool table_names(const char *name) {
+    for (size_t i = 0; i < sizeof(k_all_strings) / sizeof(k_all_strings[0]); i++) {
+        if (strcmp(k_all_strings[i].name, name) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static void test_the_table_names_every_macro_of_the_header(void **state) {
+    (void) state;
+
+    /* no entry names the same macro twice */
+    for (size_t i = 0; i < sizeof(k_all_strings) / sizeof(k_all_strings[0]); i++) {
+        for (size_t j = i + 1; j < sizeof(k_all_strings) / sizeof(k_all_strings[0]); j++) {
+            if (strcmp(k_all_strings[i].name, k_all_strings[j].name) == 0) {
+                fail_msg("k_all_strings[] lists %s twice", k_all_strings[i].name);
+            }
+        }
+    }
+
+    FILE *header = fopen(UI_STRINGS_HEADER_PATH, "r");
+    if (header == NULL) {
+        fail_msg("cannot open %s", UI_STRINGS_HEADER_PATH);
+    }
+
+    size_t declared = 0;
+    char line[512];
+    while (fgets(line, sizeof(line), header) != NULL) {
+        if (strncmp(line, MACRO_PREFIX, strlen(MACRO_PREFIX)) != 0) {
+            continue;
+        }
+        declared++;
+
+        /* the macro name is the token after "#define " */
+        const char *start = line + strlen("#define ");
+        size_t len = 0;
+        while (start[len] != '\0' && !isspace((unsigned char) start[len]) &&
+               start[len] != '(') {
+            len++;
+        }
+        char name[128];
+        if (len >= sizeof(name)) {
+            fail_msg("%s declares a macro name longer than this test can hold", MACRO_PREFIX);
+        }
+        memcpy(name, start, len);
+        name[len] = '\0';
+
+        if (!table_names(name)) {
+            fclose(header);
+            fail_msg("%s declares %s, k_all_strings[] does not list it; a macro "
+                     "missing from that table is checked by nothing in this file",
+                     UI_STRINGS_HEADER_PATH, name);
+        }
+    }
+    fclose(header);
+
+    /* every name in the table is a macro of the header, so equal totals now
+     * mean equal sets -- the reverse direction is a compile error anyway,
+     * since ENTRY() expands to the macro itself */
+    const size_t listed = sizeof(k_all_strings) / sizeof(k_all_strings[0]);
+    if (declared != listed) {
+        fail_msg("%s declares %zu UI_STR_ macros, k_all_strings[] lists %zu",
+                 UI_STRINGS_HEADER_PATH, declared, listed);
+    }
+}
+
 int main(void) {
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(test_every_string_is_non_empty),
+        cmocka_unit_test(test_the_table_names_every_macro_of_the_header),
         cmocka_unit_test(test_nano_fixed_layout_strings_fit_their_budget),
         cmocka_unit_test(test_sskr_share_label_fits_the_nano_title_line),
         cmocka_unit_test(test_announced_bounds_are_the_applied_ones),

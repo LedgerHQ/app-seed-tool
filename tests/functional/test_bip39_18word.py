@@ -7,7 +7,7 @@ from ragger.conftest import configuration
 from ragger.firmware.touch.use_cases import UseCaseHomeExt, UseCaseViewDetails, UseCaseChoice
 from ragger.firmware.touch.layouts import CenteredFooter, LetterOnlyKeyboard, Suggestions, ChoiceList
 from keypad import Keypad
-from genericlayout import GenericLayout
+from genericlayout import GenericLayout, MENU_BACKUP
 
 @fixture(scope='session')
 def set_seed():
@@ -394,8 +394,14 @@ def all_eink_bip39_18word(backend, device):
 
     backend.wait_for_text_on_screen("Seed Tool", 10)
     home_page.action()
-    backend.wait_for_text_on_screen("BIP39 Check", 5)
-    genericbuttons.choose(1)
+    # Splitting a phrase into shares is now something the user asks for at
+    # the menu, so this test asks for it there. It used to get here by
+    # checking the phrase and accepting an offer that arrived afterwards,
+    # which was the only way in and is the thing this change removes.
+    backend.wait_for_text_on_screen("Generate backup shares", 5)
+    genericbuttons.choose(MENU_BACKUP)
+    backend.wait_for_text_on_screen("Enter your recovery", 5)
+    choice.confirm()
     backend.wait_for_text_on_screen("18 words", 5)
     genericbuttons.choose(2)
     backend.wait_for_text_on_screen("Enter word", 5)
@@ -405,8 +411,6 @@ def all_eink_bip39_18word(backend, device):
     backend.wait_for_text_on_screen("Valid Secret", 10)
     backend.wait_for_text_on_screen("Recovery Phrase", 1)
     check_result.tap()
-    backend.wait_for_text_on_screen("Generate SSKR", 5)
-    choice.confirm()
     backend.wait_for_text_on_screen("Enter number of SSKR shares", 5)
     keypad.write("3")
     keypad.enter()
