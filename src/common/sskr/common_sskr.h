@@ -106,6 +106,33 @@ bool bolos_ux_sskr_share_slice(size_t buffer_length,
                                size_t *offset,
                                size_t *length);
 
+// How long one serialized shard is, in bytes, for a phrase of `bip39_type`
+// words -- the shard value plus its metadata. Returns 0, and only 0, for a
+// word count this application does not offer, which is what stops a caller
+// sizing a buffer from an arbitrary product.
+uint8_t bolos_ux_sskr_share_length(uint8_t bip39_type);
+
+// How many bytes the CBOR byte-string header of a shard that long occupies:
+// four up to SSKR_CBOR_SHORT_FORM_MAX_LENGTH, five above it.
+uint8_t bolos_ux_sskr_cbor_header_length(uint8_t share_len);
+
+// How many ByteWords one generated share is written as -- the number a user
+// has to copy off one sheet, and the number a review can state *before*
+// anything is generated.
+//
+// This exists because the review has to say what the user is engaging before
+// the thing exists: bolos_ux_sskr_share_slice() and sskr_sharecount_get()
+// describe a set that has already been produced, and nothing may be produced
+// until the user has approved. It is therefore a second computation of a
+// number the generator also arrives at -- so it is written as the same sum,
+// out of the same two functions bolos_ux_bip39_to_sskr_convert() uses, and
+// tests/unit/tests/sskr_share_wordcount.c pins it against the length that
+// function actually returns for all three phrase lengths. The agreement is
+// held by a test, not by the two being read side by side.
+//
+// Returns 0 for a word count this application does not offer.
+uint8_t bolos_ux_sskr_share_wordcount(uint8_t bip39_type);
+
 // Encode SSKR ByteWord as hex. Returns false, without writing to *value, if
 // the ByteWord is not in the wordlist.
 bool bolos_ux_sskr_byteword_to_hex(const unsigned char *byteword, uint8_t *value);

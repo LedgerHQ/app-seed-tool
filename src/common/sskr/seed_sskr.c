@@ -96,6 +96,37 @@ static bool bolos_ux_sskr_bip39_type_valid(unsigned int bip39_type) {
            (bip39_type == BIP39_MNEMONIC_SIZE_24);
 }
 
+// See common_sskr.h. One expression for the serialized shard length, because
+// two things now need it: the buffer sizing below, and the count of ByteWords
+// a review announces before any of them exists.
+uint8_t bolos_ux_sskr_share_length(uint8_t bip39_type) {
+    if (!bolos_ux_sskr_bip39_type_valid(bip39_type)) {
+        return 0;
+    }
+    return bip39_type * 4 / 3 + SSKR_METADATA_LENGTH_BYTES;
+}
+
+// See common_sskr.h. Same reason: bolos_ux_bip39_to_sskr_convert() below
+// decides the header length while building the header, and the review needs
+// the number without building anything.
+uint8_t bolos_ux_sskr_cbor_header_length(uint8_t share_len) {
+    return (share_len <= SSKR_CBOR_SHORT_FORM_MAX_LENGTH)
+               ? SSKR_CBOR_SHORT_FORM_HEADER_LENGTH
+               : SSKR_CBOR_LONG_FORM_HEADER_LENGTH;
+}
+
+// See common_sskr.h.
+uint8_t bolos_ux_sskr_share_wordcount(uint8_t bip39_type) {
+    uint8_t share_len = bolos_ux_sskr_share_length(bip39_type);
+    if (share_len == 0) {
+        return 0;
+    }
+    // One ByteWord per byte of what gets encoded, which is exactly the buffer
+    // bolos_ux_sskr_share_hex_decode() is handed below: header, shard, CRC.
+    return bolos_ux_sskr_cbor_header_length(share_len) + share_len +
+           SSKR_CRC32_LENGTH_BYTES;
+}
+
 int16_t bolos_ux_sskr_size_get(uint8_t bip39_type, uint8_t groups_threshold,
                                unsigned int* group_descriptor,
                                uint8_t groups_len, uint8_t* share_len) {
@@ -116,7 +147,7 @@ int16_t bolos_ux_sskr_size_get(uint8_t bip39_type, uint8_t groups_threshold,
 
     int16_t share_count_expected =
         sskr_count_shards(groups_threshold, groups, groups_len);
-    *share_len = bip39_type * 4 / 3 + SSKR_METADATA_LENGTH_BYTES;
+    *share_len = bolos_ux_sskr_share_length(bip39_type);
 
     return share_count_expected;
 }
@@ -403,22 +434,39 @@ unsigned int bolos_ux_bip39_to_sskr_convert(
             // CBOR Major type 2 is 0x40
             // (see https://www.rfc-editor.org/rfc/rfc8949#name-major-types)
             uint8_t cbor[] = {0xD9, 0x9D, 0x75, 0x40, 0x00};
-            size_t cbor_len = sizeof(cbor);
-            if (share_len < 24) {
+            // The length this header will occupy, taken from the same function
+            // bolos_ux_sskr_share_wordcount() reads, so that the number of
+            // words a review promises and the number this loop then writes
+            // cannot disagree about the short/long form boundary.
+            size_t cbor_len = bolos_ux_sskr_cbor_header_length(share_len);
+            if (share_len <= SSKR_CBOR_SHORT_FORM_MAX_LENGTH) {
                 cbor[3] |= (share_len & 0x1F);
-                cbor_len--;
             } else {
                 cbor[3] |= 0x18;
                 cbor[4] = (uint8_t)share_len;
             }
 
             uint32_t checksum = 0;
-            uint8_t checksum_len = sizeof(checksum);
+            uint8_t checksum_len = SSKR_CRC32_LENGTH_BYTES;
 
             size_t cbor_share_crc_buffer_len =
                 cbor_len + share_len + checksum_len;
-            uint8_t cbor_share_crc_buffer[4 + SSKR_METADATA_LENGTH_BYTES + 1 +
-                                          SSKR_MAX_STRENGTH_BYTES + 4];
+            /*
+             * SSKR_SHARE_MAX_WIRE_LENGTH is this buffer, named. It was spelled
+             * out as "4 + metadata + 1 + strength + 4", which is the same 46
+             * bytes and the same four terms -- the long-form CBOR header, the
+             * shard, and the CRC -- written twice in the same file. The
+             * assertion below is what says the runtime length can never exceed
+             * it: cbor_share_crc_buffer_len is that sum with the real values,
+             * and every one of them is bounded by a constant here.
+             */
+            uint8_t cbor_share_crc_buffer[SSKR_SHARE_MAX_WIRE_LENGTH];
+            _Static_assert(
+                SSKR_CBOR_LONG_FORM_HEADER_LENGTH + SSKR_METADATA_LENGTH_BYTES +
+                        SSKR_MAX_STRENGTH_BYTES + SSKR_CRC32_LENGTH_BYTES <=
+                    SSKR_SHARE_MAX_WIRE_LENGTH,
+                "the widest header, shard and CRC this loop can "
+                "write do not fit the buffer it writes them into");
 
             // sskr_words_buffer is space separated bytewords of cbor + share +
             // checksum

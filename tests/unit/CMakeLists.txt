@@ -955,6 +955,12 @@ add_executable(test_sskr_wire_properties ./tests/sskr_wire_properties.c ../../sr
 target_include_directories(test_sskr_wire_properties PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common)
 target_link_libraries(test_sskr_wire_properties PUBLIC cmocka gcov sskr sss testutils)
 
+# Predicts a share length and then generates a real set to check the
+# prediction, so it needs the same sources as the other seed_sskr.c tests.
+add_executable(test_sskr_share_wordcount ./tests/sskr_share_wordcount.c ../../src/common/bip39/seed_rom_variables.c ../../src/common/bip39/seed_bip39.c ../../src/common/sskr/seed_rom_variables.c ../../src/common/sskr/seed_sskr.c)
+target_include_directories(test_sskr_share_wordcount PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common)
+target_link_libraries(test_sskr_share_wordcount PUBLIC cmocka gcov sskr sss testutils)
+
 add_executable(test_bip39_properties ./tests/bip39_properties.c ../../src/common/bip39/seed_rom_variables.c ../../src/common/bip39/seed_bip39.c)
 target_include_directories(test_bip39_properties PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common)
 target_link_libraries(test_bip39_properties PUBLIC cmocka gcov testutils)
