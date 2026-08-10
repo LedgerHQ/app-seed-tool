@@ -6,6 +6,8 @@ from ragger.conftest import configuration
 from ragger.firmware.touch.use_cases import UseCaseHomeExt, UseCaseViewDetails
 from ragger.firmware.touch.layouts import ChoiceList
 from keypad import Keypad
+import reviews
+import explanations
 from genericlayout import GenericLayout, MENU_DERIVE
 
 @fixture(scope='session')
@@ -24,7 +26,8 @@ def all_eink_bip85_pwd_base64(backend, device):
     home_page.action()
     backend.wait_for_text_on_screen("Derive with BIP85", 5)
     genericbuttons.choose(MENU_DERIVE)
-    backend.wait_for_text_on_screen("Which BIP85", 5)
+    explanations.pass_explanation(
+        backend, device, explanations.EXPLAIN_BIP85, "Which BIP85")
     genericbuttons.choose(2)
     backend.wait_for_text_on_screen("Enter password length", 5)
     # The keypad names the range this application accepts, on its own line --
@@ -42,10 +45,19 @@ def all_eink_bip85_pwd_base64(backend, device):
     keypad.write("2")
     keypad.write("1")
     keypad.enter()
-    backend.wait_for_text_on_screen("Enter index", 5)
+    explanations.pass_explanation(
+        backend, device, explanations.EXPLAIN_INDEX, "Enter index")
     backend.wait_for_text_on_screen(r"Enter index \(0 - 9,999,999\)", 1)
     keypad.write("0")
     keypad.enter()
+
+    # The index no longer derives anything. The review lists the three
+    # parameters and the path they combine into -- the path being what makes
+    # the result reproducible anywhere else -- and its last page is the
+    # warning that stands in front of the secret.
+    backend.wait_for_text_on_screen("Path", 5)
+    reviews.approve(backend, device, "Derive this secret")
+
     backend.wait_for_text_on_screen("Base64 Password", 5)
     if device.type == DeviceType.STAX:
         backend.wait_for_text_on_screen("dKLoepugzdVJvdL56o", 1)

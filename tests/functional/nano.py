@@ -127,7 +127,7 @@ def select_in_menu(navigator, label, timeout=30):
     `screen_change_before_first_instruction` has to be off, as it is at every
     call site in this repository: the entry the caller is after is often
     already displayed when this is called -- the home screen opens on
-    "Check phrase" -- and waiting for a screen change that nobody is going to
+    "Check Phrase" -- and waiting for a screen change that nobody is going to
     cause times out.
     """
     navigator.navigate_until_text(NavInsID.RIGHT_CLICK, [NavInsID.BOTH_CLICK],
@@ -160,6 +160,32 @@ def choose_in_flow(backend, label, timeout_clicks=None):
         f"{label!r} is not on any step of this flow; last saw {_texts(backend)}")
 
 
+def walk_to_lines(backend, *lines, timeout_clicks=None):
+    """Walk a bounded UX_FLOW right until every one of `lines` is on one
+    screen, and stop there without validating.
+
+    The third of the three things one does to a flow, and the one the review
+    steps need. wait_for_lines() asserts about the screen that is already up;
+    choose_in_flow() walks and then presses both buttons, which on a review
+    would run the callback of whatever step it stopped on. A review is read,
+    not chosen: its steps have to be reached, looked at, and left alone.
+
+    Every line is matched as a prefix of a drawn line, and all of them have to
+    be on the *same* screen -- a nn step draws two lines and asserting one of
+    them says nothing about which step was reached.
+    """
+    limit = timeout_clicks if timeout_clicks is not None else _MAX_CLICKS
+    for _ in range(limit):
+        texts = _texts(backend)
+        if all(any(text.startswith(line) for text in texts) for line in lines):
+            return
+        if not _click(backend, "right"):
+            break
+    raise AssertionError(
+        f"{list(lines)} are not on any one step of this flow; last saw "
+        f"{_texts(backend)}")
+
+
 def confirm(backend):
     """Click through a screen that only asks to be acknowledged.
 
@@ -169,6 +195,31 @@ def confirm(backend):
     helpers below apply to it.
     """
     _click(backend, "both")
+
+
+def open_sskr_entry(backend):
+    """Get from the Recover menu entry to the first word of the first share.
+
+    Two screens stand in the way and they take *different* gestures, which is
+    the whole reason this helper exists. Both live in ux_sskr_flow,
+    src/bagl/ui.c:
+
+    - `ux_recover_explain_step` is a UX_STEP_NOCB -- it says that not all the
+      shares are needed and that any order works, and it has no callback at
+      all. A both-click does nothing on it; a flow moves off a NOCB step on a
+      right click.
+    - `ux_sskr_instruction_step` is a UX_STEP_CB, and its callback is what
+      starts the entry. That one is a both-click.
+
+    Acknowledging both the same way leaves the flow sitting on the instruction
+    screen, and the failure surfaces much later as a word that is not among the
+    keyboard's candidates.
+
+    The BIP-39 flow reaches its keyboard through a word-count menu instead,
+    which is why nothing equivalent exists for it.
+    """
+    _click(backend, "right")
+    confirm(backend)
 
 
 def choose_in_carousel(backend, label):

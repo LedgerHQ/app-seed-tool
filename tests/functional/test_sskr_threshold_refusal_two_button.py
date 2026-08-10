@@ -11,7 +11,7 @@ The refusal had no test that reads the screen. test_sskr_unsupported_values.py
 drives the equivalent touch path, but its assertion on the message is
 commented out, with the reason given in the file: the touch status page lasts
 three seconds and the test cannot catch it in time. What it asserts instead is
-that the application comes back to the "Generate SSKR" screen -- which a
+that the application comes back to the "Set up / SSKR Backup" screen -- which a
 build that silently ignored the choice and returned would also satisfy. So on
 no device did anything check that the user is told why nothing was generated.
 
@@ -57,14 +57,14 @@ def test_sskr_threshold_of_one_is_refused(device, backend, navigator, set_seed):
     nano.select_in_menu(navigator, "Generate")
     nano.select_in_menu(navigator, "12 words")
     nano.enter_phrase(backend, DEVICE_PHRASE)
-    nano.wait_for_lines(backend, "BIP39 Phrase", "is correct")
+    nano.wait_for_lines(backend, "Your Phrase", "is correct")
 
     # The verdict flow carries the entry into generation on its last step.
-    nano.choose_in_flow(backend, "Generate")
+    nano.choose_in_flow(backend, "Set up")
 
     nano.choose_in_carousel(backend, "3")
     nano.choose_in_carousel(backend, "1")
 
     # Both lines, because the flow's second step is another warning screen and
     # the first line alone would not say which one was reached.
-    nano.wait_for_lines(backend, "1-of-m shares", "where m > 1")
+    nano.wait_for_lines(backend, "A threshold of 1", "needs 1 Share")

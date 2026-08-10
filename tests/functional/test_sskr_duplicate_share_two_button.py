@@ -20,14 +20,14 @@ What no test pinned is the screen the user is then shown. In
 src/bagl/nanox_enter_phrase.c the answer runs through `reconstructed`, a flag
 distinct from the verdict itself:
 
-    if (!reconstructed)   -> ux_sskr_invalid_flow   "SSKR Recovery"/"phrase invalid"
-    else if (match)       -> ux_sskr_match_flow     "SSKR Phrase"/"is correct"
-    else                  -> ux_sskr_nomatch_flow   "SSKR Phrase"/"doesn't match"
+    if (!reconstructed)   -> ux_sskr_invalid_flow   "SSKR Shares"/"are not valid"
+    else if (match)       -> ux_sskr_match_flow     "SSKR Shares"/"are correct"
+    else                  -> ux_sskr_nomatch_flow   "SSKR Shares"/"don't match"
 
 Collapsing the first branch into the third is the failure this test exists to
 catch, and it is a plausible one -- combination failed, so the reconstructed
 seed does not match, and reporting a mismatch looks locally reasonable. It
-would be the wrong answer: "doesn't match" tells the user their shares belong
+would be the wrong answer: "don't match" tells the user their shares belong
 to some other seed, sending them to look for the wrong shares, when what
 actually happened is that they entered one share twice and need a second,
 different share. Both branches refuse; only one of them says something true.
@@ -70,10 +70,10 @@ def test_sskr_duplicate_share_is_refused_as_invalid(device, backend, navigator,
         skip("Two-button devices only; the touch path is covered elsewhere")
 
     nano.select_in_menu(navigator, "Recover")
-    nano.confirm(backend)
+    nano.open_sskr_entry(backend)
 
     for _ in range(2):
         for word in SHARD.split():
             nano.enter_word(backend, word)
 
-    nano.wait_for_lines(backend, "SSKR Recovery", "phrase invalid")
+    nano.wait_for_lines(backend, "SSKR Shares", "are not valid")

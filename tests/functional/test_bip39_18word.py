@@ -7,6 +7,8 @@ from ragger.conftest import configuration
 from ragger.firmware.touch.use_cases import UseCaseHomeExt, UseCaseViewDetails, UseCaseChoice
 from ragger.firmware.touch.layouts import CenteredFooter, LetterOnlyKeyboard, Suggestions, ChoiceList
 from keypad import Keypad
+import reviews
+import explanations
 from genericlayout import GenericLayout, MENU_BACKUP
 
 @fixture(scope='session')
@@ -14,8 +16,8 @@ def set_seed():
     configuration.OPTIONAL.CUSTOM_SEED = "profit result tip galaxy hawk immune hockey series melody grape unusual prize nothing federal dad crew pact sad"
 
 def nanos_bip39_18word(backend, navigator):
-    backend.wait_for_text_on_screen("Check BIP39", 5)
-    backend.wait_for_text_on_screen("recovery phras", 1)
+    backend.wait_for_text_on_screen("Check Phrase", 5)
+    backend.wait_for_text_on_screen("on this Ledger", 1)
     instructions = [
         NavInsID.BOTH_CLICK,
         NavInsID.RIGHT_CLICK,
@@ -351,16 +353,16 @@ def nanos_bip39_18word(backend, navigator):
         NavInsID.BOTH_CLICK
     ]
     navigator.navigate(instructions, screen_change_before_first_instruction=False)
-    backend.wait_for_text_on_screen("BIP39 Phrase", 5)
+    backend.wait_for_text_on_screen("Your Phrase", 5)
     backend.wait_for_text_on_screen("is correct", 1)
     navigator.navigate([NavInsID.RIGHT_CLICK], screen_change_before_first_instruction=False)
     backend.wait_for_text_on_screen("Quit", 1)
     navigator.navigate([NavInsID.RIGHT_CLICK], screen_change_before_first_instruction=False)
-    backend.wait_for_text_on_screen("Generate", 1)
-    backend.wait_for_text_on_screen("SSKR phrases", 1)
+    backend.wait_for_text_on_screen("Set up", 1)
+    backend.wait_for_text_on_screen("SSKR Backup", 1)
     navigator.navigate([NavInsID.BOTH_CLICK], screen_change_before_first_instruction=False)
     backend.wait_for_text_on_screen("Select number", 1)
-    backend.wait_for_text_on_screen("of shares", 1)
+    backend.wait_for_text_on_screen("of SSKR Shares", 1)
     navigator.navigate([NavInsID.RIGHT_CLICK,
                         NavInsID.RIGHT_CLICK,
                         NavInsID.RIGHT_CLICK,
@@ -398,37 +400,52 @@ def all_eink_bip39_18word(backend, device):
     # the menu, so this test asks for it there. It used to get here by
     # checking the phrase and accepting an offer that arrived afterwards,
     # which was the only way in and is the thing this change removes.
-    backend.wait_for_text_on_screen("Generate backup shares", 5)
+    backend.wait_for_text_on_screen("Generate Backup Shares", 5)
     genericbuttons.choose(MENU_BACKUP)
-    backend.wait_for_text_on_screen("Enter your recovery", 5)
-    choice.confirm()
-    backend.wait_for_text_on_screen("18 words", 5)
+    # Through the helper rather than by hand: the explanation is two pages
+    # now, and only the second carries the button.
+    explanations.pass_explanation(
+        backend, device, explanations.EXPLAIN_BACKUP, "18 words",
+        button=explanations.ENTER_PHRASE, action=True)
     genericbuttons.choose(2)
     backend.wait_for_text_on_screen("Enter word", 5)
     for word in configuration.OPTIONAL.CUSTOM_SEED.split():
         keyboard.write(word[:4])
         suggestion.choose(1)
-    backend.wait_for_text_on_screen("Valid Secret", 10)
+    backend.wait_for_text_on_screen("Valid", 10)
     backend.wait_for_text_on_screen("Recovery Phrase", 1)
     check_result.tap()
-    backend.wait_for_text_on_screen("Enter number of SSKR shares", 5)
+    explanations.pass_explanation(
+        backend, device, explanations.EXPLAIN_NUMBERS,
+        "Enter number of SSKR Shares")
     keypad.write("3")
     keypad.enter()
-    backend.wait_for_text_on_screen("Enter threshold value", 5)
+    explanations.pass_explanation(
+        backend, device, explanations.EXPLAIN_THRESHOLD,
+        "Enter threshold value")
     keypad.write("2")
     keypad.enter()
-    backend.wait_for_text_on_screen("SSKR share", 5)
+
+    # The threshold no longer generates anything. The review says what the job
+    # will cost -- its word total is the one number this flow never gave before
+    # -- and its last page is the warning that stands in front of the words.
+    backend.wait_for_text_on_screen("Words to write", 5)
+    reviews.approve(backend, device, "Generate Backup Shares")
+
+    backend.wait_for_text_on_screen("SSKR Share", 5)
     backend.wait_for_text_on_screen("tuna next keep hard", 1)
     backend.wait_for_text_on_screen("1 of 3", 1)
     review.next()
-    backend.wait_for_text_on_screen("SSKR share", 5)
+    backend.wait_for_text_on_screen("SSKR Share", 5)
     backend.wait_for_text_on_screen("tuna next keep hard", 1)
     backend.wait_for_text_on_screen("2 of 3", 1)
     review.next()
-    backend.wait_for_text_on_screen("SSKR share", 5)
+    backend.wait_for_text_on_screen("SSKR Share", 5)
     backend.wait_for_text_on_screen("tuna next keep hard", 1)
     backend.wait_for_text_on_screen("3 of 3", 1)
+    # Closing the shares destroys them, and now says so first.
     review.exit()
+    reviews.close_shares(backend, device)
     backend.wait_for_text_on_screen("Seed Tool", 5)
     home_page.quit()
 

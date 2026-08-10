@@ -10,7 +10,7 @@ this application exists to give.
 
 Until this file's most recent revision, the touch stack could not tell the
 first two of those apart from the assertions alone: both were titled
-"Valid Secret Recovery Phrase" (src/nbgl/ui.c), and only the paragraph below
+"Valid / Recovery Phrase" (src/nbgl/ui.c), and only the paragraph below
 it changed, from "matches the one present on this Ledger device" to "doesn't
 match the one present on this Ledger device". NBGL now gives all three
 outcomes their own title (UI_STR_NBGL_RESULT_NOMATCH_TITLE in ui_strings.h),
@@ -42,6 +42,7 @@ from ragger.conftest import configuration
 from ragger.firmware.touch.use_cases import UseCaseHomeExt
 from ragger.firmware.touch.layouts import LetterOnlyKeyboard, Suggestions
 from genericlayout import GenericLayout, MENU_CHECK
+import explanations
 import nano
 
 # Same seed as the other functional tests.
@@ -64,7 +65,7 @@ def set_seed():
 
 
 def _two_button_check(backend, navigator, phrase, first_line, second_line):
-    nano.select_in_menu(navigator, "Check phrase")
+    nano.select_in_menu(navigator, "Check Phrase")
     nano.select_in_menu(navigator, "12 words")
     nano.enter_phrase(backend, phrase)
     nano.wait_for_lines(backend, first_line, second_line)
@@ -78,8 +79,10 @@ def _touch_check(backend, device, phrase, title, verdict):
 
     backend.wait_for_text_on_screen("Seed Tool", 10)
     home_page.action()
-    backend.wait_for_text_on_screen("Check recovery phrase", 5)
+    backend.wait_for_text_on_screen("Check Recovery Phrase", 5)
     genericbuttons.choose(MENU_CHECK)
+    # Straight to the length choice: this journey has no explanation in front
+    # of it, because entering the Phrase is the thing the entry asked for.
     backend.wait_for_text_on_screen("12 words", 5)
     genericbuttons.choose(1)
     backend.wait_for_text_on_screen("Enter word", 5)
@@ -104,32 +107,32 @@ def _touch_check(backend, device, phrase, title, verdict):
 def test_bip39_phrase_matches_the_seed(device, backend, navigator, set_seed):
     if device.type in (DeviceType.NANOSP, DeviceType.NANOX):
         _two_button_check(backend, navigator, DEVICE_PHRASE,
-                          "BIP39 Phrase", "is correct")
+                          "Your Phrase", "is correct")
     else:
-        _touch_check(backend, device, DEVICE_PHRASE, "Valid Secret", "matches")
+        _touch_check(backend, device, DEVICE_PHRASE, "Valid", "matches")
 
 
 @mark.use_on_backend("speculos")
 def test_bip39_phrase_does_not_match_the_seed(device, backend, navigator, set_seed):
     if device.type in (DeviceType.NANOSP, DeviceType.NANOX):
         _two_button_check(backend, navigator, OTHER_PHRASE,
-                          "BIP39 Phrase", "doesn't match")
+                          "Your Phrase", "doesn't match")
     else:
-        _touch_check(backend, device, OTHER_PHRASE, "Mismatched Secret", "doesn't match")
+        _touch_check(backend, device, OTHER_PHRASE, "Mismatched", "doesn't match")
 
 
 @mark.use_on_backend("speculos")
 def test_bip39_phrase_is_invalid(device, backend, navigator, set_seed):
     if device.type in (DeviceType.NANOSP, DeviceType.NANOX):
         _two_button_check(backend, navigator, BAD_CHECKSUM_PHRASE,
-                          "BIP39 Recovery", "phrase invalid")
+                          "Your Phrase", "is not valid")
     else:
         # The verdict line has no explicit break before its second half (unlike
         # the match/nomatch strings' "...you have entered\nmatches..."), so it
         # renders as one event and must be matched from its start -- see
         # _touch_check()'s comment on wait_for_text_on_screen()'s anchoring.
-        _touch_check(backend, device, BAD_CHECKSUM_PHRASE, "Invalid Secret",
-                    "you have entered is not valid")
+        _touch_check(backend, device, BAD_CHECKSUM_PHRASE, "Invalid",
+                    "is not valid")
         # The advice line: new on this stack (UI_STR_NBGL_RESULT_INVALID_ADVICE),
         # already present on the two-button screens asserted above via
         # ux_invalid_step_2 in src/bagl/ux_nano.c.

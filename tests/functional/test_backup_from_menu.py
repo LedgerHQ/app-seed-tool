@@ -21,7 +21,7 @@ Three claims, and the second and third are what make the first mean something.
 The second and third also pin the wording apart. The same screen, reached
 from two different entries with the same correct phrase, says two different
 things -- "matches the one present on this Ledger device" when the question
-was whether it matches, "This is the recovery phrase on this Ledger device.
+was whether it matches, "This is the Recovery Phrase on this Ledger device.
 It can be split into shares." when the question was whether it can be backed
 up -- and the footer follows: one screen ends, the other continues. Asserting
 only one of the two would pass on a build that had lost the distinction.
@@ -41,6 +41,7 @@ from ragger.conftest import configuration
 from ragger.firmware.touch.use_cases import UseCaseHomeExt, UseCaseChoice
 from ragger.firmware.touch.layouts import CenteredFooter, LetterOnlyKeyboard, Suggestions
 from genericlayout import GenericLayout, MENU_BACKUP, MENU_CHECK
+import explanations
 
 # https://github.com/BlockchainCommons/crypto-commons/blob/master/Docs/sskr-test-vector.md#128-bit-seed
 DEVICE_PHRASE = "fly mule excess resource treat plunge nose soda reflect adult ramp planet"
@@ -77,19 +78,24 @@ def _walk_to_verdict(backend, device, entry, phrase):
 
     backend.wait_for_text_on_screen("Seed Tool", 10)
     home_page.action()
-    backend.wait_for_text_on_screen("Check recovery phrase", 5)
-    backend.wait_for_text_on_screen("Generate backup shares", 1)
+    backend.wait_for_text_on_screen("Check Recovery Phrase", 5)
+    backend.wait_for_text_on_screen("Generate Backup Shares", 1)
     genericbuttons.choose(entry)
 
+    # Only one of the two journeys opens on an explanation, and the difference
+    # is the point: Backup was asked for Shares and has to account for wanting
+    # twenty-four words, where Check was asked for exactly this. Asserting a
+    # body row rather than only the title is what stops an empty screen from
+    # passing, and the row is matched from the start of one drawn line, so it
+    # stops where the wrapping does.
     if entry == MENU_BACKUP:
-        # The screen this change adds. Its first body line is the reason the
-        # phrase is being asked for at all, which is the whole point of the
-        # screen; asserting the title alone would pass on an empty one.
-        backend.wait_for_text_on_screen("Enter your recovery", 5)
-        backend.wait_for_text_on_screen("This Ledger cannot read back", 1)
-        choice.confirm()
+        backend.wait_for_text_on_screen("Your Phrase is split into", 1)
+        explanations.pass_explanation(
+            backend, device, explanations.EXPLAIN_BACKUP, "12 words",
+            button=explanations.ENTER_PHRASE, action=True)
+    else:
+        backend.wait_for_text_on_screen("How long is your", 5)
 
-    backend.wait_for_text_on_screen("12 words", 5)
     genericbuttons.choose(1)
     backend.wait_for_text_on_screen("Enter word", 5)
     _enter(backend, device, phrase)
@@ -105,15 +111,17 @@ def test_backup_reaches_the_share_count_from_the_menu(device, backend, set_seed)
     # A verdict that continues, and says so. "Tap to continue" is not
     # decoration: the same screen in the check flow reads "Tap to dismiss",
     # and test_checking_a_phrase_does_not_lead_to_shares() below asserts that.
-    backend.wait_for_text_on_screen("Valid Secret", 5)
-    backend.wait_for_text_on_screen("This is the recovery phrase", 1)
-    backend.wait_for_text_on_screen("It can be split into shares.", 1)
+    backend.wait_for_text_on_screen("Valid", 5)
+    backend.wait_for_text_on_screen("This is the Recovery Phrase", 1)
+    backend.wait_for_text_on_screen("It can be split into Shares.", 1)
     backend.wait_for_text_on_screen("Tap to continue", 1)
     check_result.tap()
 
     # Reached without a single screen having offered anything: the user asked
     # for this at the menu five screens ago.
-    backend.wait_for_text_on_screen("Enter number of SSKR shares", 5)
+    explanations.pass_explanation(
+        backend, device, explanations.EXPLAIN_NUMBERS,
+        "Enter number of SSKR Shares")
 
 
 @mark.use_on_backend("speculos")
@@ -127,9 +135,9 @@ def test_backup_stops_on_a_phrase_this_device_cannot_recover(device, backend, se
     # comparison refused it. The sentence is the backup flow's own: "doesn't
     # match the one present on this Ledger device" answers a question this
     # user did not ask.
-    backend.wait_for_text_on_screen("Mismatched Secret", 5)
+    backend.wait_for_text_on_screen("Mismatched", 5)
     backend.wait_for_text_on_screen("You would be backing up", 1)
-    backend.wait_for_text_on_screen("a phrase this Ledger", 1)
+    backend.wait_for_text_on_screen("a Phrase this Ledger", 1)
     backend.wait_for_text_on_screen("cannot recover.", 1)
     # A failure ends the flow, so it is dismissed and not continued.
     backend.wait_for_text_on_screen("Tap to dismiss", 1)
@@ -152,8 +160,8 @@ def test_checking_a_phrase_does_not_lead_to_shares(device, backend, set_seed):
 
     # Same phrase, same device, same screen as the first test -- and a
     # different answer, because a different question was asked.
-    backend.wait_for_text_on_screen("Valid Secret", 5)
-    backend.wait_for_text_on_screen("The BIP39 Recovery Phrase", 1)
+    backend.wait_for_text_on_screen("Valid", 5)
+    backend.wait_for_text_on_screen("The Phrase you have entered", 1)
     backend.wait_for_text_on_screen("matches the one present", 1)
     backend.wait_for_text_on_screen("Tap to dismiss", 1)
     check_result.tap()

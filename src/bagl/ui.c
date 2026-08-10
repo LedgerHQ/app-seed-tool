@@ -80,6 +80,12 @@ UX_STEP_NOCB(ux_bip39_instruction_step, nnn,
 UX_STEP_MENULIST(ux_bip39_menu_step, number_of_bip39_words_getter,
                  number_of_bip39_words_selector);
 
+/*
+ * No step explaining why the Phrase is asked for, on purpose: entering it *is*
+ * the task the user chose from the menu. app-recovery-check, which does only
+ * this, opens the same way. ux_backup_explain_step below exists because that
+ * journey was asked for Shares and has to account for the Phrase.
+ */
 UX_FLOW(ux_bip39_flow, &ux_bip39_instruction_step, &ux_bip39_menu_step);
 
 //////////////////////////////////////////////////////////////////////
@@ -142,7 +148,22 @@ UX_STEP_CB(ux_sskr_instruction_step, nnn,
              });
 #endif
 
-UX_FLOW(ux_sskr_flow, &ux_sskr_instruction_step);
+#if defined(TARGET_NANOS)
+UX_STEP_NOCB(ux_recover_explain_step, nn,
+             {
+                 UI_STR_BAGL_RECOVER_EXPLAIN_L1,
+                 UI_STR_BAGL_RECOVER_EXPLAIN_L2,
+             });
+#else
+UX_STEP_NOCB(ux_recover_explain_step, nnn,
+             {
+                 UI_STR_BAGL_RECOVER_EXPLAIN_L1,
+                 UI_STR_BAGL_RECOVER_EXPLAIN_L2,
+                 UI_STR_BAGL_RECOVER_EXPLAIN_L3,
+             });
+#endif
+
+UX_FLOW(ux_sskr_flow, &ux_recover_explain_step, &ux_sskr_instruction_step);
 
 //////////////////////////////////////////////////////////////////////
 
