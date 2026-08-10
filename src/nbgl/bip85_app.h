@@ -84,4 +84,19 @@ uint8_t *bip85_app_pwd_base64_gen(void);
  * Generate base85 password and return pointer to password
  */
 uint8_t *bip85_app_pwd_base85_gen(void);
+
+/*
+ * Writes the BIP-85 derivation path of the currently selected application,
+ * with its currently entered index and length, as "m/83696968'/39'/0'/24'/42'".
+ *
+ * Dispatches to the formatter that sits beside the matching derivation in
+ * src/common/bip85/seed_bip85.c, with the same arguments the generator above
+ * will be called with -- so the review cannot announce a path the derivation
+ * does not take.
+ *
+ * Returns false, and sets `out` to the empty string, if the path does not fit
+ * or if no application has been selected. A caller must show nothing rather
+ * than a path that has been cut short.
+ */
+bool bip85_app_path_format(char *out, size_t out_len);
 #endif  // SCREEN_SIZE_WALLET

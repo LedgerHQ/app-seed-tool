@@ -798,6 +798,12 @@ target_link_libraries(test_base85 PUBLIC cmocka gcov)
 # cx_hmac_sha512_init_no_throw()/cx_hmac_no_throw() too, even though this
 # target itself never calls it -- testutils is where those symbols actually
 # live.
+# Pure rendering of a built path: needs the builders and the formatter, both
+# of which sit outside seed_bip85.c's HAVE_NBGL guard, and no crypto at all.
+add_executable(test_bip85_path_format tests/bip85_path_format.c ../../src/common/bip85/seed_bip85.c)
+target_include_directories(test_bip85_path_format PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src)
+target_link_libraries(test_bip85_path_format PUBLIC cmocka gcov testutils)
+
 add_executable(test_bip85_dice_bits_per_roll tests/bip85_dice_bits_per_roll.c ../../src/common/bip85/seed_bip85.c)
 target_include_directories(test_bip85_dice_bits_per_roll PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src)
 target_link_libraries(test_bip85_dice_bits_per_roll PUBLIC cmocka gcov testutils)
