@@ -121,11 +121,28 @@ static void display_bip85_select_password_length_page(void);
  */
 static const char* buttonTexts[NB_MAX_SUGGESTION_BUTTONS] = {0};
 
+// Where the characters those pointers point at actually live. Declared here
+// rather than beside the keyboard it serves so that reset_globals() below can
+// reach it: the two are one object, and only one of them was being cleared.
+// The longest BIP39 word is 8 characters, 9 with its terminator, and at most
+// NB_MAX_SUGGESTION_BUTTONS are shown.
+static char wordCandidates[(BIP39_MAX_WORD_LENGTH + 1) *
+                           NB_MAX_SUGGESTION_BUTTONS] = {0};
+
 static void reset_globals() {
     bip39_mnemonic_reset();
     sskr_shares_reset();
     bip85_app_reset();
     memzero(buttonTexts, sizeof(buttonTexts[0]) * NB_MAX_SUGGESTION_BUTTONS);
+    // buttonTexts is only the array of pointers; wordCandidates holds the
+    // characters, and it was left behind. What survives there is the set of
+    // BIP-39 words matching the prefix last typed -- not the phrase, but
+    // enough to narrow one of its words -- and the rule this function applies
+    // is "everything a screen composed", not "everything that is itself
+    // secret". textToEnter needs nothing here: both keyboard dispatchers
+    // memzero it before they route anywhere, so it cannot outlive the
+    // keyboard.
+    memzero(wordCandidates, sizeof(wordCandidates));
     memzero(headerText, sizeof(headerText));
     memzero(reviewText, sizeof(reviewText));
     // No secret in it -- a share count and a length range, never a word or a
@@ -454,11 +471,6 @@ enum __attribute__((packed)) check {
 static char textToEnter[BIP39_MAX_WORD_LENGTH + 1] = {0};
 static int keyboardIndex = 0;
 static bool seed_match = false;
-// the biggest word of BIP39 list is 8 char (9 with trailing '\0'), and
-// the max number of showed suggestions is NB_MAX_SUGGESTION_BUTTONS
-static char wordCandidates[(BIP39_MAX_WORD_LENGTH + 1) *
-                           NB_MAX_SUGGESTION_BUTTONS] = {0};
-
 /*
  * Function called when a key of keyboard is touched
  */
