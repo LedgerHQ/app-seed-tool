@@ -60,6 +60,58 @@ static void test_formats_the_password_paths(void** state) {
     assert_string_equal(out, "m/83696968'/707785'/12'/7'");
 }
 
+/*
+ * DICE, which is what a PIN is derived with -- application 89101, a ten-sided
+ * die, and one roll per digit.
+ *
+ * Rendered through bolos_ux_bip85_dice_path_format(), the wrapper the screens
+ * call, rather than through the builder directly: that call is what pairs the
+ * displayed path with the derivation, and the parameters it takes are the
+ * parameters bolos_ux_bip85_dice() takes. A PIN whose path named a six-sided
+ * die, or a different roll count, would still be four perfectly good digits --
+ * derived from somewhere the user could never find again.
+ */
+static void test_formats_the_dice_path(void** state) {
+    (void)state;
+
+    char out[BIP85_PATH_STRING_MAX_LENGTH];
+
+    assert_true(bolos_ux_bip85_dice_path_format(10, 6, 0, out, sizeof(out)));
+    assert_string_equal(out, "m/83696968'/89101'/10'/6'/0'");
+
+    /* The other two lengths this application offers, and an index that is not
+     * the first one: the roll count and the index sit in adjacent components,
+     * and a formatter that swapped them would still render six of something. */
+    assert_true(bolos_ux_bip85_dice_path_format(10, 4, 1, out, sizeof(out)));
+    assert_string_equal(out, "m/83696968'/89101'/10'/4'/1'");
+
+    assert_true(bolos_ux_bip85_dice_path_format(10, 8, 3, out, sizeof(out)));
+    assert_string_equal(out, "m/83696968'/89101'/10'/8'/3'");
+
+    assert_true(
+        bolos_ux_bip85_dice_path_format(10, 8, 9999999, out, sizeof(out)));
+    assert_string_equal(out, "m/83696968'/89101'/10'/8'/9999999'");
+}
+
+static void test_refuses_a_dice_path_that_does_not_fit(void** state) {
+    (void)state;
+
+    /* Exactly the 29 bytes "m/83696968'/89101'/10'/6'/0'" needs with its
+     * terminator, then one fewer. The screens must draw nothing rather than
+     * "m/83696968'/89101'/10'/6'", which is a path to a different secret and
+     * reads like a complete one. */
+    char exact[29];
+    assert_true(bolos_ux_bip85_dice_path_format(10, 6, 0, exact,
+                                                sizeof(exact)));
+    assert_string_equal(exact, "m/83696968'/89101'/10'/6'/0'");
+    assert_int_equal(exact[28], '\0');
+
+    char one_short[28];
+    assert_false(bolos_ux_bip85_dice_path_format(10, 6, 0, one_short,
+                                                 sizeof(one_short)));
+    assert_string_equal(one_short, "");
+}
+
 static void test_formats_the_largest_index_the_keypad_accepts(void** state) {
     (void)state;
 
@@ -149,6 +201,8 @@ int main(void) {
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(test_formats_the_bip39_path),
         cmocka_unit_test(test_formats_the_password_paths),
+        cmocka_unit_test(test_formats_the_dice_path),
+        cmocka_unit_test(test_refuses_a_dice_path_that_does_not_fit),
         cmocka_unit_test(test_formats_the_largest_index_the_keypad_accepts),
         cmocka_unit_test(test_buffer_holds_the_widest_path_possible),
         cmocka_unit_test(test_refuses_rather_than_truncating),

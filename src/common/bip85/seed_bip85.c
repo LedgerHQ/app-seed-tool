@@ -46,6 +46,55 @@ uint8_t bip85_dice_bits_per_roll(uint32_t sides) {
     return (sizeof(sides) << 3) - __builtin_clz(sides - 1);
 }
 
+/*
+ * See common_bip85.h for what this is for.
+ *
+ * Two loops rather than one, and that is the whole design: everything is
+ * checked before anything is written, so a refusal leaves the caller with an
+ * empty string rather than with the digits that were valid before the one
+ * that was not. A partial PIN is not a shorter PIN -- it is a different one,
+ * and it is one the user might copy down.
+ *
+ * No conversion to an integer anywhere. A PIN is a sequence of digits, not a
+ * number: `strtol("0934")` is 934, which is three digits where there were
+ * four, and the leading zero the derivation produced would be gone with no
+ * symptom other than a PIN that does not open anything.
+ */
+bool bip85_dice_rolls_to_digits(const uint32_t* rolls, size_t count, char* out,
+                                size_t out_size) {
+    if (out == NULL || out_size == 0) {
+        return false;
+    }
+    out[0] = '\0';
+
+    // A zero-length result is not a PIN. Refused here rather than returned as
+    // an empty string, so that a caller that lost its roll count cannot draw
+    // "" as though it were a secret.
+    //
+    // The room needed is written `count >= out_size`, which is
+    // `count + 1 > out_size` without the addition: `count` is a size_t and
+    // comes from a caller, and adding to it is the one place where an
+    // overflow could turn this refusal into a walk off the end of `rolls`.
+    if (rolls == NULL || count == 0 || count >= out_size) {
+        return false;
+    }
+
+    for (size_t i = 0; i < count; i++) {
+        // Only a ten-sided die produces a digit. Any other `sides` is a
+        // different application of DICE and has no decimal rendering: 11 is
+        // one roll, not two digits.
+        if (rolls[i] > 9) {
+            return false;
+        }
+    }
+
+    for (size_t i = 0; i < count; i++) {
+        out[i] = (char)('0' + rolls[i]);
+    }
+    out[count] = '\0';
+    return true;
+}
+
 #ifdef HAVE_SHA3
 
 // How many times the DRNG digest is allowed to double in size (from
@@ -106,8 +155,26 @@ int32_t bip85_dice_roll(uint32_t* out, size_t out_capacity, uint32_t sides,
     uint8_t bytes_per_roll = (bits_per_roll + 7) >> 3;
     uint8_t shift_amount = (bytes_per_roll << 3) - bits_per_roll;
 
-    // Sized for the largest digest a retry can request; only the leading
-    // `digest_length` bytes are meaningful on any given attempt.
+    /*
+     * Sized for the largest digest a retry can request; only the leading
+     * `digest_length` bytes are meaningful on any given attempt.
+     *
+     * That is 2048 bytes of stack, allocated whichever attempt is reached
+     * and whether four rolls are asked for or five hundred. It is the reason
+     * no BAGL screen may ever call this: measured free stack at the deepest
+     * point of a derivation is 1848 bytes on nanos, against 23403 on nanox,
+     * 35691 on nanos2, 29086 on stax, 29146 on flex and 33242 on apex_p. Only
+     * nanos does not fit, and it does not fit by a margin no rearrangement of
+     * this function closes -- the overflow would be a stack smash on a device
+     * holding a seed, and no emulator would show it, since Speculos dropped
+     * nanos and nothing else runs that target.
+     *
+     * The application is safe today because BIP-85 has no screen on the BAGL
+     * stack at all: this function is compiled on all six targets and called
+     * from none of them but the NBGL flow. Whoever exposes DICE on a Nano S
+     * has to shrink this buffer first -- deriving the digest in chunks, or
+     * bounding it by `rolls` -- rather than only adding a screen.
+     */
     uint8_t digest[BIP85_DRNG_MAX_DIGEST_SIZE << BIP85_DICE_MAX_DRNG_DOUBLINGS];
     int32_t result = -3;
 
@@ -419,6 +486,14 @@ bool bolos_ux_bip85_pwd_base85_path_format(uint8_t pwd_len, unsigned int index,
                                            char* out, size_t out_len) {
     unsigned int path[BIP85_PATH_LEN_PWD_BASE85];
     return bip85_path_format(path, bip85_path_pwd_base85(path, pwd_len, index),
+                             out, out_len);
+}
+
+bool bolos_ux_bip85_dice_path_format(uint32_t sides, uint32_t rolls,
+                                     unsigned int index, char* out,
+                                     size_t out_len) {
+    unsigned int path[BIP85_PATH_LEN_DICE];
+    return bip85_path_format(path, bip85_path_dice(path, sides, rolls, index),
                              out, out_len);
 }
 
