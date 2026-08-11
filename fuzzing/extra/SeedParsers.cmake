@@ -51,12 +51,25 @@ add_library(seedparsers
     ${BOLOS_SDK}/lib_cxng/src/cx_hmac.c
     ${BOLOS_SDK}/lib_cxng/src/cx_pbkdf2.c
     ${BOLOS_SDK}/lib_cxng/src/cx_utils.c
-    ${BOLOS_SDK}/lib_cxng/src/cx_crc32.c
-    # cx_crc32() delegates to the cx_crc_hw() syscall. The SDK ships its own
-    # host stand-in for it, which is preferred here over writing a third
-    # CRC-32 (the cmocka suite has one in tests/unit/lib/bolos, and
-    # tests/unit/tests/sskr_hex_check_guards.c a deliberately independent one).
-    ${BOLOS_SDK}/unit-tests/mock/src/cx_crc.c
+    # The CRC-32 the share checksum is built on, taken from this repository
+    # rather than from the SDK. The SDK's own cx_crc32.c computes nothing: it
+    # delegates to the cx_crc_hw() syscall, so a host build needs a stand-in
+    # for that syscall, and the one the SDK shipped
+    # (unit-tests/mock/src/cx_crc.c) was removed from it -- taking every build
+    # that named it down with it, this one included, on the day the image was
+    # republished.
+    #
+    # The file below is the one the cmocka suite already links, so the two
+    # suites compute the checksum with the same code instead of with two
+    # implementations that might drift. It defines cx_crc32_update(); the
+    # cx_crc32() that seed_sskr.c actually calls is in extra/host_syscalls.c
+    # beside the other stand-ins, as it is in tests/unit/lib/testutils.c for
+    # the cmocka build.
+    #
+    # Nothing here writes a third CRC-32: tests/unit/tests/sskr_hex_check_guards.c
+    # has a deliberately independent one, and it is a test's business to
+    # disagree, not a build's.
+    ${CMAKE_CURRENT_SOURCE_DIR}/../tests/unit/lib/bolos/cx_crc.c
     ${CMAKE_CURRENT_SOURCE_DIR}/extra/host_syscalls.c
     ${CMAKE_CURRENT_SOURCE_DIR}/extra/unreachable.c
 )
