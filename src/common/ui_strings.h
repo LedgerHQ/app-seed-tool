@@ -222,9 +222,9 @@
  * kept apart, and someone who writes them all on one sheet has made a copy of
  * their Phrase with none of the protection.
  */
-#define UI_STR_BAGL_BACKUP_SSKR_L1 "Your Phrase is split"
-#define UI_STR_BAGL_BACKUP_SSKR_L2 "into Shares to write."
-#define UI_STR_BAGL_BACKUP_SSKR_L3 "Keep them apart."
+#define UI_STR_BAGL_BACKUP_SSKR_L1       "Your Phrase is split"
+#define UI_STR_BAGL_BACKUP_SSKR_L2       "into Shares to write."
+#define UI_STR_BAGL_BACKUP_SSKR_L3       "Keep them apart."
 #define UI_STR_BAGL_BACKUP_SSKR_L1_NANOS "Phrase split into"
 #define UI_STR_BAGL_BACKUP_SSKR_L2_NANOS "Shares. Keep apart."
 
@@ -622,11 +622,9 @@
  * it: the page before now says the same thing about the path as a whole, and
  * saying it twice in one journey spends a page on nothing.
  */
-#define UI_STR_NBGL_BIP85_INDEX_CONCEPT_TITLE "What is an index?"
-#define UI_STR_NBGL_BIP85_INDEX_CONCEPT_ROW_TELLS \
-    "The index tells one secret from another."
-#define UI_STR_NBGL_BIP85_INDEX_CONCEPT_ROW_COUNT \
-    "Use 0 for the first, then 1, 2, and so on."
+#define UI_STR_NBGL_BIP85_INDEX_CONCEPT_TITLE     "What is an index?"
+#define UI_STR_NBGL_BIP85_INDEX_CONCEPT_ROW_TELLS "The index tells one secret from another."
+#define UI_STR_NBGL_BIP85_INDEX_CONCEPT_ROW_COUNT "Use 0 for the first, then 1, 2, and so on."
 
 /*
  * What deriving a secret means, read before an application is chosen.
@@ -650,9 +648,8 @@
  * is computed from the seed this device already holds, and this journey never
  * asks the user to type anything.
  */
-#define UI_STR_NBGL_BIP85_TITLE "How BIP85 works"
-#define UI_STR_NBGL_BIP85_ROW_DERIVED \
-    "A new secret is computed from this Ledger's seed."
+#define UI_STR_NBGL_BIP85_TITLE       "How BIP85 works"
+#define UI_STR_NBGL_BIP85_ROW_DERIVED "A new secret is computed from this Ledger's seed."
 /*
  * This is the second page, and it is the trap rather than the property: the
  * page before says what BIP-85 gives, this one says what it costs to lose.
@@ -689,7 +686,7 @@
  * the threshold out of the first Share's own header, and
  * sskr_shares_complete_check() stops there.
  */
-#define UI_STR_NBGL_RECOVER_TITLE "How recovery works"
+#define UI_STR_NBGL_RECOVER_TITLE      "How recovery works"
 #define UI_STR_NBGL_RECOVER_ROW_SUBSET "Enter your Shares one at a time, in any order."
 #define UI_STR_NBGL_RECOVER_ROW_ORDER \
     "You do not need all of them. This Ledger stops when it has enough."
@@ -1223,9 +1220,9 @@
  * here. The review further on shows "any k of n", which demonstrates the
  * relationship but arrives after the choice has been made.
  */
-#define UI_STR_BAGL_SSKR_THRESHOLD_CONCEPT_L1 "The threshold is how"
-#define UI_STR_BAGL_SSKR_THRESHOLD_CONCEPT_L2 "many Shares rebuild"
-#define UI_STR_BAGL_SSKR_THRESHOLD_CONCEPT_L3 "your Phrase."
+#define UI_STR_BAGL_SSKR_THRESHOLD_CONCEPT_L1       "The threshold is how"
+#define UI_STR_BAGL_SSKR_THRESHOLD_CONCEPT_L2       "many Shares rebuild"
+#define UI_STR_BAGL_SSKR_THRESHOLD_CONCEPT_L3       "your Phrase."
 #define UI_STR_BAGL_SSKR_THRESHOLD_CONCEPT_L1_NANOS "Threshold: Shares"
 #define UI_STR_BAGL_SSKR_THRESHOLD_CONCEPT_L2_NANOS "needed to rebuild."
 
@@ -1275,7 +1272,7 @@
  * Speculos, a 24-word phrase pushed the path and the words onto separate
  * pages, which is the defect this was meant to fix rather than move.
  */
-#define UI_STR_NBGL_BIP85_RESULT_LABEL "%s\n%s"
+#define UI_STR_NBGL_BIP85_RESULT_LABEL_SEPARATOR "\n"
 
 /*
  * The review shown before a BIP-85 secret is derived, and the path it carries.
@@ -1318,12 +1315,18 @@
  * than having to infer it. The password applications have no language
  * component in their paths and get no parenthesis.
  */
-#define UI_STR_NBGL_BIP85_REVIEW_ITEM_APP          "Application"
-#define UI_STR_NBGL_BIP85_REVIEW_ITEM_LENGTH       "Length"
-#define UI_STR_NBGL_BIP85_REVIEW_ITEM_INDEX        "Index"
-#define UI_STR_NBGL_BIP85_REVIEW_ITEM_PATH         "Path"
-#define UI_STR_NBGL_BIP85_LANGUAGE_ENGLISH         "English"
-#define UI_STR_NBGL_BIP85_REVIEW_APP_WITH_LANGUAGE "%s (%s)"
+#define UI_STR_NBGL_BIP85_REVIEW_ITEM_APP    "Application"
+#define UI_STR_NBGL_BIP85_REVIEW_ITEM_LENGTH "Length"
+#define UI_STR_NBGL_BIP85_REVIEW_ITEM_INDEX  "Index"
+#define UI_STR_NBGL_BIP85_REVIEW_ITEM_PATH   "Path"
+/*
+ * Appended to the application's own name, rather than a format taking both.
+ * String conversions are refused anywhere under src/ -- they are how a secret
+ * leaks through a trace statement -- and the rule is enforced by grep rather
+ * than by reading, so it holds for a screen's format string as much as for a
+ * PRINTF. Every composition here is built by appending instead.
+ */
+#define UI_STR_NBGL_BIP85_REVIEW_APP_LANGUAGE      " (English)"
 #define UI_STR_NBGL_BIP85_REVIEW_INDEX_VALUE       "%d"
 #define UI_STR_NBGL_BIP85_REVIEW_LENGTH_WORDS      "%d words"
 #define UI_STR_NBGL_BIP85_REVIEW_LENGTH_CHARACTERS "%d characters"

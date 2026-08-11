@@ -191,6 +191,33 @@ static const char* buttonTexts[NB_MAX_SUGGESTION_BUTTONS] = {0};
 static char wordCandidates[(BIP39_MAX_WORD_LENGTH + 1) *
                            NB_MAX_SUGGESTION_BUTTONS] = {0};
 
+/*
+ * Appends `src` to `dst`, never writing past `size`, and reports whether all
+ * of it fitted.
+ *
+ * SPRINTF() would be shorter and is not available for this: string
+ * conversions are refused anywhere under src/, because that is how a secret
+ * leaks through a trace statement, and the rule is enforced by grep rather
+ * than by reading -- so it applies to a screen's format string exactly as it
+ * does to a PRINTF.
+ *
+ * The return value is checked at both call sites. A label composed of two
+ * halves with the second silently missing is worse than one that was never
+ * shown: the BIP-85 result header carries the derivation path, and a path cut
+ * short does not lead back to the secret.
+ */
+static bool append_bounded(char* dst, size_t size, const char* src) {
+    const size_t used = strlen(dst);
+    const size_t room = (used < size) ? size - used - 1 : 0;
+    const size_t len = strlen(src);
+
+    if (len > room) {
+        return false;
+    }
+    memcpy(dst + used, src, len + 1);
+    return true;
+}
+
 static void reset_globals() {
     bip39_mnemonic_reset();
     sskr_shares_reset();
@@ -438,10 +465,10 @@ void display_select_recover_bip39_page(void) {
  * carrying on into the next, rather than one screen with a smaller sentence.
  *
  * What the height allows, and it is a height rather than a row count. A row
- * costs INTER_ROWS_MARGIN plus its wrapped lines plus LEFT_CONTENT_TEXT_PADDING,
- * so three short rows can fit where two long ones do not. Measured from the
- * rendered screens: about 8 lines of text, comfortable at 7; a one-line title
- * is about 20 characters and a row line about 26.
+ * costs INTER_ROWS_MARGIN plus its wrapped lines plus
+ * LEFT_CONTENT_TEXT_PADDING, so three short rows can fit where two long ones do
+ * not. Measured from the rendered screens: about 8 lines of text, comfortable
+ * at 7; a one-line title is about 20 characters and a row line about 26.
  *
  * Flex is the binding target, not apex_p. Wrapping turns on single pixels --
  * apex fit a 29-character line in 236px of 236 while Flex broke the same string
@@ -606,7 +633,8 @@ static void display_sskr_threshold_concept_page(void) {
  * does not exist. Both should be revisited if the missing artwork is drawn.
  */
 static const char* const k_bip85_index_rows[] = {
-    UI_STR_NBGL_BIP85_INDEX_CONCEPT_ROW_TELLS, UI_STR_NBGL_BIP85_INDEX_CONCEPT_ROW_COUNT};
+    UI_STR_NBGL_BIP85_INDEX_CONCEPT_ROW_TELLS,
+    UI_STR_NBGL_BIP85_INDEX_CONCEPT_ROW_COUNT};
 static const nbgl_icon_details_t* const k_bip85_index_icons[] = {
     &BIP85_ICON_SMALL, &CHECKED_ICON};
 
@@ -680,8 +708,8 @@ static void display_recover_concept_page(void) {
  * is the screen that leads to the keyboard. One screen could not hold both:
  * four rows do not fit, and the title had to promise one subject or the other.
  */
-static const char* const k_backup_sskr_rows[] = {
-    UI_STR_NBGL_BACKUP_ROW_SPLIT, UI_STR_NBGL_BACKUP_ROW_APART};
+static const char* const k_backup_sskr_rows[] = {UI_STR_NBGL_BACKUP_ROW_SPLIT,
+                                                 UI_STR_NBGL_BACKUP_ROW_APART};
 static const nbgl_icon_details_t* const k_backup_sskr_icons[] = {
     &SSKR_ICON_SMALL, &PRIVACY_ICON};
 
@@ -1315,7 +1343,7 @@ _Static_assert(sizeof(UI_STR_NBGL_BIP85_REVIEW_INDEX_VALUE) + 5 <=
 // The BIP85 result label is the longest thing HEADER_SIZE has to hold: the
 // widest of the three result headers with a seven-digit index, a newline, and
 // a full derivation path. Bounded against the parts rather than against the
-// "%s\n%s" that joins them, which accounts for none of it.
+// separator that joins them, which accounts for one character.
 _Static_assert(sizeof(UI_STR_NBGL_BIP85_BASE64_HEADER) + 5 + 1 +
                        BIP85_PATH_STRING_MAX_LENGTH <=
                    HEADER_SIZE,
@@ -1655,7 +1683,8 @@ static void display_sskr_generate_review_page(void) {
     pairs[3].value = PIC(reviewValueWords);
 
     display_review(pairs, 4, UI_STR_NBGL_SSKR_REVEAL_WARN,
-                   UI_STR_NBGL_SSKR_REVIEW_FINISH, &generate_and_display_sskr_shares);
+                   UI_STR_NBGL_SSKR_REVIEW_FINISH,
+                   &generate_and_display_sskr_shares);
 }
 
 static void sskr_threshold_validate(const uint8_t* thresholdentry,
@@ -1797,10 +1826,14 @@ static void bip85_generate_and_display(void) {
      * Composed from headerText rather than into it: SPRINTF() cannot take its
      * own destination as an argument.
      */
-    SPRINTF(resultLabel, UI_STR_NBGL_BIP85_RESULT_LABEL, headerText,
-            reviewValuePath);
-    strncpy(headerText, resultLabel, sizeof(headerText) - 1);
-    headerText[sizeof(headerText) - 1] = '\0';
+    resultLabel[0] = '\0';
+    if (append_bounded(resultLabel, sizeof(resultLabel), headerText) &&
+        append_bounded(resultLabel, sizeof(resultLabel),
+                       UI_STR_NBGL_BIP85_RESULT_LABEL_SEPARATOR) &&
+        append_bounded(resultLabel, sizeof(resultLabel), reviewValuePath)) {
+        strncpy(headerText, resultLabel, sizeof(headerText) - 1);
+        headerText[sizeof(headerText) - 1] = '\0';
+    }
 
     display_generic_review();
 }
@@ -1883,10 +1916,17 @@ static void display_bip85_generate_review_page(void) {
     // survives because of what the button drawing does with them, not because
     // the pointers are usable as they stand.
     if (bip85_type_get() == BIP85_APP_BIP39) {
-        SPRINTF(reviewValueApp, UI_STR_NBGL_BIP85_REVIEW_APP_WITH_LANGUAGE,
-                (const char*)PIC(bip85_select_app[bip85_type_get()]),
-                UI_STR_NBGL_BIP85_LANGUAGE_ENGLISH);
-        pairs[0].value = PIC(reviewValueApp);
+        reviewValueApp[0] = '\0';
+        if (append_bounded(
+                reviewValueApp, sizeof(reviewValueApp),
+                (const char*)PIC(bip85_select_app[bip85_type_get()])) &&
+            append_bounded(reviewValueApp, sizeof(reviewValueApp),
+                           UI_STR_NBGL_BIP85_REVIEW_APP_LANGUAGE)) {
+            pairs[0].value = PIC(reviewValueApp);
+        } else {
+            pairs[0].value =
+                (const char*)PIC(bip85_select_app[bip85_type_get()]);
+        }
     } else {
         pairs[0].value = (const char*)PIC(bip85_select_app[bip85_type_get()]);
     }
