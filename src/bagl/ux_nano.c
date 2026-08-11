@@ -28,8 +28,13 @@ void clean_exit(bolos_task_status_t exit_code) {
             sizeof(G_bolos_ux_context.words_buffer));
     memzero(G_bolos_ux_context.string_buffer,
             sizeof(G_bolos_ux_context.string_buffer));
+    // sizeof, not sskr_words_buffer_length. The length is set to 0 by the
+    // entry path without the buffer being erased, so an erase measured on it
+    // can erase nothing at all: enter shares, get "not valid", press
+    // "Re-enter Shares" and leave, and this ran memzero(buffer, 0) over a
+    // buffer still holding every ByteWord that had been typed.
     memzero(G_bolos_ux_context.sskr_words_buffer,
-            G_bolos_ux_context.sskr_words_buffer_length);
+            sizeof(G_bolos_ux_context.sskr_words_buffer));
     G_bolos_ux_context.words_buffer_length = 0;
     G_bolos_ux_context.sskr_words_buffer_length = 0;
     G_bolos_ux_context.sskr_share_index = 0;

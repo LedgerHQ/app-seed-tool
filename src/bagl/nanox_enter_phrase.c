@@ -607,9 +607,15 @@ void screen_onboarding_restore_word_init(unsigned int firstWord) {
         G_bolos_ux_context.onboarding_step = 0;
         G_bolos_ux_context.sskr_share_index = 0;
 
-        // flush the words first
+        // Flush the words first, both buffers, whole. Measuring an erase on
+        // the length currently in use leaves whatever a longer previous entry
+        // wrote past it -- and for the SSKR buffer the length was being
+        // cleared with nothing erased at all, which left every ByteWord of a
+        // refused set behind for the exit path to miss.
         memzero(G_bolos_ux_context.words_buffer,
-                G_bolos_ux_context.words_buffer_length);
+                sizeof(G_bolos_ux_context.words_buffer));
+        memzero(G_bolos_ux_context.sskr_words_buffer,
+                sizeof(G_bolos_ux_context.sskr_words_buffer));
         G_bolos_ux_context.words_buffer_length = 0;
         G_bolos_ux_context.sskr_words_buffer_length = 0;
         // Not yet known: it comes out of the CBOR header of the first share,
