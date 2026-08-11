@@ -133,16 +133,6 @@ void bip85_app_reset(void);
 void bip85_app_bip39_gen(void);
 
 /*
- * Sets the BIP85 child password length
- */
-void bip85_password_length_set(const uint8_t length);
-
-/*
- * Gets the BIP85 child password length
- */
-uint8_t bip85_get_get();
-
-/*
  * Generate base64 password and return pointer to password
  */
 uint8_t *bip85_app_pwd_base64_gen(void);
