@@ -1,6 +1,13 @@
+#include <stddef.h>
 #include <stdint.h>
 
-#include "cx.h"
+// cx_crc.h, not cx.h: the two tables below and the two functions that walk
+// them need a size_t and their own prototypes, and nothing else. cx.h reaches
+// cx_ed25519.h, which includes <openssl/bn.h> for the big-number stand-in --
+// so including it here made a CRC-32 depend on OpenSSL. The cmocka suite
+// builds OpenSSL anyway and never noticed; the fuzzer build deliberately does
+// not, and cannot link this file at all while that include is here.
+#include "cx_crc.h"
 
 static const unsigned short cx_ccitt16[] = {
   0x0000, 0x1021, 0x2042, 0x3063, 0x4084, 0x50a5, 0x60c6, 0x70e7, 0x8108,

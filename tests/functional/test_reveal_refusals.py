@@ -33,11 +33,13 @@ from pytest import skip
 from ledgered.devices import DeviceType
 from ragger.conftest import configuration
 from ragger.firmware.touch.use_cases import UseCaseHomeExt, UseCaseChoice, UseCaseViewDetails
-from ragger.firmware.touch.layouts import CenteredFooter, LetterOnlyKeyboard, Suggestions
+from ragger.firmware.touch.layouts import (CenteredFooter, ChoiceList,
+                                           LetterOnlyKeyboard, Suggestions)
 from keypad import Keypad
 import reviews
 import explanations
-from genericlayout import GenericLayout, MENU_BACKUP, MENU_RECOVER, MENU_DERIVE
+from genericlayout import (GenericLayout, MENU_BACKUP, MENU_RECOVER,
+                           MENU_DERIVE, BIP85_APP_BIP39)
 
 # https://github.com/BlockchainCommons/crypto-commons/blob/master/Docs/sskr-test-vector.md#128-bit-seed
 DEVICE_PHRASE = "fly mule excess resource treat plunge nose soda reflect adult ramp planet"
@@ -177,7 +179,10 @@ def test_refusing_the_derivation_review_derives_nothing(device, backend, set_see
     buttons.choose(MENU_DERIVE)
     explanations.pass_explanation(
         backend, device, explanations.EXPLAIN_BIP85, "Which BIP85")
-    buttons.choose(1)
+    # The secret list is the SDK's own, so it is driven by ragger's ChoiceList
+    # and counted from the top; the phrase length below it is still one of
+    # this application's own button screens, counted from the bottom.
+    ChoiceList(backend, device).choose(BIP85_APP_BIP39)
     backend.wait_for_text_on_screen("Length of BIP39", 5)
     buttons.choose(1)
     explanations.pass_explanation(

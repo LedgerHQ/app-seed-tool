@@ -804,6 +804,14 @@ add_executable(test_bip85_path_format tests/bip85_path_format.c ../../src/common
 target_include_directories(test_bip85_path_format PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src)
 target_link_libraries(test_bip85_path_format PUBLIC cmocka gcov testutils)
 
+# The rolls-to-digits rendering, which is the whole of the PIN preset: a PIN
+# is DICE with a ten-sided die, so its digits are its rolls. Same dependency
+# as the two targets around it -- rendering only, no crypto, outside the
+# HAVE_NBGL guard.
+add_executable(test_bip85_dice_digits tests/bip85_dice_digits.c ../../src/common/bip85/seed_bip85.c)
+target_include_directories(test_bip85_dice_digits PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src)
+target_link_libraries(test_bip85_dice_digits PUBLIC cmocka gcov testutils)
+
 add_executable(test_bip85_dice_bits_per_roll tests/bip85_dice_bits_per_roll.c ../../src/common/bip85/seed_bip85.c)
 target_include_directories(test_bip85_dice_bits_per_roll PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src)
 target_link_libraries(test_bip85_dice_bits_per_roll PUBLIC cmocka gcov testutils)

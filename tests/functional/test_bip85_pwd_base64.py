@@ -8,7 +8,7 @@ from ragger.firmware.touch.layouts import ChoiceList
 from keypad import Keypad
 import reviews
 import explanations
-from genericlayout import GenericLayout, MENU_DERIVE
+from genericlayout import GenericLayout, MENU_DERIVE, BIP85_APP_PWD_BASE64
 
 @fixture(scope='session')
 def set_seed():
@@ -28,7 +28,7 @@ def all_eink_bip85_pwd_base64(backend, device):
     genericbuttons.choose(MENU_DERIVE)
     explanations.pass_explanation(
         backend, device, explanations.EXPLAIN_BIP85, "Which BIP85")
-    genericbuttons.choose(2)
+    select_tool.choose(BIP85_APP_PWD_BASE64)
     backend.wait_for_text_on_screen("Enter password length", 5)
     # The keypad names the range this application accepts, on its own line --
     # escaped because wait_for_text_on_screen() matches with re.match(). Base85

@@ -15,7 +15,23 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#include "bolos/cx_crc.h"
 #include "cx_errors.h"
+
+/* The CRC-32 entry point seed_sskr.c calls, over the update function
+ * tests/unit/lib/bolos/cx_crc.c provides -- byte-for-byte what
+ * tests/unit/lib/testutils.c defines for the cmocka suite, per the note at the
+ * top of this file. The SDK's own cx_crc32() is not linked here because it
+ * computes nothing: it delegates to the cx_crc_hw() syscall, whose host
+ * stand-in the SDK used to ship and no longer does. */
+uint32_t cx_crc32(const void *buf, size_t len);
+
+uint32_t cx_crc32(const void *buf, size_t len) {
+    uint32_t crc;
+    crc = cx_crc32_update(0xFFFFFFFF, buf, len);
+
+    return crc;
+}
 
 /* Declared by the SDK's ledger_assert_internals.h; defined here so a
  * LEDGER_ASSERT() firing inside any fuzzed function stops the run with a

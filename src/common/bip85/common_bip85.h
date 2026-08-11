@@ -182,3 +182,42 @@ bool bolos_ux_bip85_pwd_base85_path_format(uint8_t pwd_len,
                                            unsigned int index,
                                            char *out,
                                            size_t out_len);
+
+/**
+ * @brief Renders the path `bolos_ux_bip85_dice()` derives over, for the same
+ *        arguments.
+ */
+bool bolos_ux_bip85_dice_path_format(uint32_t sides,
+                                     uint32_t rolls,
+                                     unsigned int index,
+                                     char *out,
+                                     size_t out_len);
+
+/**
+ * @brief Renders DICE rolls as the decimal digits a ten-sided die produces.
+ *
+ * @details The whole of what turns the DICE application into a PIN: a PIN is
+ *          `DICE(sides = 10, rolls = length)`, and its digits are the rolls
+ *          themselves, written down in order. Nothing is hashed, reduced or
+ *          folded here -- a value that went through any transformation after
+ *          the derivation could not be reproduced by another BIP-85
+ *          implementation, which is the only reason to derive it rather than
+ *          draw it at random.
+ *
+ *          Leading zeros are kept, because they are digits and not the
+ *          absence of one: `{0, 9, 3, 4}` is the PIN "0934". That is also why
+ *          this writes characters rather than converting to an integer
+ *          anywhere.
+ *
+ * @param[in]  rolls    Roll values, each of which must be in `[0, 9]`.
+ * @param[in]  count    Number of rolls, which is the PIN's length.
+ * @param[out] out      Destination, null-terminated on success.
+ * @param[in]  out_size Capacity of `out`, in bytes, terminator included.
+ *
+ * @return true if the whole sequence was written. false, with `out` set to
+ *         the empty string and no digit written, if `count` is 0, if `out`
+ *         cannot hold `count` digits and a terminator, or if any roll is
+ *         greater than 9 -- a PIN cut short is a different PIN, not an
+ *         incomplete one.
+ */
+bool bip85_dice_rolls_to_digits(const uint32_t *rolls, size_t count, char *out, size_t out_size);
