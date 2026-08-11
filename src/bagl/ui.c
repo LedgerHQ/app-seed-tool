@@ -104,10 +104,25 @@ UX_FLOW(ux_bip39_flow, &ux_bip39_instruction_step, &ux_bip39_menu_step);
  * on their own; the taller Nanos add the third.
  */
 #if defined(TARGET_NANOS)
+UX_STEP_NOCB(ux_backup_sskr_step, nn,
+             {
+                 UI_STR_BAGL_BACKUP_SSKR_L1_NANOS,
+                 UI_STR_BAGL_BACKUP_SSKR_L2_NANOS,
+             });
+#else
+UX_STEP_NOCB(ux_backup_sskr_step, nnn,
+             {
+                 UI_STR_BAGL_BACKUP_SSKR_L1,
+                 UI_STR_BAGL_BACKUP_SSKR_L2,
+                 UI_STR_BAGL_BACKUP_SSKR_L3,
+             });
+#endif
+
+#if defined(TARGET_NANOS)
 UX_STEP_NOCB(ux_backup_explain_step, nn,
              {
-                 UI_STR_BAGL_BACKUP_EXPLAIN_L1,
-                 UI_STR_BAGL_BACKUP_EXPLAIN_L2,
+                 UI_STR_BAGL_BACKUP_EXPLAIN_L1_NANOS,
+                 UI_STR_BAGL_BACKUP_EXPLAIN_L2_NANOS,
              });
 #else
 UX_STEP_NOCB(ux_backup_explain_step, nnn,
@@ -121,8 +136,11 @@ UX_STEP_NOCB(ux_backup_explain_step, nnn,
 // The length menu and its instruction are the same two steps the check flow
 // uses -- the question they ask is the same one, and the intention already
 // recorded is what makes the difference later.
-UX_FLOW(ux_backup_flow, &ux_backup_explain_step, &ux_bip39_instruction_step,
-        &ux_bip39_menu_step);
+// What the journey makes, then why the Phrase is wanted, then the length --
+// the order the touch stack uses, for the same reason: naming the product
+// before asking for the input is what makes the input make sense.
+UX_FLOW(ux_backup_flow, &ux_backup_sskr_step, &ux_backup_explain_step,
+        &ux_bip39_instruction_step, &ux_bip39_menu_step);
 
 //////////////////////////////////////////////////////////////////////
 
@@ -151,8 +169,8 @@ UX_STEP_CB(ux_sskr_instruction_step, nnn,
 #if defined(TARGET_NANOS)
 UX_STEP_NOCB(ux_recover_explain_step, nn,
              {
-                 UI_STR_BAGL_RECOVER_EXPLAIN_L1,
-                 UI_STR_BAGL_RECOVER_EXPLAIN_L2,
+                 UI_STR_BAGL_RECOVER_EXPLAIN_L1_NANOS,
+                 UI_STR_BAGL_RECOVER_EXPLAIN_L2_NANOS,
              });
 #else
 UX_STEP_NOCB(ux_recover_explain_step, nnn,

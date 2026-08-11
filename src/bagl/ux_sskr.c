@@ -368,6 +368,17 @@ void sskr_threshold_selector(unsigned int idx) {
     }
 }
 
+#if defined(TARGET_NANOS)
+UX_STEP_NOCB(ux_threshold_concept_step, nn,
+             {UI_STR_BAGL_SSKR_THRESHOLD_CONCEPT_L1_NANOS,
+              UI_STR_BAGL_SSKR_THRESHOLD_CONCEPT_L2_NANOS});
+#else
+UX_STEP_NOCB(ux_threshold_concept_step, nnn,
+             {UI_STR_BAGL_SSKR_THRESHOLD_CONCEPT_L1,
+              UI_STR_BAGL_SSKR_THRESHOLD_CONCEPT_L2,
+              UI_STR_BAGL_SSKR_THRESHOLD_CONCEPT_L3});
+#endif
+
 UX_STEP_NOCB(ux_threshold_instruction_step, nn,
              {UI_STR_BAGL_SSKR_THRESHOLD_TITLE_L1,
               UI_STR_BAGL_SSKR_THRESHOLD_TITLE_L2});
@@ -375,8 +386,10 @@ UX_STEP_NOCB(ux_threshold_instruction_step, nn,
 UX_STEP_MENULIST(ux_threshold_menu_step, sskr_threshold_getter,
                  sskr_threshold_selector);
 
-UX_FLOW(ux_threshold_flow, &ux_threshold_instruction_step,
-        &ux_threshold_menu_step);
+// The definition, then the instruction, then the menu. "Select / threshold"
+// is the only place the word appears on this stack, and it appeared cold.
+UX_FLOW(ux_threshold_flow, &ux_threshold_concept_step,
+        &ux_threshold_instruction_step, &ux_threshold_menu_step);
 
 const char* sskr_shares_number_getter(unsigned int idx) {
     return sskr_descriptor_label(idx, sskr_descriptor_count());

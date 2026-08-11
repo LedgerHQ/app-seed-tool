@@ -203,6 +203,34 @@
 #define UI_STR_BAGL_BACKUP_EXPLAIN_L2 "read back its Phrase."
 #define UI_STR_BAGL_BACKUP_EXPLAIN_L3 "Enter it to split it."
 /*
+ * The same screen on Nano S, which has two lines where the others have three.
+ *
+ * Dropping the third line was the obvious thing and is what this replaces: it
+ * left the reader told what the device cannot do and never told what to do
+ * about it. Both halves are kept by tightening instead, and the pair is held
+ * to the same 116px box as every other nn line by the test in
+ * tests/unit/tests/ui_strings.c -- which is the only check there can be, since
+ * no emulator runs this target.
+ */
+/*
+ * What the journey makes, said before the screen that asks for the Phrase.
+ *
+ * The touch stack has had this since the Backup journey was written and the
+ * Nano did not, so a Nano reader typed twenty-four words and reached a share
+ * count never having been told what a Share is. The second half is the one
+ * that earns the screen: splitting a Phrase is only a backup if the pieces are
+ * kept apart, and someone who writes them all on one sheet has made a copy of
+ * their Phrase with none of the protection.
+ */
+#define UI_STR_BAGL_BACKUP_SSKR_L1 "Your Phrase is split"
+#define UI_STR_BAGL_BACKUP_SSKR_L2 "into Shares to write."
+#define UI_STR_BAGL_BACKUP_SSKR_L3 "Keep them apart."
+#define UI_STR_BAGL_BACKUP_SSKR_L1_NANOS "Phrase split into"
+#define UI_STR_BAGL_BACKUP_SSKR_L2_NANOS "Shares. Keep apart."
+
+#define UI_STR_BAGL_BACKUP_EXPLAIN_L1_NANOS "Ledger cannot read"
+#define UI_STR_BAGL_BACKUP_EXPLAIN_L2_NANOS "its Phrase. Enter it."
+/*
  * The same two lines serve the Check journey, which differs only in what it
  * does with the phrase once it has it. The third line is where they part, and
  * it exists for the same reason the touch stack gained its own Check screen:
@@ -226,6 +254,16 @@
 #define UI_STR_BAGL_RECOVER_EXPLAIN_L1 "Not all your Shares"
 #define UI_STR_BAGL_RECOVER_EXPLAIN_L2 "are needed."
 #define UI_STR_BAGL_RECOVER_EXPLAIN_L3 "Any order works."
+/*
+ * The same screen on Nano S. "Any order works" is the line that was being
+ * dropped, and it is the one that changes what the reader does: without it
+ * someone hunts for the share numbered 1 before starting. It is also the claim
+ * that was checked on the device before being printed -- two shares entered
+ * reversed give the same verdict -- so losing it on one target and keeping it
+ * on the others would state it inconsistently rather than briefly.
+ */
+#define UI_STR_BAGL_RECOVER_EXPLAIN_L1_NANOS "Not all Shares needed."
+#define UI_STR_BAGL_RECOVER_EXPLAIN_L2_NANOS "Any order works."
 
 /* NBGL home screen description and action (src/nbgl/ui.c). */
 /*
@@ -1177,6 +1215,20 @@
  */
 #define UI_STR_NBGL_SSKR_THRESHOLD_ONE_OF_M_ERROR \
     "A threshold of 1 works only with a single Share.\nEnter 2 or more."
+/*
+ * What a threshold is, read immediately before the menu that asks for one.
+ *
+ * That menu says "Select / threshold" and nothing on the Nano defines the
+ * word -- the same gap the touch stack had, and it was fixed there and not
+ * here. The review further on shows "any k of n", which demonstrates the
+ * relationship but arrives after the choice has been made.
+ */
+#define UI_STR_BAGL_SSKR_THRESHOLD_CONCEPT_L1 "The threshold is how"
+#define UI_STR_BAGL_SSKR_THRESHOLD_CONCEPT_L2 "many Shares rebuild"
+#define UI_STR_BAGL_SSKR_THRESHOLD_CONCEPT_L3 "your Phrase."
+#define UI_STR_BAGL_SSKR_THRESHOLD_CONCEPT_L1_NANOS "Threshold: Shares"
+#define UI_STR_BAGL_SSKR_THRESHOLD_CONCEPT_L2_NANOS "needed to rebuild."
+
 #define UI_STR_BAGL_SSKR_THRESHOLD_TITLE_L1 "Select"
 #define UI_STR_BAGL_SSKR_THRESHOLD_TITLE_L2 "threshold"
 /*
