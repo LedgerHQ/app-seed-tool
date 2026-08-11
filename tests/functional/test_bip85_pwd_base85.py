@@ -8,7 +8,7 @@ from ragger.firmware.touch.layouts import ChoiceList
 from keypad import Keypad
 import reviews
 import explanations
-from genericlayout import GenericLayout, MENU_DERIVE
+from genericlayout import GenericLayout, MENU_DERIVE, BIP85_APP_PWD_BASE85
 
 @fixture(scope='session')
 def set_seed():
@@ -28,7 +28,7 @@ def all_eink_bip85_pwd_base85(backend, device):
     genericbuttons.choose(MENU_DERIVE)
     explanations.pass_explanation(
         backend, device, explanations.EXPLAIN_BIP85, "Which BIP85")
-    genericbuttons.choose(3)
+    select_tool.choose(BIP85_APP_PWD_BASE85)
     backend.wait_for_text_on_screen("Enter password length", 5)
     # Base85 accepts 10 to 80, where Base64 accepts 20 to 86. Asserting the
     # range here and in test_bip85_pwd_base64.py is what keeps the composed

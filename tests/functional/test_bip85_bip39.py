@@ -8,7 +8,7 @@ from ragger.firmware.touch.layouts import ChoiceList
 from keypad import Keypad
 import reviews
 import explanations
-from genericlayout import GenericLayout, MENU_DERIVE
+from genericlayout import GenericLayout, MENU_DERIVE, BIP85_APP_BIP39
 
 @fixture(scope='session')
 def set_seed():
@@ -28,7 +28,7 @@ def all_eink_bip85_bip39(backend, device):
     genericbuttons.choose(MENU_DERIVE)
     explanations.pass_explanation(
         backend, device, explanations.EXPLAIN_BIP85, "Which BIP85")
-    genericbuttons.choose(1)
+    select_tool.choose(BIP85_APP_BIP39)
     backend.wait_for_text_on_screen("Length of BIP39", 5)
     genericbuttons.choose(1)
     explanations.pass_explanation(

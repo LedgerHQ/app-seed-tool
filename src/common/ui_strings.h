@@ -1246,17 +1246,55 @@
 #define UI_STR_NBGL_BIP85_APP_PWD_BASE64 "Password (Base64)"
 #define UI_STR_NBGL_BIP85_APP_PWD_BASE85 "Password (Base85)"
 /*
+ * "PIN", and not "Dice": the entry names what the user came for.
+ *
+ * The derivation underneath is BIP-85's DICE application with a ten-sided
+ * die, and the path on the review says so -- `m/83696968'/89101'/10'/6'/0'`,
+ * with 89101 being DICE and nothing else. That is what makes this PIN
+ * reproducible by any other BIP-85 implementation, and it is why the screen
+ * naming it "PIN" is not a private extension: the label is the use, the path
+ * is the standard, and both are on screen before anything is derived.
+ */
+#define UI_STR_NBGL_BIP85_APP_PIN "PIN"
+/*
  * "BIP85" stays: a screen is also where a term is learned, and this one names
  * a standard the user will need in order to derive the same secret anywhere
  * else. "application" goes: on a Ledger that word means the app itself, which
  * the home screen two screens earlier uses it for. It is a false friend rather
  * than jargon, and the only word here that could be read as something else.
+ *
+ * One line, and no placed break, unlike every other title in this file: this
+ * one is a header title now (nbgl_useCaseGenericConfiguration()), drawn in
+ * the bar beside the back arrow rather than as a text area over the buttons.
+ * That bar is one line high on all three devices and clips rather than wraps,
+ * so the question is short enough to fit the narrowest of them -- checked
+ * under Speculos on apex_p, which is where it would be cut.
  */
-#define UI_STR_NBGL_BIP85_SELECT_APP_TITLE "Which BIP85 secret\ndo you want?"
+#define UI_STR_NBGL_BIP85_SELECT_APP_TITLE "Which BIP85 secret?"
 
 #define UI_STR_NBGL_BIP85_BIP39_HEADER  "BIP39 Phrase (Index #%d)"
 #define UI_STR_NBGL_BIP85_BASE64_HEADER "Base64 Password (Index #%d)"
 #define UI_STR_NBGL_BIP85_BASE85_HEADER "Base85 Password (Index #%d)"
+#define UI_STR_NBGL_BIP85_PIN_HEADER    "PIN (Index #%d)"
+
+/*
+ * How long a PIN, asked with three buttons rather than with the keypad the
+ * password length uses.
+ *
+ * The keypad exists because a password length is any number in a range of
+ * sixty-odd values. A PIN is 4, 6 or 8 digits here -- three values, which is
+ * a choice and not an entry -- and a keypad for it would put a number pad in
+ * front of someone about to be shown a number, with a range error waiting
+ * behind every other value they could type.
+ *
+ * The unit is named on every button, as the phrase-length screen names words:
+ * "4" alone on a screen reached from a menu of secrets does not say four of
+ * what.
+ */
+#define UI_STR_NBGL_BIP85_PIN_LENGTH_TITLE "How many digits\nin the PIN?"
+#define UI_STR_NBGL_BIP85_PIN_DIGITS_4     "4 digits"
+#define UI_STR_NBGL_BIP85_PIN_DIGITS_6     "6 digits"
+#define UI_STR_NBGL_BIP85_PIN_DIGITS_8     "8 digits"
 
 /*
  * The label above a derived secret, once the path has been folded into it.
@@ -1330,13 +1368,21 @@
 #define UI_STR_NBGL_BIP85_REVIEW_INDEX_VALUE       "%d"
 #define UI_STR_NBGL_BIP85_REVIEW_LENGTH_WORDS      "%d words"
 #define UI_STR_NBGL_BIP85_REVIEW_LENGTH_CHARACTERS "%d characters"
+/*
+ * A third unit, for the same reason the first two are named: the length row
+ * carries "8" for a PIN of eight digits and "8" would also be a password of
+ * eight characters, which this application does not offer and the reader has
+ * no way of knowing. Digits are also rolls -- one ten-sided roll each -- and
+ * "digits" is the word for what is on the screen the user is about to copy.
+ */
+#define UI_STR_NBGL_BIP85_REVIEW_LENGTH_DIGITS "%d digits"
 
 /*
  * The same page, for the derivation flow. See UI_STR_NBGL_SSKR_REVEAL_WARN
  * above for why the warning is the review's last page and not a screen after
  * it.
  *
- * Two forms, because the three applications do not share a danger.
+ * Three forms, because the four applications do not share a danger.
  *
  * The risk is the same everywhere and is the first sentence: a derived secret
  * is usable by whoever reads it, and this screen is the last one before it is
@@ -1357,12 +1403,31 @@
  *
  * display_bip85_review() (src/nbgl/ui.c) already switches on
  * bip85_type_get() twice, for the Length row's unit and for the Application
- * row's language; this is the third arm of the same distinction.
+ * row's language; this is the third place the same distinction is drawn.
  */
 #define UI_STR_NBGL_BIP85_REVEAL_WARN_BIP39 \
     "Anyone who sees this secret can use it. It is not the Phrase on this Ledger."
 
 #define UI_STR_NBGL_BIP85_REVEAL_WARN_PWD "Anyone who sees this secret can use it."
+
+/*
+ * The fourth arm, and it names the thing rather than calling it a secret. A
+ * PIN is read off a screen and typed into something else, so what is at stake
+ * is not abstract: whoever reads these digits opens whatever they open.
+ */
+#define UI_STR_NBGL_BIP85_REVEAL_WARN_PIN "Anyone who sees this PIN can use it."
+
+/*
+ * Shown when a PIN could not be derived, which no parameter this flow accepts
+ * produces: the DRNG stream would have to run out under rejection sampling
+ * for a request of four to eight rolls from a ten-sided die.
+ *
+ * It exists because the alternative to saying so is drawing what was
+ * produced, and a PIN that came back one digit short looks exactly like a
+ * PIN. Nothing is displayed, everything is erased, and this is what the user
+ * gets instead -- see bip85_app_pin_gen() (src/nbgl/bip85_app.c).
+ */
+#define UI_STR_NBGL_BIP85_PIN_DERIVE_ERROR "PIN could not be derived"
 
 /*
  * The bound in the title is the keypad's own digit cap

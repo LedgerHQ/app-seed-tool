@@ -43,7 +43,7 @@
 
 /*
  * Sized on the BIP85 result label, which is the longest thing written into it:
- * the widest of the three result headers, a newline, and a full derivation
+ * the widest of the four result headers, a newline, and a full derivation
  * path. Everything else it carries -- "SSKR share 16 of 16", "BIP39 Phrase" --
  * is far shorter. The _Static_assert below is what holds the number.
  */
@@ -173,6 +173,7 @@ static void display_sskr_select_threshold_page(void);
 static void display_bip85_select_app_page(void);
 static void display_bip85_select_index_page(void);
 static void display_bip85_select_password_length_page(void);
+static void display_bip85_select_pin_length_page(void);
 static void display_sskr_shares_review(void);
 static void display_sskr_close_confirm_page(void);
 static void display_sskr_generate_review_page(void);
@@ -201,10 +202,16 @@ static char wordCandidates[(BIP39_MAX_WORD_LENGTH + 1) *
  * than by reading -- so it applies to a screen's format string exactly as it
  * does to a PRINTF.
  *
- * The return value is checked at both call sites. A label composed of two
- * halves with the second silently missing is worse than one that was never
- * shown: the BIP-85 result header carries the derivation path, and a path cut
- * short does not lead back to the secret.
+ * The return value is checked at both call sites, and neither shows a label
+ * that was composed only in part: each keeps what it had before the failed
+ * append rather than the truncated result. On the BIP-85 result label that
+ * means the header without the derivation path, which is a label that says
+ * less than it should rather than one that says something wrong.
+ *
+ * What keeps it from happening at all is not this check but the
+ * _Static_assert on HEADER_SIZE further down, which bounds the widest header
+ * plus a seven-digit index, a newline and a full path against the buffer.
+ * The check is what makes the failure legible if that assert is ever weakened.
  */
 static bool append_bounded(char* dst, size_t size, const char* src) {
     const size_t used = strlen(dst);
@@ -1330,9 +1337,12 @@ _Static_assert(sizeof(UI_STR_NBGL_SSKR_REVIEW_COUNT_VALUE) <= REVIEW_VALUE_SIZE,
 _Static_assert(sizeof(UI_STR_NBGL_BIP85_REVIEW_LENGTH_WORDS) <=
                        REVIEW_VALUE_SIZE &&
                    sizeof(UI_STR_NBGL_BIP85_REVIEW_LENGTH_CHARACTERS) <=
+                       REVIEW_VALUE_SIZE &&
+                   sizeof(UI_STR_NBGL_BIP85_REVIEW_LENGTH_DIGITS) <=
                        REVIEW_VALUE_SIZE,
-               "both length phrases have two-digit arguments, so each format "
-               "literal is at least as wide as what it composes");
+               "all three length phrases have single or two-digit arguments, "
+               "so each format literal is at least as wide as what it "
+               "composes");
 
 // The BIP85 index reaches seven digits (BIP85_INDEX_MAX_NUMBER_LENGTH), where
 // its "%d" format is two characters -- five more than the literal.
@@ -1341,7 +1351,7 @@ _Static_assert(sizeof(UI_STR_NBGL_BIP85_REVIEW_INDEX_VALUE) + 5 <=
                "the BIP85 index composes up to seven digits into a '%d'");
 
 // The BIP85 result label is the longest thing HEADER_SIZE has to hold: the
-// widest of the three result headers with a seven-digit index, a newline, and
+// widest of the four result headers with a seven-digit index, a newline, and
 // a full derivation path. Bounded against the parts rather than against the
 // separator that joins them, which accounts for one character.
 _Static_assert(sizeof(UI_STR_NBGL_BIP85_BASE64_HEADER) + 5 + 1 +
@@ -1753,19 +1763,50 @@ void display_sskr_select_threshold_page() {
                        display_sskr_select_numshares_page);
 }
 
-enum __attribute__((packed)) select_bip85_app {
-    SELECT_BIP85_APP_ICON_INDEX = 0,
-    SELECT_BIP85_APP_TEXT_INDEX,
-    SELECT_BIP85_APP_BUTTON_BIP39_INDEX,
-    SELECT_BIP85_APP_BUTTON_PWD_BASE64_INDEX,
-    SELECT_BIP85_APP_BUTTON_PWD_BASE85_INDEX,
-    SELECT_BIP85_APP_BACK_BUTTON_INDEX,
-    SELECT_BIP85_APP_NB_CHILDREN,
+/*
+ * The four secrets this flow derives, in the order of `enum bip85_app_type`.
+ *
+ * That order is not a presentation choice: the review reads
+ * bip85_select_app[bip85_type_get()] to say back which one was chosen, so a
+ * table sorted for the screen would make it name a different application than
+ * the one being derived.
+ *
+ * The DICE entry is labelled "PIN", which is a use and not the primitive, and
+ * that is why the review does not read this table for it: a second use of
+ * DICE -- generic rolls, any number of sides -- would be a fifth entry
+ * sharing the fourth's application type, and one entry cannot name two.
+ * bip85_review_app_name() reads bip85_dice_use_get() instead.
+ *
+ * `const char* const`, rather than an array of mutable pointers, because
+ * BARS_LIST below takes exactly that: the SDK reads the array out of flash
+ * and translates each entry itself (nbgl_use_case.c PIC()s barTexts).
+ */
+static const char* const bip85_select_app[] = {
+    UI_STR_NBGL_BIP85_APP_BIP39, UI_STR_NBGL_BIP85_APP_PWD_BASE64,
+    UI_STR_NBGL_BIP85_APP_PWD_BASE85, UI_STR_NBGL_BIP85_APP_PIN};
+
+/*
+ * One token per entry, rather than one shared token read with the row index.
+ *
+ * The index the SDK reports is a position on the page it drew, and this list
+ * is one entry away from paginating -- five bars is what fits, and a sixth
+ * secret would put the last of them on a page of its own with an index of 0.
+ * A token says which secret was touched whatever page it was drawn on.
+ */
+enum __attribute__((packed)) select_bip85_app_token {
+    SELECT_BIP85_APP_BIP39_TOKEN = FIRST_USER_TOKEN,
+    SELECT_BIP85_APP_PWD_BASE64_TOKEN,
+    SELECT_BIP85_APP_PWD_BASE85_TOKEN,
+    SELECT_BIP85_APP_PIN_TOKEN,
 };
 
-static const char* bip85_select_app[] = {UI_STR_NBGL_BIP85_APP_BIP39,
-                                         UI_STR_NBGL_BIP85_APP_PWD_BASE64,
-                                         UI_STR_NBGL_BIP85_APP_PWD_BASE85};
+static const uint8_t bip85_select_app_tokens[] = {
+    SELECT_BIP85_APP_BIP39_TOKEN, SELECT_BIP85_APP_PWD_BASE64_TOKEN,
+    SELECT_BIP85_APP_PWD_BASE85_TOKEN, SELECT_BIP85_APP_PIN_TOKEN};
+
+_Static_assert(ARRAYLEN(bip85_select_app_tokens) == ARRAYLEN(bip85_select_app),
+               "every entry of the BIP85 list needs the token that says which "
+               "secret it is; the SDK reads the two arrays in step");
 
 /*
  * Deriving, and then showing what was derived.
@@ -1809,6 +1850,34 @@ static void bip85_generate_and_display(void) {
             // Ensure null termination
             reviewText[bip85_length_get()] = '\0';
             break;
+        case BIP85_APP_DICE: {
+            /*
+             * The only derivation here that can come back with nothing, and
+             * the only one whose failure would be invisible on screen: a PIN
+             * short of a digit still looks like a PIN. bip85_app_pin_gen()
+             * checks the rolls it got against the rolls that were asked for
+             * and erases everything rather than returning what it has, so
+             * there is nothing to draw and nothing partial to inspect.
+             *
+             * Going home rather than back to a parameter screen, because
+             * display_home_page() is what calls reset_globals(): the index
+             * and the length that produced this are cleared with the rest.
+             */
+            const char* pin = bip85_app_pin_gen();
+            if (pin == NULL) {
+                memzero(headerText, sizeof(headerText));
+                memzero(reviewText, sizeof(reviewText));
+                nbgl_useCaseStatus(UI_STR_NBGL_BIP85_PIN_DERIVE_ERROR, false,
+                                   display_home_page);
+                return;
+            }
+            SPRINTF(headerText, UI_STR_NBGL_BIP85_PIN_HEADER,
+                    bip85_index_get());
+            strncpy(reviewText, pin, bip85_length_get());
+            // Ensure null termination
+            reviewText[bip85_length_get()] = '\0';
+            break;
+        }
     }
 
     /*
@@ -1836,6 +1905,40 @@ static void bip85_generate_and_display(void) {
     }
 
     display_generic_review();
+}
+
+/*
+ * What the review calls the application, which for DICE is the use rather
+ * than the primitive.
+ *
+ * bip85_select_app[] is indexed by application type and its DICE entry is the
+ * button that chose it, labelled "PIN". Reading the use here rather than that
+ * entry is what keeps this row right when a second use of DICE is added: two
+ * buttons would then share one application type, and the table could only
+ * name one of them.
+ *
+ * PIC() on the table, and it is not decoration. bip85_select_app[] is a table
+ * of pointers to literals, so each entry is a link-time address that has to
+ * be translated before the string is read. Handing an untranslated one to a
+ * tag/value pair takes the application down -- measured under Speculos on
+ * Flex, where this without PIC() killed it on the way into the review, and
+ * with it the review draws.
+ *
+ * The same pointers are assigned straight to button labels on the selection
+ * screen without PIC(), which is why this looked safe: that path survives
+ * because of what the button drawing does with them, not because the pointers
+ * are usable as they stand.
+ */
+static const char* bip85_review_app_name(void) {
+    if ((enum bip85_app_type)bip85_type_get() == BIP85_APP_DICE) {
+        switch ((enum bip85_dice_use)bip85_dice_use_get()) {
+            case BIP85_DICE_USE_PIN:
+                return UI_STR_NBGL_BIP85_APP_PIN;
+            case BIP85_DICE_USE_NB:
+                break;
+        }
+    }
+    return (const char*)PIC(bip85_select_app[bip85_type_get()]);
 }
 
 /*
@@ -1901,34 +2004,33 @@ static void display_bip85_generate_review_page(void) {
                     UI_STR_NBGL_BIP85_REVIEW_LENGTH_CHARACTERS,
                     bip85_length_get());
             break;
+        case BIP85_APP_DICE:
+            // From the roll count, which is where this flow put it, and not
+            // from bip85_length_get(): that one is the app buffer's length
+            // and is written by the derivation itself, so reading it here --
+            // before anything has been derived -- would show whatever the
+            // previous journey left behind.
+            SPRINTF(reviewValueLength, UI_STR_NBGL_BIP85_REVIEW_LENGTH_DIGITS,
+                    bip85_dice_rolls_get());
+            break;
     }
 
     pairs[0].item = UI_STR_NBGL_BIP85_REVIEW_ITEM_APP;
-    // PIC(), and it is not decoration. bip85_select_app[] is a table of
-    // pointers to literals, so each entry is a link-time address that has to
-    // be translated before the string is read. Handing an untranslated one to
-    // a tag/value pair takes the application down -- measured under Speculos
-    // on Flex, where this line without PIC() killed it on the way into the
-    // review, and with it the review draws.
-    //
-    // The same pointers are assigned straight to button labels on the
-    // selection screen without PIC(), which is why this looked safe: that path
-    // survives because of what the button drawing does with them, not because
-    // the pointers are usable as they stand.
+    // The language belongs to the BIP39 application alone -- it is the `0'`
+    // after `39'` in the path, and the other three have no such component --
+    // so it is appended here rather than carried by the name itself.
     if (bip85_type_get() == BIP85_APP_BIP39) {
         reviewValueApp[0] = '\0';
-        if (append_bounded(
-                reviewValueApp, sizeof(reviewValueApp),
-                (const char*)PIC(bip85_select_app[bip85_type_get()])) &&
+        if (append_bounded(reviewValueApp, sizeof(reviewValueApp),
+                           bip85_review_app_name()) &&
             append_bounded(reviewValueApp, sizeof(reviewValueApp),
                            UI_STR_NBGL_BIP85_REVIEW_APP_LANGUAGE)) {
             pairs[0].value = PIC(reviewValueApp);
         } else {
-            pairs[0].value =
-                (const char*)PIC(bip85_select_app[bip85_type_get()]);
+            pairs[0].value = bip85_review_app_name();
         }
     } else {
-        pairs[0].value = (const char*)PIC(bip85_select_app[bip85_type_get()]);
+        pairs[0].value = bip85_review_app_name();
     }
     pairs[1].item = UI_STR_NBGL_BIP85_REVIEW_ITEM_LENGTH;
     pairs[1].value = PIC(reviewValueLength);
@@ -1942,9 +2044,23 @@ static void display_bip85_generate_review_page(void) {
     // its warning says which one it is not; a password cannot be mistaken for
     // a recovery phrase, so saying it is not one would be a sentence about
     // nothing. See UI_STR_NBGL_BIP85_REVEAL_WARN_BIP39 in ui_strings.h.
+    //
+    // A switch rather than the pair of ifs this was, for the same reason as
+    // the two above: the warning is the last thing between the user and the
+    // secret, and a fifth application must not inherit whichever sentence
+    // happened to be the fallback.
     const char* warning = UI_STR_NBGL_BIP85_REVEAL_WARN_PWD;
-    if (bip85_type_get() == BIP85_APP_BIP39) {
-        warning = UI_STR_NBGL_BIP85_REVEAL_WARN_BIP39;
+    switch ((enum bip85_app_type)bip85_type_get()) {
+        case BIP85_APP_BIP39:
+            warning = UI_STR_NBGL_BIP85_REVEAL_WARN_BIP39;
+            break;
+        case BIP85_APP_DICE:
+            warning = UI_STR_NBGL_BIP85_REVEAL_WARN_PIN;
+            break;
+        case BIP85_APP_PWD_BASE64:
+        case BIP85_APP_PWD_BASE85:
+            warning = UI_STR_NBGL_BIP85_REVEAL_WARN_PWD;
+            break;
     }
 
     display_review(pairs, 4, warning, UI_STR_NBGL_BIP85_REVIEW_FINISH,
@@ -2071,9 +2187,9 @@ static void bip85_password_length_validate(const uint8_t* lengthentry,
     if ((bip85_length_get() >= password_length_min) &&
         (bip85_length_get() <= password_length_max)) {
         // The explanation, as the BIP39 branch does. The index means the same
-        // thing for all three applications, so all three have to meet it: this
-        // is the second and last route into that keypad from a value the user
-        // has just accepted, and it was the one that skipped the screen.
+        // thing for all four applications, so all four have to meet it: this
+        // is one of three routes into that keypad from a value the user has
+        // just accepted, and it was the one that skipped the screen.
         display_bip85_index_concept_page();
     } else {
         snprintf(message, sizeof(message),
@@ -2104,74 +2220,204 @@ void display_bip85_select_password_length_page() {
                        display_bip85_select_app_page);
 }
 
-static void select_bip85_app_callback(nbgl_obj_t* obj,
-                                      nbgl_touchType_t eventType) {
+/*
+ * How many digits, asked with three buttons rather than with a keypad.
+ *
+ * The password length is a number in a range of sixty-odd values and gets the
+ * keypad it needs; a PIN is one of three lengths, and a keypad for it would
+ * put a number pad in front of someone about to be shown a number, with a
+ * range error waiting behind every other value it accepts. Same shape as the
+ * phrase-length screen, for the same reason.
+ *
+ * These are the three values the derivation is asked for, so they are named
+ * here and bounded against the preset rather than typed as literals beside
+ * the labels: bip85_app_pin_gen() refuses anything outside
+ * [BIP85_DICE_PIN_DIGITS_MIN, BIP85_DICE_PIN_DIGITS_MAX] before it derives,
+ * and a button that could reach it would be a screen offering a length the
+ * next step rejects.
+ */
+#define BIP85_PIN_DIGITS_SHORT BIP85_DICE_PIN_DIGITS_MIN
+#define BIP85_PIN_DIGITS_MEDIUM 6
+#define BIP85_PIN_DIGITS_LONG BIP85_DICE_PIN_DIGITS_MAX
+
+_Static_assert(BIP85_PIN_DIGITS_SHORT >= BIP85_DICE_PIN_DIGITS_MIN &&
+                   BIP85_PIN_DIGITS_MEDIUM > BIP85_PIN_DIGITS_SHORT &&
+                   BIP85_PIN_DIGITS_LONG > BIP85_PIN_DIGITS_MEDIUM &&
+                   BIP85_PIN_DIGITS_LONG <= BIP85_DICE_PIN_DIGITS_MAX,
+               "every length this screen offers has to be one the PIN "
+               "derivation accepts, in the order the buttons are drawn");
+
+enum __attribute__((packed)) select_bip85_pin_length {
+    SELECT_BIP85_PIN_LENGTH_ICON_INDEX = 0,
+    SELECT_BIP85_PIN_LENGTH_TEXT_INDEX,
+    SELECT_BIP85_PIN_LENGTH_BUTTON_4_INDEX,
+    SELECT_BIP85_PIN_LENGTH_BUTTON_6_INDEX,
+    SELECT_BIP85_PIN_LENGTH_BUTTON_8_INDEX,
+    SELECT_BIP85_PIN_LENGTH_BACK_BUTTON_INDEX,
+    SELECT_BIP85_PIN_LENGTH_NB_CHILDREN,
+};
+
+static const char* bip85_pin_lengths[] = {UI_STR_NBGL_BIP85_PIN_DIGITS_4,
+                                          UI_STR_NBGL_BIP85_PIN_DIGITS_6,
+                                          UI_STR_NBGL_BIP85_PIN_DIGITS_8};
+
+static void select_bip85_pin_length_callback(nbgl_obj_t* obj,
+                                             nbgl_touchType_t eventType) {
     nbgl_obj_t** screenChildren = nbgl_screenGetElements(0);
     if (eventType != TOUCHED) {
         return;
     }
     io_seproxyhal_play_tune(TUNE_TAP_CASUAL);
     nbgl_layoutRelease(layout);
-    if (obj == screenChildren[SELECT_BIP85_APP_BUTTON_BIP39_INDEX]) {
-        bip85_type_set(BIP85_APP_BIP39);
-        display_bip39_select_phrase_length_page();
+    if (obj == screenChildren[SELECT_BIP85_PIN_LENGTH_BUTTON_4_INDEX]) {
+        bip85_dice_rolls_set(BIP85_PIN_DIGITS_SHORT);
+    } else if (obj == screenChildren[SELECT_BIP85_PIN_LENGTH_BUTTON_6_INDEX]) {
+        bip85_dice_rolls_set(BIP85_PIN_DIGITS_MEDIUM);
+    } else if (obj == screenChildren[SELECT_BIP85_PIN_LENGTH_BUTTON_8_INDEX]) {
+        bip85_dice_rolls_set(BIP85_PIN_DIGITS_LONG);
     } else if (obj ==
-               screenChildren[SELECT_BIP85_APP_BUTTON_PWD_BASE64_INDEX]) {
-        bip85_type_set(BIP85_APP_PWD_BASE64);
-        display_bip85_select_password_length_page();
-    } else if (obj ==
-               screenChildren[SELECT_BIP85_APP_BUTTON_PWD_BASE85_INDEX]) {
-        bip85_type_set(BIP85_APP_PWD_BASE85);
-        display_bip85_select_password_length_page();
-    } else if (obj == screenChildren[SELECT_BIP85_APP_BACK_BUTTON_INDEX]) {
-        display_select_menu_page();
+               screenChildren[SELECT_BIP85_PIN_LENGTH_BACK_BUTTON_INDEX]) {
+        display_bip85_select_app_page();
         return;
     } else {
         display_home_page();
+        return;
     }
+    // The explanation of what an index is, as both other branches of this
+    // flow reach it: the index means the same thing for all four
+    // applications, so all four meet the same screen.
+    display_bip85_index_concept_page();
 }
 
-static void display_bip85_select_app_page(void) {
+static void display_bip85_select_pin_length_page(void) {
     nbgl_obj_t** screenChildren;
 
     // From top to bottom:
     // <return back arrow> + <icon> + <text> + <3 buttons>
-    nbgl_screenSet(&screenChildren, SELECT_BIP85_APP_NB_CHILDREN, NULL,
-                   (nbgl_touchCallback_t)&select_bip85_app_callback);
+    nbgl_screenSet(&screenChildren, SELECT_BIP85_PIN_LENGTH_NB_CHILDREN, NULL,
+                   (nbgl_touchCallback_t)&select_bip85_pin_length_callback);
 
-    screenChildren[SELECT_BIP85_APP_ICON_INDEX] =
+    screenChildren[SELECT_BIP85_PIN_LENGTH_ICON_INDEX] =
         (nbgl_obj_t*)generic_screen_set_icon(&BIP85_ICON);
-    screenChildren[SELECT_BIP39_PHRASE_LENGTH_TEXT_INDEX] =
+    screenChildren[SELECT_BIP85_PIN_LENGTH_TEXT_INDEX] =
         (nbgl_obj_t*)generic_screen_set_title(
-            screenChildren[SELECT_BIP85_APP_ICON_INDEX]);
-    ((nbgl_text_area_t*)screenChildren[SELECT_BIP39_PHRASE_LENGTH_TEXT_INDEX])
-        ->text = UI_STR_NBGL_BIP85_SELECT_APP_TITLE;
+            screenChildren[SELECT_BIP85_PIN_LENGTH_ICON_INDEX]);
+    ((nbgl_text_area_t*)screenChildren[SELECT_BIP85_PIN_LENGTH_TEXT_INDEX])
+        ->text = UI_STR_NBGL_BIP85_PIN_LENGTH_TITLE;
 
-    // create bip85 app buttons
+    // create digit count buttons
     nbgl_objPoolGetArray(
-        BUTTON, ARRAYLEN(bip85_select_app), 0,
-        (nbgl_obj_t**)&screenChildren[SELECT_BIP85_APP_BUTTON_BIP39_INDEX]);
+        BUTTON, ARRAYLEN(bip85_pin_lengths), 0,
+        (nbgl_obj_t**)&screenChildren[SELECT_BIP85_PIN_LENGTH_BUTTON_4_INDEX]);
     generic_screen_configure_buttons(
-        (nbgl_button_t**)&screenChildren[SELECT_BIP85_APP_BUTTON_BIP39_INDEX],
-        ARRAYLEN(bip85_select_app));
-    ((nbgl_button_t*)screenChildren[SELECT_BIP85_APP_BUTTON_BIP39_INDEX])
-        ->text = bip85_select_app[0];
-    ((nbgl_button_t*)screenChildren[SELECT_BIP85_APP_BUTTON_PWD_BASE64_INDEX])
-        ->text = bip85_select_app[1];
-    ((nbgl_button_t*)screenChildren[SELECT_BIP85_APP_BUTTON_PWD_BASE85_INDEX])
-        ->text = bip85_select_app[2];
-    ((nbgl_button_t*)screenChildren[SELECT_BIP85_APP_BUTTON_PWD_BASE85_INDEX])
+        (nbgl_button_t**)&screenChildren
+            [SELECT_BIP85_PIN_LENGTH_BUTTON_4_INDEX],
+        ARRAYLEN(bip85_pin_lengths));
+    ((nbgl_button_t*)screenChildren[SELECT_BIP85_PIN_LENGTH_BUTTON_4_INDEX])
+        ->text = bip85_pin_lengths[0];
+    ((nbgl_button_t*)screenChildren[SELECT_BIP85_PIN_LENGTH_BUTTON_6_INDEX])
+        ->text = bip85_pin_lengths[1];
+    ((nbgl_button_t*)screenChildren[SELECT_BIP85_PIN_LENGTH_BUTTON_8_INDEX])
+        ->text = bip85_pin_lengths[2];
+    // The longest PIN is the emphasised one, as the 24-word phrase is on the
+    // length screen this is modelled on: where the choice is how much of
+    // something to have, the black button is the safest amount rather than
+    // the first one.
+    ((nbgl_button_t*)screenChildren[SELECT_BIP85_PIN_LENGTH_BUTTON_8_INDEX])
         ->borderColor = BLACK;
-    ((nbgl_button_t*)screenChildren[SELECT_BIP85_APP_BUTTON_PWD_BASE85_INDEX])
+    ((nbgl_button_t*)screenChildren[SELECT_BIP85_PIN_LENGTH_BUTTON_8_INDEX])
         ->innerColor = BLACK;
-    ((nbgl_button_t*)screenChildren[SELECT_BIP85_APP_BUTTON_PWD_BASE85_INDEX])
+    ((nbgl_button_t*)screenChildren[SELECT_BIP85_PIN_LENGTH_BUTTON_8_INDEX])
         ->foregroundColor = WHITE;
 
     // create back button
-    screenChildren[SELECT_BIP85_APP_BACK_BUTTON_INDEX] =
+    screenChildren[SELECT_BIP85_PIN_LENGTH_BACK_BUTTON_INDEX] =
         (nbgl_obj_t*)generic_screen_set_back_button();
 
     nbgl_screenRedraw();
+}
+
+/*
+ * Which secret to derive, as a list.
+ *
+ * This screen was four hand-built buttons stacked from the bottom of the
+ * screen, and the fourth is what ended that: the stack grew up into the
+ * title, and Flex drew "PIN" across the second line of the question. Nothing
+ * in a test could see it -- every text event is still reported at full height
+ * with its full text, which is the same silence reviews.assert_body_clears_
+ * button() exists to break.
+ *
+ * So the list is the SDK's own. nbgl_useCaseGenericConfiguration() draws a
+ * BARS_LIST: a titled header with a back arrow, and one touchable bar per
+ * entry with a chevron saying it leads somewhere -- which is what each of
+ * these does. It also paginates by itself, so the fifth secret this flow
+ * grows costs nothing here rather than another silent overlap, and the entry
+ * order stops being a claim about where the buttons ended up on screen.
+ *
+ * The list reads top-down in the order of the table above, where the buttons
+ * read bottom-up. Nothing in the application depended on that order; the
+ * functional tests did, and they now count from the top as the screen does.
+ */
+static void bip85_select_app_action(int token, uint8_t index, int page) {
+    UNUSED(index);
+    UNUSED(page);
+
+    // No default: the tokens are this screen's own enumeration, and a fifth
+    // secret has to say here where it goes rather than falling through to
+    // whichever branch was last.
+    switch ((enum select_bip85_app_token)token) {
+        case SELECT_BIP85_APP_BIP39_TOKEN:
+            bip85_type_set(BIP85_APP_BIP39);
+            display_bip39_select_phrase_length_page();
+            break;
+        case SELECT_BIP85_APP_PWD_BASE64_TOKEN:
+            bip85_type_set(BIP85_APP_PWD_BASE64);
+            display_bip85_select_password_length_page();
+            break;
+        case SELECT_BIP85_APP_PWD_BASE85_TOKEN:
+            bip85_type_set(BIP85_APP_PWD_BASE85);
+            display_bip85_select_password_length_page();
+            break;
+        case SELECT_BIP85_APP_PIN_TOKEN:
+            // The application is DICE, which is what BIP-85 defines and what
+            // the path on the review will name; the PIN is the use it is
+            // being put to. Both are set here, on the entry that chose them,
+            // rather than being inferred later from a parameter.
+            bip85_type_set(BIP85_APP_DICE);
+            bip85_dice_use_set(BIP85_DICE_USE_PIN);
+            display_bip85_select_pin_length_page();
+            break;
+    }
+}
+
+static void display_bip85_select_app_page(void) {
+    /*
+     * Static, and it has to be, for the reason display_review() gives: the
+     * use case keeps the pointers it is handed and reads them again on every
+     * page turn, so a local would be a dangling read. Uninitialised, because
+     * BOLOS refuses a non-empty .data section -- hence the memset rather than
+     * an initialiser.
+     */
+    static nbgl_content_t contents[1];
+    static nbgl_genericContents_t generic;
+
+    memset(contents, 0, sizeof(contents));
+
+    contents[0].type = BARS_LIST;
+    contents[0].content.barsList.barTexts = bip85_select_app;
+    contents[0].content.barsList.tokens = bip85_select_app_tokens;
+    contents[0].content.barsList.nbBars = ARRAYLEN(bip85_select_app);
+    contents[0].content.barsList.tuneId = TUNE_TAP_CASUAL;
+    contents[0].contentActionCallback = &bip85_select_app_action;
+
+    generic.callbackCallNeeded = false;
+    generic.contentsList = contents;
+    generic.nbContents = 1;
+
+    // Back goes to the menu, which is where this screen is reached from --
+    // the same destination the hand-built back arrow had.
+    nbgl_useCaseGenericConfiguration(UI_STR_NBGL_BIP85_SELECT_APP_TITLE, 0,
+                                     &generic, &display_select_menu_page);
 }
 
 /*
