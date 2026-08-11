@@ -72,11 +72,32 @@ def test_sskr_generate_two_button(device, backend, navigator, set_seed):
     # (ux_bip39_backup_match_flow, src/bagl/ux_nano.c). Asserting it here is
     # what makes the rest of this test mean "generation from a verified
     # phrase" rather than "generation".
-    nano.wait_for_lines(backend, "BIP39 Phrase", "is correct")
+    nano.wait_for_lines(backend, "Your Phrase", "is correct")
 
-    nano.choose_in_flow(backend, "Generate")
+    nano.choose_in_flow(backend, "Set up")
     nano.choose_in_carousel(backend, str(SHARE_COUNT))
     nano.choose_in_carousel(backend, str(THRESHOLD))
+
+    # The review, which is what now stands between a chosen threshold and a
+    # generated set. Its two numbers are the point of it: the scheme names the
+    # format so the sheets can be recovered by something other than this
+    # application, and the total is the size of the copying job, which nothing
+    # in this flow said before.
+    nano.wait_for_lines(backend, "Review", "your Backup")
+    nano.walk_to_lines(backend,
+                       f"SSKR: any {THRESHOLD} of {SHARE_COUNT}",
+                       f"{SHARE_COUNT * SHARE_LENGTH} words to write")
+
+    # And the warning after it, which is the last screen before the words are
+    # drawn. Asserting it here is what says the shares cannot be reached
+    # without passing it.
+    nano.walk_to_lines(backend, "Shares will", "be shown")
+
+    # Both lines. This step is "Generate / Backup Shares" and the idle entry
+    # that started the journey is "Generate / backup shares" in the touch
+    # stack's wording -- matching the first line alone would not say which
+    # screen was reached.
+    nano.choose_in_flow(backend, "Backup Shares")
 
     shares = nano.collect_shares(backend)
 

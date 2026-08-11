@@ -27,6 +27,7 @@
 #include <nbgl_fonts.h>
 #include <nbgl_front.h>
 #include <nbgl_layout.h>
+#include <nbgl_obj.h>
 #include <nbgl_page.h>
 #include <nbgl_use_case.h>
 
@@ -40,7 +41,13 @@
 #include "./layout_generic_screen.h"
 #include "./sskr_shares.h"
 
-#define HEADER_SIZE 50
+/*
+ * Sized on the BIP85 result label, which is the longest thing written into it:
+ * the widest of the three result headers, a newline, and a full derivation
+ * path. Everything else it carries -- "SSKR share 16 of 16", "BIP39 Phrase" --
+ * is far shorter. The _Static_assert below is what holds the number.
+ */
+#define HEADER_SIZE 96
 
 static nbgl_page_t* pageContext;
 
@@ -79,6 +86,51 @@ static char reviewText[(SSKR_SHARES_MAX_LENGTH / 16) + 1] = {0};
          : sizeof(UI_STR_NBGL_BIP85_PWD_LENGTH_TITLE))
 static char keypadTitle[KEYPAD_TITLE_SIZE] = {0};
 
+/*
+ * The values the two review screens display, and the one composed title.
+ *
+ * Same reason the keypad title above cannot be a local: nbgl memorises the
+ * pointer rather than the text. nbgl_useCaseGenericReview() keeps the whole
+ * content list it is handed, `pairs` pointer and all, and the pages are drawn
+ * long after the function that filled them returned; nbgl_useCaseChoice()
+ * keeps `message` and `subMessage` the same way. A composed string on the
+ * stack would be redrawn from freed memory.
+ *
+ * Sized from the formats themselves, as the keypad title is. Every `%d` is two
+ * characters wide, so a composed value is never longer than its own format
+ * literal *provided* every argument stays within two digits -- and the word
+ * total does not: sixteen shares of forty-six words is 736. The
+ * _Static_asserts further down check each bound against the constant that
+ * supplies it rather than assuming any of them.
+ *
+ * One set, not one per screen: the SSKR generation flow and the BIP85
+ * derivation flow are reached from different menu entries, and no screen of
+ * one is on display while a screen of the other is being composed.
+ */
+#define REVIEW_VALUE_SIZE 24
+#define CONFIRM_TITLE_SIZE sizeof(UI_STR_NBGL_SSKR_CLOSE_CONFIRM_TITLE)
+
+static char reviewValueShares[REVIEW_VALUE_SIZE] = {0};
+static char reviewValueThreshold[REVIEW_VALUE_SIZE] = {0};
+static char reviewValueWords[REVIEW_VALUE_SIZE] = {0};
+static char reviewValueApp[REVIEW_VALUE_SIZE] = {0};
+static char reviewValueIndex[REVIEW_VALUE_SIZE] = {0};
+static char reviewValueLength[REVIEW_VALUE_SIZE] = {0};
+static char reviewValuePath[BIP85_PATH_STRING_MAX_LENGTH] = {0};
+// The one explanation row composed at display time; sized on its format, whose
+// only argument is a word count of at most three digits.
+#define EXPLANATION_ROW_SIZE 128
+static char sskrNumbersText[EXPLANATION_ROW_SIZE] = {0};
+_Static_assert(sizeof(UI_STR_NBGL_SSKR_NUMBERS_ROW_WORDS) <=
+                   EXPLANATION_ROW_SIZE,
+               "the composed row is sized on its own format; %d stands for a "
+               "three-digit word count, which is narrower than the two "
+               "characters it replaces");
+static char confirmTitle[CONFIRM_TITLE_SIZE] = {0};
+// Where the BIP85 result label is composed before it replaces headerText.
+// Separate because SPRINTF() cannot read and write the same buffer.
+static char resultLabel[HEADER_SIZE] = {0};
+
 unsigned int tool_type;
 
 /*
@@ -108,6 +160,12 @@ static void display_select_menu_page(void);
 static void display_check_keyboard_page(void);
 static void display_check_result_page(const bool result);
 static void display_backup_explain_page(void);
+static void display_sskr_numbers_page(void);
+static void display_sskr_threshold_concept_page(void);
+static void display_bip85_index_concept_page(void);
+static void display_sskr_select_numshares_page(void);
+static void display_bip85_concept_page(void);
+static void display_recover_concept_page(void);
 static void display_bip39_select_phrase_length_page(void);
 static void display_generic_review(void);
 static void display_sskr_select_numshares_page(void);
@@ -115,17 +173,38 @@ static void display_sskr_select_threshold_page(void);
 static void display_bip85_select_app_page(void);
 static void display_bip85_select_index_page(void);
 static void display_bip85_select_password_length_page(void);
+static void display_sskr_shares_review(void);
+static void display_sskr_close_confirm_page(void);
+static void display_sskr_generate_review_page(void);
+static void display_bip85_generate_review_page(void);
 
 /*
  * Utils
  */
 static const char* buttonTexts[NB_MAX_SUGGESTION_BUTTONS] = {0};
 
+// Where the characters those pointers point at actually live. Declared here
+// rather than beside the keyboard it serves so that reset_globals() below can
+// reach it: the two are one object, and only one of them was being cleared.
+// The longest BIP39 word is 8 characters, 9 with its terminator, and at most
+// NB_MAX_SUGGESTION_BUTTONS are shown.
+static char wordCandidates[(BIP39_MAX_WORD_LENGTH + 1) *
+                           NB_MAX_SUGGESTION_BUTTONS] = {0};
+
 static void reset_globals() {
     bip39_mnemonic_reset();
     sskr_shares_reset();
     bip85_app_reset();
     memzero(buttonTexts, sizeof(buttonTexts[0]) * NB_MAX_SUGGESTION_BUTTONS);
+    // buttonTexts is only the array of pointers; wordCandidates holds the
+    // characters, and it was left behind. What survives there is the set of
+    // BIP-39 words matching the prefix last typed -- not the phrase, but
+    // enough to narrow one of its words -- and the rule this function applies
+    // is "everything a screen composed", not "everything that is itself
+    // secret". textToEnter needs nothing here: both keyboard dispatchers
+    // memzero it before they route anywhere, so it cannot outlive the
+    // keyboard.
+    memzero(wordCandidates, sizeof(wordCandidates));
     memzero(headerText, sizeof(headerText));
     memzero(reviewText, sizeof(reviewText));
     // No secret in it -- a share count and a length range, never a word or a
@@ -133,6 +212,21 @@ static void reset_globals() {
     // class of thing ("SSKR share 2 of 3") and is cleared: leaving one of the
     // two behind would make the rule here look like a judgement call.
     memzero(keypadTitle, sizeof(keypadTitle));
+    // The review values, for the same reason and with one of them mattering
+    // more than the rest: reviewValuePath is the BIP85 derivation path, which
+    // is not a secret but does say exactly which secret was derived. The rule
+    // applied here is "everything a screen composed", not "everything secret",
+    // because deciding that case by case is how one gets left behind.
+    memzero(reviewValueShares, sizeof(reviewValueShares));
+    memzero(reviewValueThreshold, sizeof(reviewValueThreshold));
+    memzero(reviewValueWords, sizeof(reviewValueWords));
+    memzero(resultLabel, sizeof(resultLabel));
+    memzero(reviewValueApp, sizeof(reviewValueApp));
+    memzero(reviewValueIndex, sizeof(reviewValueIndex));
+    memzero(reviewValueLength, sizeof(reviewValueLength));
+    memzero(reviewValuePath, sizeof(reviewValuePath));
+    memzero(confirmTitle, sizeof(confirmTitle));
+    memzero(sskrNumbersText, sizeof(sskrNumbersText));
 }
 
 static void on_quit(void) { os_sched_exit(-1); }
@@ -187,6 +281,17 @@ static void select_menu_callback(nbgl_obj_t* obj, nbgl_touchType_t eventType) {
     if (obj == screenChildren[SELECT_MENU_CHECK_INDEX]) {
         user_intent = USER_INTENT_CHECK;
         tool_type = TOOL_TYPE_BIP39;
+        /*
+         * Straight to the length choice, with nothing explaining why the
+         * Phrase is wanted -- the shape app-recovery-check has, and the one
+         * this journey had before the menu existed.
+         *
+         * Entering the Phrase *is* the task here. Someone who chose "Check
+         * Recovery Phrase" is not owed a screen telling them a check needs
+         * the Phrase. The Backup journey keeps its own, because there the
+         * user asked for Shares and being asked for twenty-four words is a
+         * surprise that has to be accounted for.
+         */
         display_bip39_select_phrase_length_page();
     } else if (obj == screenChildren[SELECT_MENU_BACKUP_INDEX]) {
         user_intent = USER_INTENT_BACKUP;
@@ -195,11 +300,11 @@ static void select_menu_callback(nbgl_obj_t* obj, nbgl_touchType_t eventType) {
     } else if (obj == screenChildren[SELECT_MENU_RECOVER_INDEX]) {
         user_intent = USER_INTENT_RECOVER;
         tool_type = TOOL_TYPE_SSKR;
-        display_check_keyboard_page();
+        display_recover_concept_page();
     } else if (obj == screenChildren[SELECT_MENU_DERIVE_INDEX]) {
         user_intent = USER_INTENT_DERIVE;
         tool_type = TOOL_TYPE_BIP85;
-        display_bip85_select_app_page();
+        display_bip85_concept_page();
     } else if (obj == screenChildren[SELECT_MENU_BACK_BUTTON_INDEX]) {
         display_home_page();
         return;
@@ -265,52 +370,347 @@ static void display_select_menu_page(void) {
 static void select_recover_bip39_choice(bool bip39_rec) {
     nbgl_layoutRelease(layout);
     if (bip39_rec) {
-        SPRINTF(headerText, UI_STR_BIP39_PHRASE_TITLE);
+        SPRINTF(headerText, UI_STR_NBGL_BIP39_PHRASE_TITLE);
         strncpy(reviewText, bip39_mnemonic_get(), bip39_mnemonic_length_get());
         // Ensure null termination
         reviewText[bip39_mnemonic_length_get()] = '\0';
         display_generic_review();
     } else {
+        // display_home_page() calls reset_globals(), and here that matters
+        // more than anywhere else on this path: words_buffer holds the phrase
+        // the shares just rebuilt. Declining erases it rather than leaving it
+        // in RAM behind the home screen.
         display_home_page();
     }
 }
 
+/*
+ * The screen that stands in front of a rebuilt recovery phrase.
+ *
+ * It used to be an offer -- "Recover BIP39 Phrase?", with a description
+ * explaining that the user could choose to rebuild the phrase from their valid
+ * shares. That question had already been answered twice by the time it
+ * appeared: once at the menu, by choosing "Recover from backup", and once by
+ * typing in the shares. What it never said was the only thing worth saying
+ * there, which is that a recovery phrase is about to be drawn on the screen.
+ *
+ * The second sentence of the description is the point the previous change left
+ * implicit. This path shows the rebuilt phrase whether or not it matches the
+ * seed this Ledger holds: check_result_callback() gates it on
+ * sskr_shares_check() succeeding -- that the shares recombined -- and not on
+ * seed_match, unlike the backup flow beside it. That is deliberate and it is
+ * what the feature is for: rebuilding your phrase from your own shares onto a
+ * spare or replacement device is the case a backup exists to serve, and it is
+ * exactly the case where the device does not already hold the phrase.
+ * Requiring a match would delete the feature on the day it is needed.
+ *
+ * So the guard stays where it is and the warning carries what the guard does
+ * not promise: what appears is what the entered shares rebuild, and not
+ * necessarily this device's phrase. The verdict screen immediately before has
+ * already reported whether the two agreed.
+ */
 void display_select_recover_bip39_page(void) {
-    nbgl_useCaseChoice(&BIP39_ICON, UI_STR_NBGL_RECOVER_BIP39_TITLE,
-                       UI_STR_NBGL_RECOVER_BIP39_DESC,
-                       UI_STR_NBGL_RECOVER_BIP39_CONFIRM, UI_STR_NBGL_CANCEL,
+    nbgl_useCaseChoice(&IMPORTANT_CIRCLE_ICON, UI_STR_NBGL_RECOVER_WARN_TITLE,
+                       UI_STR_NBGL_RECOVER_WARN_DESC,
+                       UI_STR_NBGL_CONTINUE_ANYWAY, UI_STR_NBGL_BACK_TO_SAFETY,
                        select_recover_bip39_choice);
 }
 
 /*
- * Backing up: why the phrase is asked for first
+ * The explanation screens.
  *
- * The one screen this change adds to the path the user walks. "Generate
- * backup shares" leads here, and here explains why an application running on
- * a device that already holds the phrase is about to ask for twenty-four
- * words -- compare_recovery_phrase() gets a seed back from the device, never
- * the words, so the words have to come from the person.
+ * Built from the layout API, because the motif has no use-case form: a title
+ * over rows that each carry their own icon. Two facts side by side read as two
+ * facts; folded into one paragraph the second is the tail of a sentence about
+ * something else, and is what a reader skips.
  *
- * It takes the place of "Generate SSKR Phrase?", which used to sit *after*
- * the verdict and ask whether to do the thing the user had not asked for.
- * Declining still lands on the home page, and still through
- * display_home_page(), which is what calls reset_globals(); nothing is entered
- * yet at this point.
+ * nbgl_useCaseAction() was tried instead and draws one centered paragraph, no
+ * rows. nbgl_useCaseGenericReview() was tried before that and draws its reject
+ * text on every page, so each explanation offered to cancel something the
+ * reader had not yet been asked to do. Neither is this motif.
+ *
+ * What carries on is deliberately not a black button. A black button is what
+ * this application uses for an act with a consequence -- entering a phrase,
+ * generating shares, revealing a secret. Reading an explanation is none of
+ * those, and giving it the same weight tells the reader it is one.
+ *
+ * A screen longer than the height allows is several of these in a row, each
+ * carrying on into the next, rather than one screen with a smaller sentence.
+ *
+ * What the height allows, and it is a height rather than a row count. A row
+ * costs INTER_ROWS_MARGIN plus its wrapped lines plus LEFT_CONTENT_TEXT_PADDING,
+ * so three short rows can fit where two long ones do not. Measured from the
+ * rendered screens: about 8 lines of text, comfortable at 7; a one-line title
+ * is about 20 characters and a row line about 26.
+ *
+ * Flex is the binding target, not apex_p. Wrapping turns on single pixels --
+ * apex fit a 29-character line in 236px of 236 while Flex broke the same string
+ * at 22 -- so any string changed here goes back through a Speculos capture on
+ * Flex before it is believed.
  */
-static void backup_explain_choice(bool proceed) {
+enum {
+    EXPLANATION_BACK_TOKEN = FIRST_USER_TOKEN,
+    EXPLANATION_CONFIRM_TOKEN,
+};
+
+typedef struct {
+    const char* title;
+    const char* const* rows;
+    const nbgl_icon_details_t* const* icons;
+    uint8_t nbRows;
+    const char* confirmText;
+    /*
+     * True on the screen that leads to an act rather than to more reading.
+     *
+     * A black button is what this application uses for an act with a
+     * consequence -- entering a phrase, generating shares, revealing a secret.
+     * The screens that only carry on into the next explanation get the grey
+     * tap-to-continue instead, so the weight of the control says which of the
+     * two the reader is about to do.
+     */
+    bool isAction;
+    // Where carrying on leads. Going back always reaches home, so only this
+    // side varies and only it is stored.
+    nbgl_callback_t onConfirm;
+} explanation_page_t;
+
+// The page being drawn, for the shared callback to read. One explanation is on
+// screen at a time, which is what makes a single pointer enough.
+static const explanation_page_t* currentExplanation = NULL;
+
+static void explanation_callback(int token, uint8_t index) {
+    UNUSED(index);
+    const explanation_page_t* page = currentExplanation;
+
     nbgl_layoutRelease(layout);
-    if (proceed) {
-        display_bip39_select_phrase_length_page();
+    if (token == EXPLANATION_CONFIRM_TOKEN) {
+        ((nbgl_callback_t)PIC(page->onConfirm))();
     } else {
         display_home_page();
     }
 }
 
+static void display_explanation_page(const explanation_page_t* page) {
+    currentExplanation = page;
+
+    /*
+     * tapActionText is what makes the whole content tappable and draws the
+     * grey line at the bottom that names the gesture -- lib_nbgl turns it into
+     * an UP_FOOTER_TEXT and wires the container to tapActionToken. It is how
+     * the SDK's own read-then-continue screens carry on, and it leaves the
+     * screen with no button at all.
+     */
+    nbgl_layoutDescription_t layoutDescription = {
+        .modal = false,
+        .tapActionText = page->isAction ? NULL : PIC(page->confirmText),
+        .tapActionToken = EXPLANATION_CONFIRM_TOKEN,
+        .tapTuneId = TUNE_TAP_CASUAL,
+        .onActionCallback = &explanation_callback};
+    layout = nbgl_layoutGet(&layoutDescription);
+
+    nbgl_layoutHeader_t headerDesc = {
+        .type = HEADER_BACK_AND_TEXT,
+        .separationLine = false,
+        .backAndText.token = EXPLANATION_BACK_TOKEN,
+        .backAndText.tuneId = TUNE_TAP_CASUAL,
+        .backAndText.text = NULL};
+    nbgl_layoutAddHeader(layout, &headerDesc);
+
+    /*
+     * PIC() on the two arrays, and it is not decoration.
+     *
+     * nbgl_layoutAddLeftContent() translates what it reads out of them --
+     * PIC(info->rowTexts[row]) and PIC(info->rowIcons[row]) -- but never the
+     * arrays themselves: it indexes info->rowTexts directly. Handed a link-time
+     * address, that read is the same fault bip85_select_app[] took this
+     * application down with, found by the emulator rather than by reading.
+     */
+    nbgl_layoutLeftContent_t content = {
+        .nbRows = page->nbRows,
+        .title = PIC(page->title),
+        .rowTexts = (const char**)PIC(page->rows),
+        .rowIcons = (const nbgl_icon_details_t**)PIC(page->icons)};
+    nbgl_layoutAddLeftContent(layout, &content);
+
+    if (page->isAction) {
+        nbgl_layoutButton_t buttonInfo = {.text = PIC(page->confirmText),
+                                          .icon = NULL,
+                                          .token = EXPLANATION_CONFIRM_TOKEN,
+                                          .style = BLACK_BACKGROUND,
+                                          .fittingContent = false,
+                                          .onBottom = true,
+                                          .tuneId = TUNE_TAP_CASUAL};
+        nbgl_layoutAddButton(layout, &buttonInfo);
+    }
+
+    nbgl_layoutDraw(layout);
+}
+
+/*
+ * The two numbers, read immediately before the keypad that asks for the first
+ * of them. The words per Share depend on the phrase length, unknown at the top
+ * of the journey and known here, so the second row is composed rather than
+ * literal: 29, 38 or 46 words for a 12, 18 or 24-word phrase.
+ */
+static const char* k_sskr_numbers_rows[2] = {0};
+static const nbgl_icon_details_t* const k_sskr_numbers_icons[] = {
+    &SSKR_ICON_SMALL, &CHECKED_ICON};
+
+static void display_sskr_numbers_page(void) {
+    snprintf(sskrNumbersText, sizeof(sskrNumbersText),
+             UI_STR_NBGL_SSKR_NUMBERS_ROW_WORDS,
+             bolos_ux_sskr_share_wordcount(bip39_mnemonic_final_size_get()));
+    k_sskr_numbers_rows[0] = UI_STR_NBGL_SSKR_NUMBERS_ROW_CREATE;
+    k_sskr_numbers_rows[1] = sskrNumbersText;
+
+    // const, like every other page: BOLOS refuses a non-empty .data section,
+    // and only the array this points at changes, never the struct.
+    static const explanation_page_t page = {
+        .title = UI_STR_NBGL_SSKR_NUMBERS_TITLE,
+        .rows = k_sskr_numbers_rows,
+        .icons = k_sskr_numbers_icons,
+        .nbRows = 2,
+        .confirmText = UI_STR_NBGL_EXPLANATION_CONTINUE,
+        .onConfirm = &display_sskr_select_numshares_page};
+    display_explanation_page(&page);
+}
+
+/*
+ * The threshold, read immediately before the keypad titled "Enter threshold
+ * value" -- the only place that word appears cold.
+ */
+static const char* const k_sskr_threshold_rows[] = {
+    UI_STR_NBGL_SSKR_THRESHOLD_CONCEPT_ROW_REBUILD,
+    UI_STR_NBGL_SSKR_THRESHOLD_CONCEPT_ROW_LOST};
+static const nbgl_icon_details_t* const k_sskr_threshold_icons[] = {
+    &SSKR_ICON_SMALL, &CHECKED_ICON};
+
+static void display_sskr_threshold_concept_page(void) {
+    static const explanation_page_t page = {
+        .title = UI_STR_NBGL_SSKR_THRESHOLD_CONCEPT_TITLE,
+        .rows = k_sskr_threshold_rows,
+        .icons = k_sskr_threshold_icons,
+        .nbRows = 2,
+        .confirmText = UI_STR_NBGL_EXPLANATION_CONTINUE,
+        .onConfirm = &display_sskr_select_threshold_page};
+    display_explanation_page(&page);
+}
+
+/*
+ * What an index is, before the keypad that demands one.
+ *
+ * Neither icon means anything here, and that is stated rather than hidden: the
+ * SDK ships no glyph for "one of many" or for a counter, and the app's own
+ * marks name formats. BIP85_ICON_SMALL at least names the standard the index
+ * belongs to; CHECKED_ICON on the second row is a placeholder for a glyph that
+ * does not exist. Both should be revisited if the missing artwork is drawn.
+ */
+static const char* const k_bip85_index_rows[] = {
+    UI_STR_NBGL_BIP85_INDEX_CONCEPT_ROW_TELLS, UI_STR_NBGL_BIP85_INDEX_CONCEPT_ROW_COUNT};
+static const nbgl_icon_details_t* const k_bip85_index_icons[] = {
+    &BIP85_ICON_SMALL, &CHECKED_ICON};
+
+static void display_bip85_index_concept_page(void) {
+    static const explanation_page_t page = {
+        .title = UI_STR_NBGL_BIP85_INDEX_CONCEPT_TITLE,
+        .rows = k_bip85_index_rows,
+        .icons = k_bip85_index_icons,
+        .nbRows = 2,
+        .confirmText = UI_STR_NBGL_EXPLANATION_CONTINUE,
+        .onConfirm = &display_bip85_select_index_page};
+    display_explanation_page(&page);
+}
+
+/*
+ * What deriving means, before an application is chosen. The first row is the
+ * property that makes BIP-85 worth using at all; the other two are the trap it
+ * comes with, and they are deliberately not what the review says. The review
+ * *shows* the path, and showing is not telling.
+ */
+static const char* const k_bip85_concept_rows[] = {
+    UI_STR_NBGL_BIP85_ROW_DERIVED, UI_STR_NBGL_BIP85_ROW_PATH,
+    UI_STR_NBGL_BIP85_ROW_LOST};
+// The format mark is gone from the rows: the whole screen is BIP-85, so a
+// BIP-85 icon on one of three rows distinguishes nothing. ROUND_WARN_ICON is
+// the SDK's own size-agnostic alias and needs none of its own.
+static const nbgl_icon_details_t* const k_bip85_concept_icons[] = {
+    &PRIVACY_ICON, &ROUND_WARN_ICON, &ROUND_WARN_ICON};
+
+static void display_bip85_concept_page(void) {
+    static const explanation_page_t page = {
+        .title = UI_STR_NBGL_BIP85_TITLE,
+        .rows = k_bip85_concept_rows,
+        .icons = k_bip85_concept_icons,
+        .nbRows = 3,
+        .confirmText = UI_STR_NBGL_EXPLANATION_CONTINUE,
+        .onConfirm = &display_bip85_select_app_page};
+    display_explanation_page(&page);
+}
+
+/*
+ * What rebuilding asks for, before the first word.
+ */
+static const char* const k_recover_concept_rows[] = {
+    UI_STR_NBGL_RECOVER_ROW_SUBSET, UI_STR_NBGL_RECOVER_ROW_ORDER};
+static const nbgl_icon_details_t* const k_recover_concept_icons[] = {
+    &SSKR_ICON_SMALL, &CHECKED_ICON};
+
+static void display_recover_concept_page(void) {
+    static const explanation_page_t page = {
+        .title = UI_STR_NBGL_RECOVER_TITLE,
+        .rows = k_recover_concept_rows,
+        .icons = k_recover_concept_icons,
+        .nbRows = 2,
+        .isAction = true,
+        .confirmText = UI_STR_NBGL_EXPLANATION_CONTINUE,
+        .onConfirm = &display_check_keyboard_page};
+    display_explanation_page(&page);
+}
+
+/*
+ * The Backup journey, on two screens.
+ *
+ * The first is SSKR: what the journey makes, and what has to be done with what
+ * it makes. Those two are one subject and belong side by side -- splitting a
+ * Phrase into Shares is only a backup if the Shares are kept apart, and a
+ * reader who writes them all on one sheet has made a copy of their Phrase and
+ * none of the safety.
+ *
+ * The second is why the Phrase is asked for, which is a different subject and
+ * is the screen that leads to the keyboard. One screen could not hold both:
+ * four rows do not fit, and the title had to promise one subject or the other.
+ */
+static const char* const k_backup_sskr_rows[] = {
+    UI_STR_NBGL_BACKUP_ROW_SPLIT, UI_STR_NBGL_BACKUP_ROW_APART};
+static const nbgl_icon_details_t* const k_backup_sskr_icons[] = {
+    &SSKR_ICON_SMALL, &PRIVACY_ICON};
+
+static const char* const k_backup_phrase_rows[] = {
+    UI_STR_NBGL_PHRASE_NOT_READABLE, UI_STR_NBGL_BACKUP_ROW_CHECKED};
+static const nbgl_icon_details_t* const k_backup_phrase_icons[] = {
+    &PRIVACY_ICON, &CHECKED_ICON};
+
+static void display_backup_explain_page_2(void) {
+    static const explanation_page_t page = {
+        .title = UI_STR_NBGL_BACKUP_PHRASE_TITLE,
+        .rows = k_backup_phrase_rows,
+        .icons = k_backup_phrase_icons,
+        .nbRows = 2,
+        .isAction = true,
+        .confirmText = UI_STR_NBGL_BACKUP_EXPLAIN_CONFIRM,
+        .onConfirm = &display_bip39_select_phrase_length_page};
+    display_explanation_page(&page);
+}
+
 static void display_backup_explain_page(void) {
-    nbgl_useCaseChoice(&SSKR_ICON, UI_STR_NBGL_BACKUP_EXPLAIN_TITLE,
-                       UI_STR_NBGL_BACKUP_EXPLAIN_DESC,
-                       UI_STR_NBGL_BACKUP_EXPLAIN_CONFIRM, UI_STR_NBGL_CANCEL,
-                       backup_explain_choice);
+    static const explanation_page_t page = {
+        .title = UI_STR_NBGL_BACKUP_SSKR_TITLE,
+        .rows = k_backup_sskr_rows,
+        .icons = k_backup_sskr_icons,
+        .nbRows = 2,
+        .confirmText = UI_STR_NBGL_EXPLANATION_CONTINUE,
+        .onConfirm = &display_backup_explain_page_2};
+    display_explanation_page(&page);
 }
 
 /*
@@ -370,7 +770,11 @@ static void select_bip39_phrase_length_callback(nbgl_obj_t* obj,
         return;
     }
     if (user_intent == USER_INTENT_DERIVE) {
-        display_bip85_select_index_page();
+        // The explanation, not the keypad. Only on this path: the same keypad
+        // is re-entered from its own range error further down, and an
+        // explanation between a rejected value and a second attempt would read
+        // as a reprimand.
+        display_bip85_index_concept_page();
     } else {
         display_check_keyboard_page();
     }
@@ -454,10 +858,6 @@ enum __attribute__((packed)) check {
 static char textToEnter[BIP39_MAX_WORD_LENGTH + 1] = {0};
 static int keyboardIndex = 0;
 static bool seed_match = false;
-// the biggest word of BIP39 list is 8 char (9 with trailing '\0'), and
-// the max number of showed suggestions is NB_MAX_SUGGESTION_BUTTONS
-static char wordCandidates[(BIP39_MAX_WORD_LENGTH + 1) *
-                           NB_MAX_SUGGESTION_BUTTONS] = {0};
 
 /*
  * Function called when a key of keyboard is touched
@@ -700,7 +1100,10 @@ static void check_result_callback(int token __attribute__((unused)),
     switch (user_intent) {
         case USER_INTENT_BACKUP:
             if (bip39_mnemonic_check(&seed_match) && seed_match) {
-                display_sskr_select_numshares_page();
+                // The numbers screen, not the keypad: it is the screen that
+                // says what the two numbers the keypads ask for decide, and it
+                // is only from here that the words-per-Share figure exists.
+                display_sskr_numbers_page();
                 return;
             }
             break;
@@ -748,9 +1151,10 @@ enum __attribute__((packed)) verdict_outcome {
  * instead of borrowing a sentence about a phrase it never compared.
  */
 _Static_assert(USER_INTENT_NB == 4,
-               "verdict_body[] has one row per intention and the backup row "
-               "does not say what the check row says on the same tool; a new "
-               "intention needs a decision here, not a default row");
+               "verdict_body[] and verdict_title[] have one row per intention, "
+               "and neither the backup row nor the recover row says what the "
+               "check row says on the same tool; a new intention needs a "
+               "decision in both, not a default row");
 static const char* const verdict_body[USER_INTENT_NB][OUTCOME_NB] = {
     [USER_INTENT_CHECK] = {UI_STR_NBGL_RESULT_BIP39_INVALID,
                            UI_STR_NBGL_RESULT_BIP39_NOMATCH,
@@ -769,9 +1173,23 @@ static void display_check_result_page(const bool result) {
     // (ux_bip39_invalid_flow / ux_bip39_check_nomatch_flow /
     // ux_bip39_check_match_flow and their SSKR equivalents) already give the
     // user.
-    static const char* const titles[OUTCOME_NB] = {
-        UI_STR_NBGL_RESULT_INVALID_TITLE, UI_STR_NBGL_RESULT_NOMATCH_TITLE,
-        UI_STR_NBGL_RESULT_VALID_TITLE};
+    // The title names the object the user handed over, which is not the same
+    // object on every journey: Check and Backup take a phrase, Recover takes a
+    // set of shares. It was a single row, so the Recover verdict was titled
+    // after a phrase that screen never received -- see
+    // UI_STR_NBGL_RESULT_SHARES_VALID_TITLE. Same shape as verdict_body[][],
+    // and indexed by the same two values.
+    static const char* const verdict_title[USER_INTENT_NB][OUTCOME_NB] = {
+        [USER_INTENT_CHECK] = {UI_STR_NBGL_RESULT_PHRASE_INVALID_TITLE,
+                               UI_STR_NBGL_RESULT_PHRASE_NOMATCH_TITLE,
+                               UI_STR_NBGL_RESULT_PHRASE_VALID_TITLE},
+        [USER_INTENT_BACKUP] = {UI_STR_NBGL_RESULT_PHRASE_INVALID_TITLE,
+                                UI_STR_NBGL_RESULT_PHRASE_NOMATCH_TITLE,
+                                UI_STR_NBGL_RESULT_PHRASE_VALID_TITLE},
+        [USER_INTENT_RECOVER] = {UI_STR_NBGL_RESULT_SHARES_INVALID_TITLE,
+                                 UI_STR_NBGL_RESULT_SHARES_NOMATCH_TITLE,
+                                 UI_STR_NBGL_RESULT_SHARES_VALID_TITLE},
+    };
     static const nbgl_icon_details_t* const icons[OUTCOME_NB] = {
         &DENIED_CIRCLE_ICON, &IMPORTANT_CIRCLE_ICON, &CHECK_CIRCLE_ICON};
 
@@ -784,9 +1202,9 @@ static void display_check_result_page(const bool result) {
     //
     // The static assertion on verdict_body[] says a new intention has to be
     // given a row. It says nothing about a byte that is not an intention at
-    // all: user_intent is a packed enum, one byte of static RAM, and this is
-    // the only array in this file indexed by it. USER_INTENT_NB is itself out
-    // of range and is a case label in three switches, so it is a value the
+    // all: user_intent is a packed enum, one byte of static RAM, and the two
+    // tables below are the only ones indexed by it. USER_INTENT_NB is itself
+    // out of range and is a case label in three switches, so it is a value the
     // code already handles rather than one nothing can hold.
     //
     // The arithmetic this table replaced carried such a bound -- it clamped
@@ -801,7 +1219,7 @@ static void display_check_result_page(const bool result) {
 
     nbgl_pageInfoDescription_t info = {
         .centeredInfo.icon = icons[outcome],
-        .centeredInfo.text1 = titles[outcome],
+        .centeredInfo.text1 = verdict_title[wording][outcome],
         .centeredInfo.text2 = verdict_body[wording][outcome],
         // Advice only on the invalid outcome; NULL elsewhere.
         // LARGE_CASE_GRAY_INFO is required for this to render as its own gray
@@ -851,6 +1269,66 @@ _Static_assert(SSS_MAX_SHARE_COUNT == 16,
 _Static_assert(SSS_MAX_SHARE_COUNT <= 99,
                "the composed threshold title assumes a two-digit share count");
 
+/*
+ * The review values, bounded against the constants that supply them rather
+ * than against the formats that print them.
+ *
+ * The word total is the one that does not fit the two-digit assumption every
+ * other composed string in this file makes: sixteen shares of a 24-word phrase
+ * is 736 words, so "%d (%d per share)" reaches 18 characters where its own
+ * format literal is 17. That is exactly the case sizing a buffer on
+ * `sizeof(format)` gets wrong, which is why these are sized on a constant and
+ * checked here instead.
+ *
+ * SSKR_LONGEST_SHARE_WORDCOUNT is not read from bolos_ux_sskr_share_wordcount()
+ * -- that is a function, and this is a compile-time bound. It is the value that
+ * function returns for the longest phrase, which
+ * tests/unit/tests/sskr_share_wordcount.c pins against a generated set.
+ */
+#define SSKR_LONGEST_SHARE_WORDCOUNT 46
+_Static_assert(SSS_MAX_SHARE_COUNT* SSKR_LONGEST_SHARE_WORDCOUNT <= 9999,
+               "the word total is composed into a '%d' that REVIEW_VALUE_SIZE "
+               "has to hold");
+// The widest composed review value is the word total: its two "%d" are two
+// characters each in the format and expand to at most four and two digits, so
+// the buffer needs two characters more than the literal.
+_Static_assert(sizeof(UI_STR_NBGL_SSKR_REVIEW_WORDS_VALUE) + 2 <=
+                   REVIEW_VALUE_SIZE,
+               "the word total value has to fit its widest composition");
+_Static_assert(sizeof(UI_STR_NBGL_SSKR_REVIEW_COUNT_VALUE) <= REVIEW_VALUE_SIZE,
+               "the share count and threshold are two-digit arguments, so the "
+               "format literal is at least as wide as what it composes");
+
+_Static_assert(sizeof(UI_STR_NBGL_BIP85_REVIEW_LENGTH_WORDS) <=
+                       REVIEW_VALUE_SIZE &&
+                   sizeof(UI_STR_NBGL_BIP85_REVIEW_LENGTH_CHARACTERS) <=
+                       REVIEW_VALUE_SIZE,
+               "both length phrases have two-digit arguments, so each format "
+               "literal is at least as wide as what it composes");
+
+// The BIP85 index reaches seven digits (BIP85_INDEX_MAX_NUMBER_LENGTH), where
+// its "%d" format is two characters -- five more than the literal.
+_Static_assert(sizeof(UI_STR_NBGL_BIP85_REVIEW_INDEX_VALUE) + 5 <=
+                   REVIEW_VALUE_SIZE,
+               "the BIP85 index composes up to seven digits into a '%d'");
+
+// The BIP85 result label is the longest thing HEADER_SIZE has to hold: the
+// widest of the three result headers with a seven-digit index, a newline, and
+// a full derivation path. Bounded against the parts rather than against the
+// "%s\n%s" that joins them, which accounts for none of it.
+_Static_assert(sizeof(UI_STR_NBGL_BIP85_BASE64_HEADER) + 5 + 1 +
+                       BIP85_PATH_STRING_MAX_LENGTH <=
+                   HEADER_SIZE,
+               "headerText has to hold a BIP85 result header, a newline and a "
+               "full derivation path; a label cut short would show a path that "
+               "is wrong rather than one that is missing");
+
+// The close confirmation composes the share count into a title sized on its
+// own format, which holds only while that count stays two digits.
+_Static_assert(SSS_MAX_SHARE_COUNT <= 99,
+               "UI_STR_NBGL_SSKR_CLOSE_CONFIRM_TITLE sizes its buffer on its "
+               "format literal, which assumes a two-digit share count");
+
 // The smallest threshold this screen accepts, and the one its title announces.
 // A threshold of 1 over more than one share means any single share rebuilds
 // the secret; sskr_threshold_validate() refuses that, so the floor is 2 as
@@ -873,7 +1351,11 @@ static void sskr_sharenum_validate(const uint8_t* sharenumentry,
     PRINTF("Number of shares entered is '%d'\n", sskr_sharenum_get());
 
     if (sskr_sharenum_get() > 0 && sskr_sharenum_get() <= SSS_MAX_SHARE_COUNT) {
-        display_sskr_select_threshold_page();
+        // The explanation, not the keypad, and only from here. The three
+        // status pages further down return straight to
+        // display_sskr_select_threshold_page(), because an explanation between
+        // a refused value and a second attempt reads as a reprimand.
+        display_sskr_threshold_concept_page();
     } else {
         // Back to this keypad, not to the head of the flow: the only thing
         // wrong is the number that was just typed, and it is the only thing
@@ -900,7 +1382,7 @@ static void review_done(void) {
     display_home_page();
 }
 
-static void display_generic_review() {
+static void display_generic_review(void) {
     static nbgl_layoutTagValue_t pairs[1];
     static const nbgl_content_t content[1] = {
         {.type = TAG_VALUE_LIST,
@@ -956,15 +1438,224 @@ static void review_sskr_shares_contentGetter(uint8_t index,
     pairs[0].value = PIC(reviewText);
 }
 
-static void display_sskr_shares(void) {
-    sskr_shares_from_bip39_mnemonic();
-
+/*
+ * Closing the shares screen destroys them, so it now says so first.
+ *
+ * review_done() ran reset_globals() and went home: the back arrow on the last
+ * share was indistinguishable from the back arrow anywhere else, except that
+ * it cost the twenty-four words needed to make the set again.
+ *
+ * nbgl_useCaseConfirm() and not nbgl_useCaseChoice(), which is what this first
+ * used. The two look alike and behave differently in the one way that matters
+ * here: Confirm is a *modal*, drawn over the screen that is already up, and
+ * declining it releases the modal and redraws that screen. Choice replaces the
+ * screen, so declining meant redrawing the share review by hand -- which
+ * worked, but reimplemented what the component does on its own.
+ *
+ * That is also why this is the one confirmation in the application with no
+ * reject callback and no "Back to safety": there is nothing to route a refusal
+ * to. Refusing here is not a refusal to reveal, it is a refusal to leave, and
+ * the shares are still on the screen underneath.
+ *
+ * Nothing regenerates on the way back, which matters:
+ * bolos_ux_bip39_to_sskr_convert() memzeroes the mnemonic buffer it read, so a
+ * second generation would split an erased phrase. The shares themselves are
+ * still in sskr_shares_get(), untouched -- nothing on this path resets them.
+ */
+static void display_sskr_shares_review(void) {
     static nbgl_genericContents_t genericContent;
     genericContent.callbackCallNeeded = true;
     genericContent.contentGetterCallback = review_sskr_shares_contentGetter;
     genericContent.nbContents = sskr_sharecount_get();
 
-    nbgl_useCaseGenericReview(&genericContent, UI_STR_NBGL_CLOSE, review_done);
+    nbgl_useCaseGenericReview(&genericContent, UI_STR_NBGL_CLOSE,
+                              display_sskr_close_confirm_page);
+}
+
+static void sskr_shares_close_confirmed(void) {
+    reset_globals();
+    display_home_page();
+}
+
+static void display_sskr_close_confirm_page(void) {
+    // SPRINTF() is snprintf() bounded by the destination's size (os_print.h),
+    // so the title is truncated and terminated whatever the count expands to.
+    // The count is at most SSS_MAX_SHARE_COUNT, which the _Static_assert below
+    // holds to two digits.
+    SPRINTF(confirmTitle, UI_STR_NBGL_SSKR_CLOSE_CONFIRM_TITLE,
+            sskr_sharecount_get());
+
+    // The icon is the component's own: nbgl_useCaseConfirm() sets
+    // IMPORTANT_CIRCLE_ICON itself and takes no icon argument.
+    nbgl_useCaseConfirm(confirmTitle, UI_STR_NBGL_SSKR_CLOSE_CONFIRM_DESC,
+                        UI_STR_NBGL_SSKR_CLOSE_CONFIRM_YES,
+                        UI_STR_NBGL_SSKR_CLOSE_CONFIRM_NO,
+                        sskr_shares_close_confirmed);
+}
+
+static void generate_and_display_sskr_shares(void) {
+    sskr_shares_from_bip39_mnemonic();
+    display_sskr_shares_review();
+}
+
+/*
+ * The review, and the number that was never on screen before it.
+ *
+ * "Words to copy" is the point. A 3-of-5 over a 24-word phrase is 230 words to
+ * write out by hand, and the only thing the application used to say about that
+ * was the threshold keypad, two screens earlier. The per-share figure is kept
+ * beside the total because it is the one that says how big each sheet is.
+ *
+ * The totals come from bolos_ux_sskr_share_wordcount(), which is the
+ * generator's own arithmetic rather than a table -- nothing is generated yet
+ * at this point, so bolos_ux_sskr_share_slice() and sskr_sharecount_get()
+ * cannot answer. See src/common/sskr/common_sskr.h for why that second route
+ * exists and what holds it to the first.
+ *
+ * Rejecting costs two gestures rather than one, and that is the SDK's doing:
+ * bundleNavReviewChoice() (lib_nbgl/src/nbgl_use_case.c) answers a rejected
+ * review with a hardcoded "Reject operation?" confirmation before it calls
+ * back. Both gestures end here, at display_home_page() and so at
+ * reset_globals().
+ */
+/*
+ * The component both reviews are built on, and why it is this one.
+ *
+ * nbgl_useCaseGenericReview() walks a list of contents: the tag/value pairs
+ * first, then an INFO_LONG_PRESS page carrying the alert icon, the sentence
+ * about what is going to be drawn, and the button that performs the act. There
+ * is no separate warning screen after it, which is what makes accepting the
+ * review the whole of "accept what it offered".
+ *
+ * nbgl_useCaseStaticReviewLight() was used here first and this replaces it,
+ * for two reasons, both measured under Speculos on Flex rather than read:
+ *
+ *   - it ignores the reject text it is given. It writes UNUSED(rejectText) and
+ *     calls prepareNavInfo(..., getRejectReviewText(TYPE_OPERATION)), so the
+ *     footer said "Reject" whatever was passed. This screen is not rejecting
+ *     an operation someone else proposed -- the user is abandoning a setting
+ *     they chose themselves -- and the footer now reads UI_STR_NBGL_CANCEL
+ *     because the use case honours the argument.
+ *
+ *   - its long-press button did not require the long press. The same tap, in
+ *     the same test, revealed the secret under the old component and does
+ *     nothing under this one: the hold is real here. That is the whole point
+ *     of the control on a page that is about to draw a secret.
+ *
+ * Neither nbgl_useCaseReview() nor nbgl_useCaseReviewLight() would do instead:
+ * they hardcode "Hold to sign" and "Approve", and neither draws anything at
+ * all in this application -- the screen underneath simply stays up, from a
+ * keypad validation callback and from a plain button callback alike.
+ *
+ * The button's token is a user token routed through the content's own
+ * contentActionCallback. Unknown tokens fall through to it, which is what lets
+ * a generic review carry a working button of its own.
+ */
+#define REVIEW_CONFIRM_TOKEN (FIRST_USER_TOKEN + 20)
+
+// Where display_review() leaves what accepting leads to, for the callback
+// below to reach. One review is on screen at a time, which is what makes a
+// single pointer enough.
+//
+// Only the accepting side is stored. Both reviews refuse the same way -- back
+// to the home page, which is also reset_globals() -- so a per-review reject
+// callback would be two identical functions and a parameter that never varies.
+static nbgl_callback_t reviewOnApprove = NULL;
+
+static void review_action_callback(int token, uint8_t index, int page) {
+    UNUSED(index);
+    UNUSED(page);
+    if (token == REVIEW_CONFIRM_TOKEN && reviewOnApprove != NULL) {
+        reviewOnApprove();
+    }
+}
+
+static void display_review(const nbgl_contentTagValue_t* pairs, uint8_t nbPairs,
+                           const char* warning, const char* finishButton,
+                           nbgl_callback_t onApprove) {
+    /*
+     * Static, and it has to be: nbgl_useCaseGenericReview() keeps the pointer
+     * it is handed and reads it again on every page turn, so a local would be
+     * a dangling read on the first tap. Uninitialised, because BOLOS refuses a
+     * non-empty .data section.
+     */
+    static nbgl_content_t contents[2];
+    static nbgl_genericContents_t generic;
+
+    memset(contents, 0, sizeof(contents));
+
+    contents[0].type = TAG_VALUE_LIST;
+    contents[0].content.tagValueList.pairs = pairs;
+    contents[0].content.tagValueList.nbPairs = nbPairs;
+    contents[0].content.tagValueList.startIndex = 0;
+    contents[0].content.tagValueList.callback = NULL;
+    contents[0].content.tagValueList.actionCallback = NULL;
+    contents[0].content.tagValueList.hideEndOfLastLine = false;
+    contents[0].content.tagValueList.nbMaxLinesForValue = 0;
+    contents[0].content.tagValueList.token = 0;
+    // Set for completeness only: displayGenericContextPage() forces it false
+    // for every TAG_VALUE_LIST, so the values are drawn in LARGE_MEDIUM_FONT
+    // whatever is asked for here.
+    contents[0].content.tagValueList.smallCaseForValue = false;
+    // Wraps values on spaces rather than mid-word. The BIP85 path has no space
+    // in it and so cannot be wrapped at all -- it is given a pair of its own
+    // for that reason, and its width is measured under Speculos rather than
+    // assumed.
+    contents[0].content.tagValueList.wrapping = true;
+
+    contents[1].type = INFO_LONG_PRESS;
+    contents[1].content.infoLongPress.text = warning;
+    contents[1].content.infoLongPress.icon = &IMPORTANT_CIRCLE_ICON;
+    contents[1].content.infoLongPress.longPressText = finishButton;
+    contents[1].content.infoLongPress.longPressToken = REVIEW_CONFIRM_TOKEN;
+    contents[1].content.infoLongPress.tuneId = TUNE_TAP_CASUAL;
+    contents[1].contentActionCallback = &review_action_callback;
+
+    generic.callbackCallNeeded = false;
+    generic.contentsList = contents;
+    generic.nbContents = 2;
+
+    reviewOnApprove = onApprove;
+    nbgl_useCaseGenericReview(&generic, UI_STR_NBGL_CANCEL, &display_home_page);
+}
+
+static void display_sskr_generate_review_page(void) {
+    static nbgl_contentTagValue_t pairs[4];
+
+    const uint8_t words_per_share =
+        bolos_ux_sskr_share_wordcount(bip39_mnemonic_final_size_get());
+
+    // SPRINTF() is snprintf() bounded by the destination (os_print.h), and the
+    // _Static_asserts above bound every argument, so each of these is
+    // terminated whatever its numbers expand to.
+    SPRINTF(reviewValueShares, UI_STR_NBGL_SSKR_REVIEW_COUNT_VALUE,
+            sskr_sharenum_get());
+    SPRINTF(reviewValueThreshold, UI_STR_NBGL_SSKR_REVIEW_COUNT_VALUE,
+            sskr_threshold_get());
+    // A single share is a legitimate scheme -- sskr_threshold_min() allows
+    // 1-of-1 -- and there the total and the per-share figure are the same
+    // number, so the parenthesis would repeat it.
+    if (sskr_sharenum_get() > 1) {
+        SPRINTF(reviewValueWords, UI_STR_NBGL_SSKR_REVIEW_WORDS_VALUE,
+                words_per_share * sskr_sharenum_get(), words_per_share);
+    } else {
+        SPRINTF(reviewValueWords, UI_STR_NBGL_SSKR_REVIEW_WORDS_VALUE_SINGLE,
+                words_per_share * sskr_sharenum_get());
+    }
+
+    // Format first, as the BIP85 review leads with the application: what this
+    // is, then the parameters that shape it, then what it will cost to copy.
+    pairs[0].item = UI_STR_NBGL_SSKR_REVIEW_ITEM_FORMAT;
+    pairs[0].value = UI_STR_NBGL_SSKR_REVIEW_FORMAT_VALUE;
+    pairs[1].item = UI_STR_NBGL_SSKR_REVIEW_ITEM_SHARES;
+    pairs[1].value = PIC(reviewValueShares);
+    pairs[2].item = UI_STR_NBGL_SSKR_REVIEW_ITEM_THRESHOLD;
+    pairs[2].value = PIC(reviewValueThreshold);
+    pairs[3].item = UI_STR_NBGL_SSKR_REVIEW_ITEM_WORDS;
+    pairs[3].value = PIC(reviewValueWords);
+
+    display_review(pairs, 4, UI_STR_NBGL_SSKR_REVEAL_WARN,
+                   UI_STR_NBGL_SSKR_REVIEW_FINISH, &generate_and_display_sskr_shares);
 }
 
 static void sskr_threshold_validate(const uint8_t* thresholdentry,
@@ -1002,7 +1693,11 @@ static void sskr_threshold_validate(const uint8_t* thresholdentry,
         nbgl_useCaseStatus(UI_STR_NBGL_SSKR_THRESHOLD_ONE_OF_M_ERROR, false,
                            display_sskr_select_threshold_page);
     } else {
-        display_sskr_shares();
+        // The threshold being accepted no longer generates anything. It leads
+        // to the review, which is the first screen that says how much there is
+        // to write down, and generation happens only after that review has
+        // been approved and the warning after it accepted.
+        display_sskr_generate_review_page();
     }
 }
 
@@ -1042,6 +1737,180 @@ enum __attribute__((packed)) select_bip85_app {
 static const char* bip85_select_app[] = {UI_STR_NBGL_BIP85_APP_BIP39,
                                          UI_STR_NBGL_BIP85_APP_PWD_BASE64,
                                          UI_STR_NBGL_BIP85_APP_PWD_BASE85};
+
+/*
+ * Deriving, and then showing what was derived.
+ *
+ * This is what used to sit inline in bip85_index_validate(), on three branches
+ * that each generated a secret and drew it in the same breath. It is a
+ * function of its own now for the same reason the SSKR path grew one: the
+ * derivation has to happen after the review and the warning, not on the way to
+ * them, and something has to be callable from the far side of two callbacks.
+ *
+ * The switch has no default and covers the enumeration, so a fourth
+ * application is a -Wswitch diagnostic here rather than a screen that draws an
+ * empty review. The old default branch, which sent the user back to the
+ * application list, is gone with it: it could only be reached by a
+ * bip85_type_get() no button sets.
+ */
+static void bip85_generate_and_display(void) {
+    switch ((enum bip85_app_type)bip85_type_get()) {
+        case BIP85_APP_BIP39:
+            bip85_app_bip39_gen();
+            SPRINTF(headerText, UI_STR_NBGL_BIP85_BIP39_HEADER,
+                    bip85_index_get());
+            strncpy(reviewText, bip39_mnemonic_get(),
+                    bip39_mnemonic_length_get());
+            // Ensure null termination
+            reviewText[bip39_mnemonic_length_get()] = '\0';
+            break;
+        case BIP85_APP_PWD_BASE64:
+            SPRINTF(headerText, UI_STR_NBGL_BIP85_BASE64_HEADER,
+                    bip85_index_get());
+            strncpy(reviewText, (const char*)bip85_app_pwd_base64_gen(),
+                    bip85_length_get());
+            // Ensure null termination
+            reviewText[bip85_length_get()] = '\0';
+            break;
+        case BIP85_APP_PWD_BASE85:
+            SPRINTF(headerText, UI_STR_NBGL_BIP85_BASE85_HEADER,
+                    bip85_index_get());
+            strncpy(reviewText, (const char*)bip85_app_pwd_base85_gen(),
+                    bip85_length_get());
+            // Ensure null termination
+            reviewText[bip85_length_get()] = '\0';
+            break;
+    }
+
+    /*
+     * The path goes into the label, not into a row of its own.
+     *
+     * The review before this screen showed it too, and that is deliberate --
+     * one is where the user decides, this is where the user copies. But the
+     * first attempt put it here as a second tag/value pair and measurement
+     * killed that: a 24-word phrase is long enough that the two pairs
+     * paginated onto separate pages, so the path was one swipe away from the
+     * words it belongs to. A pair is never split across pages, so folding the
+     * path into the item of the pair that carries the secret is what
+     * guarantees the two are read, and copied, together.
+     *
+     * Composed from headerText rather than into it: SPRINTF() cannot take its
+     * own destination as an argument.
+     */
+    SPRINTF(resultLabel, UI_STR_NBGL_BIP85_RESULT_LABEL, headerText,
+            reviewValuePath);
+    strncpy(headerText, resultLabel, sizeof(headerText) - 1);
+    headerText[sizeof(headerText) - 1] = '\0';
+
+    display_generic_review();
+}
+
+/*
+ * The review, and the path.
+ *
+ * The three parameters of a BIP-85 derivation are collected on three separate
+ * screens and were never shown together anywhere; the path they combine into
+ * was never shown at all. That is what made a derived password unusable as
+ * anything but a one-off: reproducing it elsewhere -- which is the only reason
+ * to derive rather than store -- needs `m/83696968'/707764'/21'/0'`, and the
+ * only way to recover that from this application was to remember which three
+ * screens had been tapped.
+ *
+ * The path is not assembled here. bip85_app_path_format() calls the formatter
+ * that lives beside the derivation it pairs with, with the arguments that
+ * derivation is called with, so what is drawn is what will be walked. When it
+ * cannot render one -- which for these three applications means only that the
+ * buffer was too small -- nothing is shown rather than something plausible,
+ * and the review is not opened at all.
+ */
+static void display_bip85_generate_review_page(void) {
+    static nbgl_contentTagValue_t pairs[5];
+
+    /*
+     * Before the derivation, and that ordering is load-bearing.
+     *
+     * app_data.length is both what the user asked for and where the derivation
+     * puts what it produced -- bip85_app_generate() assigns its own return
+     * value back into it. The path is built from the *requested* length, so
+     * formatting it after the derivation would print whatever the derivation
+     * returned instead. It is called once, here, and the result screen reuses
+     * reviewValuePath rather than rebuilding it, which is what keeps the two
+     * screens showing the same path.
+     */
+    if (!bip85_app_path_format(reviewValuePath, sizeof(reviewValuePath))) {
+        // Unreachable from the screens: every button sets one of the three
+        // applications, and BIP85_PATH_STRING_MAX_LENGTH covers the widest
+        // path any of them can build. Kept because the alternative to
+        // returning here is drawing a review whose path field is empty, which
+        // is the one thing this screen must never do -- an absent path reads
+        // as "no path needed" rather than as a failure.
+        nbgl_useCaseStatus(UI_STR_NBGL_BIP85_INDEX_RANGE_ERROR, false,
+                           display_bip85_select_index_page);
+        return;
+    }
+
+    SPRINTF(reviewValueIndex, UI_STR_NBGL_BIP85_REVIEW_INDEX_VALUE,
+            bip85_index_get());
+
+    // The two kinds of length this flow has. A BIP39 derivation is measured in
+    // words and takes its size from the length screen the flow shares with the
+    // check flow; a password is measured in characters and takes it from its
+    // own keypad. Naming the unit is what stops "24" and "24" meaning two
+    // different things on the same row.
+    switch ((enum bip85_app_type)bip85_type_get()) {
+        case BIP85_APP_BIP39:
+            SPRINTF(reviewValueLength, UI_STR_NBGL_BIP85_REVIEW_LENGTH_WORDS,
+                    bip39_mnemonic_final_size_get());
+            break;
+        case BIP85_APP_PWD_BASE64:
+        case BIP85_APP_PWD_BASE85:
+            SPRINTF(reviewValueLength,
+                    UI_STR_NBGL_BIP85_REVIEW_LENGTH_CHARACTERS,
+                    bip85_length_get());
+            break;
+    }
+
+    pairs[0].item = UI_STR_NBGL_BIP85_REVIEW_ITEM_APP;
+    // PIC(), and it is not decoration. bip85_select_app[] is a table of
+    // pointers to literals, so each entry is a link-time address that has to
+    // be translated before the string is read. Handing an untranslated one to
+    // a tag/value pair takes the application down -- measured under Speculos
+    // on Flex, where this line without PIC() killed it on the way into the
+    // review, and with it the review draws.
+    //
+    // The same pointers are assigned straight to button labels on the
+    // selection screen without PIC(), which is why this looked safe: that path
+    // survives because of what the button drawing does with them, not because
+    // the pointers are usable as they stand.
+    if (bip85_type_get() == BIP85_APP_BIP39) {
+        SPRINTF(reviewValueApp, UI_STR_NBGL_BIP85_REVIEW_APP_WITH_LANGUAGE,
+                (const char*)PIC(bip85_select_app[bip85_type_get()]),
+                UI_STR_NBGL_BIP85_LANGUAGE_ENGLISH);
+        pairs[0].value = PIC(reviewValueApp);
+    } else {
+        pairs[0].value = (const char*)PIC(bip85_select_app[bip85_type_get()]);
+    }
+    pairs[1].item = UI_STR_NBGL_BIP85_REVIEW_ITEM_LENGTH;
+    pairs[1].value = PIC(reviewValueLength);
+    pairs[2].item = UI_STR_NBGL_BIP85_REVIEW_ITEM_INDEX;
+    pairs[2].value = PIC(reviewValueIndex);
+    pairs[3].item = UI_STR_NBGL_BIP85_REVIEW_ITEM_PATH;
+    pairs[3].value = PIC(reviewValuePath);
+
+    // The third arm of the same distinction the two switches above make. A
+    // BIP39 derivation is twenty-four words that would restore *a* wallet, so
+    // its warning says which one it is not; a password cannot be mistaken for
+    // a recovery phrase, so saying it is not one would be a sentence about
+    // nothing. See UI_STR_NBGL_BIP85_REVEAL_WARN_BIP39 in ui_strings.h.
+    const char* warning = UI_STR_NBGL_BIP85_REVEAL_WARN_PWD;
+    if (bip85_type_get() == BIP85_APP_BIP39) {
+        warning = UI_STR_NBGL_BIP85_REVEAL_WARN_BIP39;
+    }
+
+    display_review(pairs, 4, warning, UI_STR_NBGL_BIP85_REVIEW_FINISH,
+                   &bip85_generate_and_display);
+}
+
 static void bip85_index_validate(const uint8_t* indexentry, uint8_t length) {
     // Code to validate BIP85 index
 
@@ -1071,39 +1940,12 @@ static void bip85_index_validate(const uint8_t* indexentry, uint8_t length) {
     // because it is addressed to whoever is typing, and 9,999,999 is what
     // they can actually enter.
     if (bip85_index_get() <= (UINT32_MAX >> 1)) {
-        switch (bip85_type_get()) {
-            case BIP85_APP_BIP39:
-                bip85_app_bip39_gen();
-                SPRINTF(headerText, UI_STR_NBGL_BIP85_BIP39_HEADER,
-                        bip85_index_get());
-                strncpy(reviewText, bip39_mnemonic_get(),
-                        bip39_mnemonic_length_get());
-                // Ensure null termination
-                reviewText[bip39_mnemonic_length_get()] = '\0';
-                display_generic_review();
-                break;
-            case BIP85_APP_PWD_BASE64:
-                SPRINTF(headerText, UI_STR_NBGL_BIP85_BASE64_HEADER,
-                        bip85_index_get());
-                strncpy(reviewText, (const char*)bip85_app_pwd_base64_gen(),
-                        bip85_length_get());
-                // Ensure null termination
-                reviewText[bip85_length_get()] = '\0';
-                display_generic_review();
-                break;
-            case BIP85_APP_PWD_BASE85:
-                SPRINTF(headerText, UI_STR_NBGL_BIP85_BASE85_HEADER,
-                        bip85_index_get());
-                strncpy(reviewText, (const char*)bip85_app_pwd_base85_gen(),
-                        bip85_length_get());
-                // Ensure null termination
-                reviewText[bip85_length_get()] = '\0';
-                display_generic_review();
-                break;
-            default:
-                display_bip85_select_app_page();
-                break;
-        }
+        // The index being accepted no longer derives anything. All three
+        // applications now go to the same review, which is the only screen in
+        // this flow that shows the derivation path -- and the path is what
+        // makes the result reproducible anywhere else, which is the whole
+        // reason to derive a secret rather than store one.
+        display_bip85_generate_review_page();
     } else {
         // Back to the index keypad. The screen this used to return to,
         // display_bip39_select_phrase_length_page(), is neither the field at
@@ -1188,7 +2030,11 @@ static void bip85_password_length_validate(const uint8_t* lengthentry,
 
     if ((bip85_length_get() >= password_length_min) &&
         (bip85_length_get() <= password_length_max)) {
-        display_bip85_select_index_page();
+        // The explanation, as the BIP39 branch does. The index means the same
+        // thing for all three applications, so all three have to meet it: this
+        // is the second and last route into that keypad from a value the user
+        // has just accepted, and it was the one that skipped the screen.
+        display_bip85_index_concept_page();
     } else {
         snprintf(message, sizeof(message),
                  UI_STR_NBGL_BIP85_PWD_LENGTH_RANGE_ERROR, password_length_min,

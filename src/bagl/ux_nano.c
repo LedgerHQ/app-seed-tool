@@ -28,8 +28,13 @@ void clean_exit(bolos_task_status_t exit_code) {
             sizeof(G_bolos_ux_context.words_buffer));
     memzero(G_bolos_ux_context.string_buffer,
             sizeof(G_bolos_ux_context.string_buffer));
+    // sizeof, not sskr_words_buffer_length. The length is set to 0 by the
+    // entry path without the buffer being erased, so an erase measured on it
+    // can erase nothing at all: enter shares, get "not valid", press
+    // "Re-enter Shares" and leave, and this ran memzero(buffer, 0) over a
+    // buffer still holding every ByteWord that had been typed.
     memzero(G_bolos_ux_context.sskr_words_buffer,
-            G_bolos_ux_context.sskr_words_buffer_length);
+            sizeof(G_bolos_ux_context.sskr_words_buffer));
     G_bolos_ux_context.words_buffer_length = 0;
     G_bolos_ux_context.sskr_words_buffer_length = 0;
     G_bolos_ux_context.sskr_share_index = 0;
@@ -163,7 +168,7 @@ UX_STEP_NOCB(ux_invalid_step_2, nn,
              });
 
 UX_STEP_NOCB(ux_bip39_invalid_step_1, pbb,
-             {&C_icon_crossmark, UI_STR_BAGL_BIP39_INVALID_TITLE_L1,
+             {&C_icon_crossmark, UI_STR_BAGL_BIP39_PHRASE_TITLE,
               UI_STR_BAGL_BIP39_INVALID_TITLE_L2});
 UX_STEP_VALID(ux_bip39_invalid_step_3, pb,
               screen_onboarding_bip39_restore_init();
@@ -173,7 +178,7 @@ UX_FLOW(ux_bip39_invalid_flow, &ux_bip39_invalid_step_1, &ux_invalid_step_2,
         &ux_bip39_invalid_step_3, &ux_return_step);
 
 UX_STEP_NOCB(ux_bip39_nomatch_step_1, pbb,
-             {&C_icon_warning, UI_STR_BIP39_PHRASE_TITLE,
+             {&C_icon_warning, UI_STR_BAGL_BIP39_PHRASE_TITLE,
               UI_STR_BAGL_BIP39_NOMATCH_TITLE_L2});
 
 // What the mismatch means when the phrase was on its way to being split. The
@@ -192,7 +197,7 @@ UX_FLOW(ux_bip39_backup_nomatch_flow, &ux_bip39_nomatch_step_1,
         &ux_backup_nomatch_step_2, &ux_return_step);
 
 UX_STEP_NOCB(ux_bip39_match_step_1, pbb,
-             {&C_icon_validate_14, UI_STR_BIP39_PHRASE_TITLE,
+             {&C_icon_validate_14, UI_STR_BAGL_BIP39_PHRASE_TITLE,
               UI_STR_BAGL_BIP39_MATCH_TITLE_L2});
 UX_STEP_CB(ux_bip39_recover_step_1, pbb, set_sskr_descriptor_values();
            , {&SSKR_ICON, UI_STR_BAGL_GENERATE_SSKR_L1,
@@ -250,7 +255,7 @@ void ux_bip39_nomatch_display(void) {
 }
 
 UX_STEP_NOCB(ux_sskr_invalid_step_1, pbb,
-             {&C_icon_crossmark, UI_STR_BAGL_SSKR_INVALID_TITLE_L1,
+             {&C_icon_crossmark, UI_STR_BAGL_SSKR_SHARES_TITLE,
               UI_STR_BAGL_SSKR_INVALID_TITLE_L2});
 UX_STEP_VALID(ux_sskr_invalid_step_3, pb, screen_onboarding_sskr_restore_init();
               , {&C_icon_back_x, UI_STR_BAGL_SSKR_REENTER_SHARES});
@@ -259,20 +264,57 @@ UX_FLOW(ux_sskr_invalid_flow, &ux_sskr_invalid_step_1, &ux_invalid_step_2,
         &ux_sskr_invalid_step_3, &ux_return_step);
 
 UX_STEP_NOCB(ux_sskr_nomatch_step_1, pbb,
-             {&C_icon_warning, UI_STR_BAGL_SSKR_NOMATCH_TITLE_L1,
+             {&C_icon_warning, UI_STR_BAGL_SSKR_SHARES_TITLE,
               UI_STR_BAGL_SSKR_NOMATCH_TITLE_L2});
 
 UX_STEP_NOCB(ux_sskr_match_step_1, pbb,
-             {&C_icon_validate_14, UI_STR_BAGL_SSKR_MATCH_TITLE_L1,
+             {&C_icon_validate_14, UI_STR_BAGL_SSKR_SHARES_TITLE,
               UI_STR_BAGL_SSKR_MATCH_TITLE_L2});
 
 UX_STEP_CB(ux_sskr_recover_step_1, pbb, recover_bip39();
            , {&BIP39_ICON, UI_STR_BAGL_RECOVER_BIP39_L1,
               UI_STR_BAGL_RECOVER_BIP39_L2});
 
+/*
+ * What stands in front of the rebuilt phrase, on both verdicts.
+ *
+ * Three steps, and the third is the reason the other two are not enough. This
+ * flow reveals what the entered shares rebuild whether or not it matches the
+ * seed this Ledger holds: ux_sskr_nomatch_flow reaches ux_sskr_recover_step_1
+ * exactly as ux_sskr_match_flow does, and the touch stack gates the same
+ * screen on sskr_shares_check() rather than on seed_match.
+ *
+ * That is deliberate, and it is what a backup is for -- rebuilding your phrase
+ * from your own shares onto a spare or replacement device is precisely the
+ * case where the device does not already hold it. Requiring a match would
+ * remove the feature on the day it is needed. What was missing was any screen
+ * saying so, on either stack. UI_STR_BAGL_RECOVER_WARN_L5/L6 say it.
+ *
+ * Placed after ux_quit_step so that the way out is read before the warning
+ * rather than after it, and before ux_sskr_recover_step_1 so that no ordering
+ * of presses reaches the reveal without passing them.
+ */
+UX_STEP_NOCB(ux_sskr_reveal_warn_step_1, pbb,
+             {&C_icon_warning, UI_STR_BAGL_RECOVER_WARN_L1,
+              UI_STR_BAGL_RECOVER_WARN_L2});
+
+UX_STEP_NOCB(ux_sskr_reveal_warn_step_2, nn,
+             {
+                 UI_STR_BAGL_SCREEN_PRIVACY_L1,
+                 UI_STR_BAGL_SCREEN_PRIVACY_L2,
+             });
+
+UX_STEP_NOCB(ux_sskr_reveal_warn_step_3, nn,
+             {
+                 UI_STR_BAGL_RECOVER_WARN_L5,
+                 UI_STR_BAGL_RECOVER_WARN_L6,
+             });
+
 UX_FLOW(ux_sskr_nomatch_flow, &ux_sskr_nomatch_step_1, &ux_quit_step,
-        &ux_sskr_recover_step_1);
+        &ux_sskr_reveal_warn_step_1, &ux_sskr_reveal_warn_step_2,
+        &ux_sskr_reveal_warn_step_3, &ux_sskr_recover_step_1);
 
 UX_FLOW(ux_sskr_match_flow, &ux_sskr_match_step_1, &ux_quit_step,
-        &ux_sskr_recover_step_1);
+        &ux_sskr_reveal_warn_step_1, &ux_sskr_reveal_warn_step_2,
+        &ux_sskr_reveal_warn_step_3, &ux_sskr_recover_step_1);
 #endif  // defined(HAVE_BAGL)

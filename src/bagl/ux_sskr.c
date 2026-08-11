@@ -113,8 +113,80 @@ UX_STEP_INIT(step_lower_delimiter, NULL, NULL, { display_next_state(false); });
 UX_STEP_CB(step_sskr_clean_exit, pb, clean_exit(0),
            {&C_icon_dashboard_x, UI_STR_QUIT});
 
+/*
+ * The composed lines of the review, and of the question in front of Quit.
+ *
+ * They cannot be locals: a UX_STEP holds the pointer it is given and the step
+ * is redrawn long after the function that filled it returned -- the same
+ * constraint the touch stack has, for the same reason. They cannot be
+ * G_bolos_ux_context.string_buffer either: get_next_data() rewrites that on
+ * every share page, and the close question is on screen in the middle of that
+ * flow.
+ *
+ * Sized on the formats, with the same caveat the touch buffers carry: "%d" is
+ * two characters and the word total reaches three digits, so one more than the
+ * literal. Rounded up rather than computed to the byte -- these are three
+ * short lines on a target whose flash matters, and eight spare bytes is
+ * cheaper than an expression nobody can check by reading.
+ */
+#define SSKR_REVIEW_LINE_SIZE 24
+static char sskr_review_words[SSKR_REVIEW_LINE_SIZE];
+static char sskr_review_shares[SSKR_REVIEW_LINE_SIZE];
+static char sskr_close_question[SSKR_REVIEW_LINE_SIZE];
+
+/*
+ * The three lines this file composes, bounded against the formats that print
+ * them -- as src/nbgl/ui.c already does for the same class of buffer, and this
+ * side did not.
+ *
+ * SPRINTF() is snprintf() bounded by its destination (os_print.h), so the
+ * failure mode is a silently truncated line rather than an overflow. Nothing
+ * would catch it: tests/unit/tests/ui_strings.c measures these formats for
+ * pixel width, but it composes them into a buffer of its own, so a buffer too
+ * small here is invisible to it.
+ *
+ * Each "%d" is two characters wide and stands for a value bounded by a
+ * constant, so what is needed is the format's own size plus the digits that
+ * exceed those two: one for the three-digit word total (SSS_MAX_SHARE_COUNT
+ * shares of at most SSKR_SHARE_MAX_WIRE_LENGTH ByteWords), none for the
+ * two-digit counts.
+ */
+_Static_assert(SSS_MAX_SHARE_COUNT <= 99,
+               "the composed lines below assume counts of at most two digits");
+_Static_assert(SSS_MAX_SHARE_COUNT* SSKR_SHARE_MAX_WIRE_LENGTH <= 999,
+               "the word total below assumes at most three digits");
+_Static_assert(sizeof(UI_STR_BAGL_SSKR_REVIEW_WORDS) + 1 <=
+                   SSKR_REVIEW_LINE_SIZE,
+               "sskr_review_words would be truncated: its format plus a "
+               "three-digit total does not fit the line");
+_Static_assert(sizeof(UI_STR_BAGL_SSKR_REVIEW_SHARES) + 2 <=
+                   SSKR_REVIEW_LINE_SIZE,
+               "sskr_review_shares would be truncated: its format plus two "
+               "two-digit counts does not fit the line");
+_Static_assert(sizeof(UI_STR_BAGL_SSKR_CLOSE_CONFIRM_L2) <=
+                   SSKR_REVIEW_LINE_SIZE,
+               "sskr_close_question would be truncated: its format plus a "
+               "two-digit count does not fit the line");
+
+/*
+ * Leaving the share display destroys the shares, and until now it said so
+ * nowhere.
+ *
+ * Quit is the only way out of this flow and it runs clean_exit(), which
+ * memzeroes sskr_words_buffer -- so the step below is the Nano's form of the
+ * touch stack's close confirmation. A step and not a branch: the flow is a
+ * FLOW_LOOP, so reading the question and pressing on reaches Quit while
+ * pressing back returns to the shares, and no second exit is created.
+ */
+UX_STEP_NOCB(step_sskr_close_question, nn,
+             {
+                 UI_STR_BAGL_SSKR_CLOSE_CONFIRM_L1,
+                 sskr_close_question,
+             });
+
 UX_FLOW(dynamic_flow, &step_upper_delimiter, &step_display_shares,
-        &step_lower_delimiter, &step_sskr_clean_exit, FLOW_LOOP);
+        &step_lower_delimiter, &step_sskr_close_question, &step_sskr_clean_exit,
+        FLOW_LOOP);
 
 void generate_sskr(void) {
 #if defined(TARGET_NANOS)
@@ -155,7 +227,105 @@ void generate_sskr(void) {
         }
     }
     G_bolos_ux_context.sskr_share_index = 1;
+    SPRINTF(sskr_close_question, UI_STR_BAGL_SSKR_CLOSE_CONFIRM_L2,
+            G_bolos_ux_context.sskr_share_count);
     ux_flow_init(0, dynamic_flow, NULL);
+}
+
+/*
+ * The review, and the warning after it.
+ *
+ * generate_sskr() used to be what the threshold menu called, so choosing a
+ * threshold produced the shares and drew them in the same breath. It is now
+ * reached only from the last step of the flow below, which is to say only
+ * after the user has read what the job costs and has been told the words are
+ * about to appear.
+ *
+ * The flow has an exit, and it is the first step of the two the user reads:
+ * ux_sskr_review_quit_step runs ui_idle_init(), which memzeroes words_buffer
+ * -- the BIP-39 phrase is still in RAM at this point, since nothing has been
+ * generated from it yet. Declining here therefore erases rather than merely
+ * going back, exactly as "Back to safety" does on the touch stack.
+ */
+UX_STEP_VALID(ux_sskr_review_quit_step, pb, ui_idle_init(),
+              {&C_icon_back_x, UI_STR_BAGL_RETURN_TO_MENU});
+
+UX_STEP_NOCB(ux_sskr_review_title_step, pbb,
+             {&SSKR_ICON, UI_STR_BAGL_SSKR_REVIEW_TITLE_L1,
+              UI_STR_BAGL_SSKR_REVIEW_TITLE_L2});
+
+UX_STEP_NOCB(ux_sskr_review_values_step, nn,
+             {
+                 sskr_review_shares,
+                 sskr_review_words,
+             });
+
+UX_STEP_NOCB(ux_sskr_shares_warn_step_1, pbb,
+             {&C_icon_warning, UI_STR_BAGL_SSKR_REVEAL_WARN_L1,
+              UI_STR_BAGL_SSKR_REVEAL_WARN_L2});
+
+UX_STEP_NOCB(ux_sskr_shares_warn_step_2, nn,
+             {
+                 UI_STR_BAGL_SCREEN_PRIVACY_L1,
+                 UI_STR_BAGL_SCREEN_PRIVACY_L2,
+             });
+
+// The risk, which the two steps above do not carry: they say to shield the
+// screen, which is the generic half. What is specific to a threshold scheme is
+// that a subset of the sheets is enough, and that is what decides where they
+// are kept. The touch warning is this sentence and only this sentence.
+UX_STEP_NOCB(ux_sskr_shares_warn_step_3, nn,
+             {
+                 UI_STR_BAGL_SSKR_REVEAL_WARN_L5,
+                 UI_STR_BAGL_SSKR_REVEAL_WARN_L6,
+             });
+
+/*
+ * What the last step of the review actually does, and why it is not a bare
+ * call to generate_sskr().
+ *
+ * On the Nano S generation is too slow to run inside a step callback with
+ * nothing on screen, so that target puts up the "Processing" screen and lets
+ * the main loop call generate_sskr() when it sees PROCESSING_GENERATE_SSKR.
+ * That split used to live in sskr_threshold_selector(), which is no longer
+ * what starts generation; it moves here with the trigger rather than being
+ * left behind on a screen that now only leads to a review.
+ */
+static void sskr_generate_confirmed(void) {
+#if defined(TARGET_NANOS)
+    // Display processing warning to user
+    screen_processing_init();
+    G_bolos_ux_context.processing = PROCESSING_GENERATE_SSKR;
+#else
+    generate_sskr();
+#endif
+}
+
+UX_STEP_CB(ux_sskr_generate_step, pbb, sskr_generate_confirmed();
+           , {&SSKR_ICON, UI_STR_BAGL_SSKR_REVIEW_CONFIRM_L1,
+              UI_STR_BAGL_SSKR_REVIEW_CONFIRM_L2});
+
+UX_FLOW(ux_sskr_review_flow, &ux_sskr_review_title_step,
+        &ux_sskr_review_quit_step, &ux_sskr_review_values_step,
+        &ux_sskr_shares_warn_step_1, &ux_sskr_shares_warn_step_2,
+        &ux_sskr_shares_warn_step_3, &ux_sskr_generate_step);
+
+void display_sskr_review(void) {
+    // The same two numbers the touch review shows, from the same call. Nothing
+    // has been generated yet, so bolos_ux_sskr_share_slice() cannot answer --
+    // see src/common/sskr/common_sskr.h for why this arithmetic exists twice
+    // and what holds the two together.
+    const uint8_t words_per_share =
+        bolos_ux_sskr_share_wordcount(G_bolos_ux_context.bip39_type);
+    const unsigned int share_count =
+        G_bolos_ux_context.sskr_group_descriptor[0][1];
+
+    SPRINTF(sskr_review_words, UI_STR_BAGL_SSKR_REVIEW_WORDS,
+            words_per_share * share_count);
+    SPRINTF(sskr_review_shares, UI_STR_BAGL_SSKR_REVIEW_SHARES,
+            G_bolos_ux_context.sskr_group_descriptor[0][0], share_count);
+
+    ux_flow_init(0, ux_sskr_review_flow, NULL);
 }
 
 UX_STEP_NOCB(ux_threshold_warn_step_1, pnn,
@@ -190,15 +360,24 @@ void sskr_threshold_selector(unsigned int idx) {
         G_bolos_ux_context.sskr_group_descriptor[0][1] > 1) {
         ux_flow_init(0, ux_threshold_warn_flow, NULL);
     } else {
-#if defined(TARGET_NANOS)
-        // Display processing warning to user
-        screen_processing_init();
-        G_bolos_ux_context.processing = PROCESSING_GENERATE_SSKR;
-#else
-        generate_sskr();
-#endif
+        // Choosing a threshold no longer generates anything. It leads to the
+        // review, and generation happens on the last step of that flow -- so
+        // the "Processing" screen and the deferred generation the Nano S needs
+        // move there with it, to ux_sskr_generate_step's callback.
+        display_sskr_review();
     }
 }
+
+#if defined(TARGET_NANOS)
+UX_STEP_NOCB(ux_threshold_concept_step, nn,
+             {UI_STR_BAGL_SSKR_THRESHOLD_CONCEPT_L1_NANOS,
+              UI_STR_BAGL_SSKR_THRESHOLD_CONCEPT_L2_NANOS});
+#else
+UX_STEP_NOCB(ux_threshold_concept_step, nnn,
+             {UI_STR_BAGL_SSKR_THRESHOLD_CONCEPT_L1,
+              UI_STR_BAGL_SSKR_THRESHOLD_CONCEPT_L2,
+              UI_STR_BAGL_SSKR_THRESHOLD_CONCEPT_L3});
+#endif
 
 UX_STEP_NOCB(ux_threshold_instruction_step, nn,
              {UI_STR_BAGL_SSKR_THRESHOLD_TITLE_L1,
@@ -207,8 +386,10 @@ UX_STEP_NOCB(ux_threshold_instruction_step, nn,
 UX_STEP_MENULIST(ux_threshold_menu_step, sskr_threshold_getter,
                  sskr_threshold_selector);
 
-UX_FLOW(ux_threshold_flow, &ux_threshold_instruction_step,
-        &ux_threshold_menu_step);
+// The definition, then the instruction, then the menu. "Select / threshold"
+// is the only place the word appears on this stack, and it appeared cold.
+UX_FLOW(ux_threshold_flow, &ux_threshold_concept_step,
+        &ux_threshold_instruction_step, &ux_threshold_menu_step);
 
 const char* sskr_shares_number_getter(unsigned int idx) {
     return sskr_descriptor_label(idx, sskr_descriptor_count());

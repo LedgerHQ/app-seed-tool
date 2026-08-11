@@ -70,14 +70,14 @@ def _two_button_only(device):
 def test_bip39_bad_checksum_is_refused(device, backend, navigator, set_seed):
     _two_button_only(device)
 
-    nano.select_in_menu(navigator, "Check phrase")
+    nano.select_in_menu(navigator, "Check Phrase")
     nano.select_in_menu(navigator, "12 words")
     nano.enter_phrase(backend, BAD_CHECKSUM_PHRASE)
 
-    # Both lines: "BIP39 Recovery" alone appears on screens that are not this
+    # Both lines: "Your Phrase" alone appears on screens that are not this
     # one, and the verdict screens of this application differ by their second
     # line rather than their first.
-    nano.wait_for_lines(backend, "BIP39 Recovery", "phrase invalid")
+    nano.wait_for_lines(backend, "Your Phrase", "is not valid")
 
 
 @mark.use_on_backend("speculos")
@@ -85,10 +85,10 @@ def test_sskr_bad_crc_is_refused(device, backend, navigator, set_seed):
     _two_button_only(device)
 
     nano.select_in_menu(navigator, "Recover")
-    nano.confirm(backend)
+    nano.open_sskr_entry(backend)
 
     for shard in CORRUPTED_SHARDS:
         for word in shard.split():
             nano.enter_word(backend, word)
 
-    nano.wait_for_lines(backend, "SSKR Recovery", "phrase invalid")
+    nano.wait_for_lines(backend, "SSKR Shares", "are not valid")

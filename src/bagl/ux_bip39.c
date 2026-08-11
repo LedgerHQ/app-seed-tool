@@ -23,7 +23,7 @@
 
 UX_STEP_NOCB(step_display_bip39, bnnn_paging,
              {
-                 .title = UI_STR_BIP39_PHRASE_TITLE,
+                 .title = UI_STR_BAGL_BIP39_PHRASE_TITLE,
                  .text = G_bolos_ux_context.words_buffer,
              });
 

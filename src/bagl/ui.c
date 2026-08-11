@@ -80,6 +80,12 @@ UX_STEP_NOCB(ux_bip39_instruction_step, nnn,
 UX_STEP_MENULIST(ux_bip39_menu_step, number_of_bip39_words_getter,
                  number_of_bip39_words_selector);
 
+/*
+ * No step explaining why the Phrase is asked for, on purpose: entering it *is*
+ * the task the user chose from the menu. app-recovery-check, which does only
+ * this, opens the same way. ux_backup_explain_step below exists because that
+ * journey was asked for Shares and has to account for the Phrase.
+ */
 UX_FLOW(ux_bip39_flow, &ux_bip39_instruction_step, &ux_bip39_menu_step);
 
 //////////////////////////////////////////////////////////////////////
@@ -98,10 +104,25 @@ UX_FLOW(ux_bip39_flow, &ux_bip39_instruction_step, &ux_bip39_menu_step);
  * on their own; the taller Nanos add the third.
  */
 #if defined(TARGET_NANOS)
+UX_STEP_NOCB(ux_backup_sskr_step, nn,
+             {
+                 UI_STR_BAGL_BACKUP_SSKR_L1_NANOS,
+                 UI_STR_BAGL_BACKUP_SSKR_L2_NANOS,
+             });
+#else
+UX_STEP_NOCB(ux_backup_sskr_step, nnn,
+             {
+                 UI_STR_BAGL_BACKUP_SSKR_L1,
+                 UI_STR_BAGL_BACKUP_SSKR_L2,
+                 UI_STR_BAGL_BACKUP_SSKR_L3,
+             });
+#endif
+
+#if defined(TARGET_NANOS)
 UX_STEP_NOCB(ux_backup_explain_step, nn,
              {
-                 UI_STR_BAGL_BACKUP_EXPLAIN_L1,
-                 UI_STR_BAGL_BACKUP_EXPLAIN_L2,
+                 UI_STR_BAGL_BACKUP_EXPLAIN_L1_NANOS,
+                 UI_STR_BAGL_BACKUP_EXPLAIN_L2_NANOS,
              });
 #else
 UX_STEP_NOCB(ux_backup_explain_step, nnn,
@@ -115,8 +136,11 @@ UX_STEP_NOCB(ux_backup_explain_step, nnn,
 // The length menu and its instruction are the same two steps the check flow
 // uses -- the question they ask is the same one, and the intention already
 // recorded is what makes the difference later.
-UX_FLOW(ux_backup_flow, &ux_backup_explain_step, &ux_bip39_instruction_step,
-        &ux_bip39_menu_step);
+// What the journey makes, then why the Phrase is wanted, then the length --
+// the order the touch stack uses, for the same reason: naming the product
+// before asking for the input is what makes the input make sense.
+UX_FLOW(ux_backup_flow, &ux_backup_sskr_step, &ux_backup_explain_step,
+        &ux_bip39_instruction_step, &ux_bip39_menu_step);
 
 //////////////////////////////////////////////////////////////////////
 
@@ -142,7 +166,22 @@ UX_STEP_CB(ux_sskr_instruction_step, nnn,
              });
 #endif
 
-UX_FLOW(ux_sskr_flow, &ux_sskr_instruction_step);
+#if defined(TARGET_NANOS)
+UX_STEP_NOCB(ux_recover_explain_step, nn,
+             {
+                 UI_STR_BAGL_RECOVER_EXPLAIN_L1_NANOS,
+                 UI_STR_BAGL_RECOVER_EXPLAIN_L2_NANOS,
+             });
+#else
+UX_STEP_NOCB(ux_recover_explain_step, nnn,
+             {
+                 UI_STR_BAGL_RECOVER_EXPLAIN_L1,
+                 UI_STR_BAGL_RECOVER_EXPLAIN_L2,
+                 UI_STR_BAGL_RECOVER_EXPLAIN_L3,
+             });
+#endif
+
+UX_FLOW(ux_sskr_flow, &ux_recover_explain_step, &ux_sskr_instruction_step);
 
 //////////////////////////////////////////////////////////////////////
 
@@ -206,8 +245,13 @@ void ui_idle_init(void) {
             sizeof(G_bolos_ux_context.words_buffer));
     memzero(G_bolos_ux_context.string_buffer,
             sizeof(G_bolos_ux_context.string_buffer));
+    // sizeof, not sskr_words_buffer_length. The length is set to 0 by the
+    // entry path without the buffer being erased, so an erase measured on it
+    // can erase nothing at all: enter shares, get "not valid", press
+    // "Re-enter Shares" and leave, and this ran memzero(buffer, 0) over a
+    // buffer still holding every ByteWord that had been typed.
     memzero(G_bolos_ux_context.sskr_words_buffer,
-            G_bolos_ux_context.sskr_words_buffer_length);
+            sizeof(G_bolos_ux_context.sskr_words_buffer));
     G_bolos_ux_context.words_buffer_length = 0;
     G_bolos_ux_context.sskr_words_buffer_length = 0;
     G_bolos_ux_context.sskr_share_index = 0;

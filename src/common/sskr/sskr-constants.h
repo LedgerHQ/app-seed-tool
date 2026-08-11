@@ -27,6 +27,27 @@
 #define SSKR_MAX_GROUP_COUNT             1
 #define SSKR_MIN_SERIALIZED_LENGTH_BYTES (SSKR_METADATA_LENGTH_BYTES + SSKR_MIN_STRENGTH_BYTES)
 
+// The CRC-32 that BCR-2020-011 appends to every serialized share. It was
+// sizeof(uint32_t) at the one place that wrote it and a bare 4 at the two that
+// reserved room for it; naming it is what lets the word count a review
+// announces be written as the same sum the generator forms.
+#define SSKR_CRC32_LENGTH_BYTES 4
+
+// A CBOR byte string carries its length in the low five bits of its initial
+// byte up to 23, and needs one following byte from 24 on (RFC 8949 3.1). That
+// boundary decides whether a serialized share's header is four bytes or five,
+// which is a ByteWord either way -- so it is part of how long a share reads,
+// not only of how it is encoded.
+#define SSKR_CBOR_SHORT_FORM_MAX_LENGTH 23
+/*
+ * The two forms the CBOR byte-string header takes, in bytes. RFC 8949 puts a
+ * length of up to 23 in the initial byte and needs one following byte from 24
+ * on. bolos_ux_sskr_cbor_header_length() returns one or the other, and the
+ * long form is what sizes the wire buffer.
+ */
+#define SSKR_CBOR_SHORT_FORM_HEADER_LENGTH 4
+#define SSKR_CBOR_LONG_FORM_HEADER_LENGTH  5
+
 #define SSKR_ERROR_NOT_ENOUGH_SERIALIZED_BYTES (-1)
 #define SSKR_ERROR_SECRET_TOO_SHORT            (-2)
 #define SSKR_ERROR_INVALID_GROUP_THRESHOLD     (-3)

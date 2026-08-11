@@ -33,12 +33,22 @@ def set_seed():
         "fly mule excess resource treat plunge nose soda reflect adult ramp planet"
 
 
-# entry constant -> a line only the screen it opens draws
+# entry constant -> a line only the screen it opens draws.
+#
+# Every journey opens on its own explanation, so these are the first pages of
+# those four rather than the screens that used to come first. That is the
+# property worth asserting here: the menu is a set of four intentions and each
+# has to land on the one that names it -- an entry wired to the wrong callback
+# would still draw *a* screen.
+#
+# These are the titles of the four screens the entries open on, and they go
+# through ragger's wait_for_text_on_screen(), which re.matches each drawn line
+# on its own -- so each has to be a prefix of one drawn line.
 DESTINATIONS = [
     (MENU_CHECK, "How long is your"),
-    (MENU_BACKUP, "Enter your recovery"),
-    (MENU_RECOVER, "Enter Share 1 Word 1"),
-    (MENU_DERIVE, "Which BIP85"),
+    (MENU_BACKUP, "How the backup works"),
+    (MENU_RECOVER, "How recovery works"),
+    (MENU_DERIVE, "How BIP85 works"),
 ]
 
 
@@ -56,9 +66,9 @@ def test_each_entry_opens_what_it_names(device, backend, set_seed, entry, destin
     home_page.action()
     # All four labels on one screen: this is the menu, before anything is
     # touched, and every entry below is drawn.
-    backend.wait_for_text_on_screen("Check recovery phrase", 5)
-    backend.wait_for_text_on_screen("Generate backup shares", 1)
-    backend.wait_for_text_on_screen("Recover from backup", 1)
+    backend.wait_for_text_on_screen("Check Recovery Phrase", 5)
+    backend.wait_for_text_on_screen("Generate Backup Shares", 1)
+    backend.wait_for_text_on_screen("Recover from Backup", 1)
     backend.wait_for_text_on_screen("Derive with BIP85", 1)
 
     genericbuttons.choose(entry)

@@ -16,10 +16,11 @@
  *     runtime; nothing else catches it. The BNNN_PAGING *body* is excluded --
  *     it wraps, so it cannot clip;
  *
- *   - the SSKR share label fits the BNNN_PAGING *title*, which does clip. It
- *     is checked on its own, at the end of this file, because what reaches
- *     the screen is the macro plus a page counter the widget appends and the
- *     string does not contain.
+ *   - the two labels that head a BNNN_PAGING page fit its *title* line, which
+ *     does clip. They are checked on their own, at the end of this file,
+ *     because what reaches the screen is the macro plus a page counter the
+ *     widget appends and the string does not contain -- which is how the
+ *     phrase title came to ship clipped while passing the table above.
  *
  * Each entry below is `ENTRY(UI_STR_X)`, which expands to `{"UI_STR_X",
  * UI_STR_X}` -- the name and the header's own macro, not a retyped copy of
@@ -29,40 +30,38 @@
  * compile error in this file, not a silent gap in the table.
  */
 
-#include <stdarg.h>
-#include <stddef.h>
-#include <setjmp.h>
-#include <cmocka.h>
-#include <stdbool.h>
-#include <string.h>
-#include <stdio.h>
-#include <ctype.h>
-
 #include "ui_strings.h"
+
+#include <cmocka.h>
+#include <ctype.h>
+#include <setjmp.h>
+#include <stdarg.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdio.h>
+#include <string.h>
+
 #include "constants.h"
 #include "sss-constants.h"
 
-#define ENTRY(name) \
-    { #name, name }
-#define BOUNDED(name, budget_px, is_bold) \
-    { #name, name, budget_px, is_bold }
+#define ENTRY(name) {#name, name}
+#define BOUNDED(name, budget_px, is_bold) {#name, name, budget_px, is_bold}
 
 /*
  * Every macro in src/common/ui_strings.h. Kept in the order the header
  * declares them, so a diff of the header and a diff of this list line up.
  */
 static const struct {
-    const char *name;
-    const char *value;
+    const char* name;
+    const char* value;
 } k_all_strings[] = {
     ENTRY(UI_STR_QUIT),
     ENTRY(UI_STR_VERSION_LABEL),
-    ENTRY(UI_STR_BIP39_PHRASE_TITLE),
-    ENTRY(UI_STR_NBGL_SSKR_SHARE_HEADER),
-    ENTRY(UI_STR_BAGL_SSKR_SHARE_HEADER),
     ENTRY(UI_STR_WORDS_12),
     ENTRY(UI_STR_WORDS_18),
     ENTRY(UI_STR_WORDS_24),
+    ENTRY(UI_STR_NBGL_BIP39_PHRASE_TITLE),
+    ENTRY(UI_STR_BAGL_BIP39_PHRASE_TITLE),
     ENTRY(UI_STR_BAGL_PROCESSING),
     ENTRY(UI_STR_NBGL_MENU_CHECK),
     ENTRY(UI_STR_NBGL_MENU_BACKUP),
@@ -78,6 +77,23 @@ static const struct {
     ENTRY(UI_STR_BAGL_BACKUP_EXPLAIN_L1),
     ENTRY(UI_STR_BAGL_BACKUP_EXPLAIN_L2),
     ENTRY(UI_STR_BAGL_BACKUP_EXPLAIN_L3),
+    ENTRY(UI_STR_BAGL_BACKUP_SSKR_L1),
+    ENTRY(UI_STR_BAGL_BACKUP_SSKR_L2),
+    ENTRY(UI_STR_BAGL_BACKUP_SSKR_L3),
+    ENTRY(UI_STR_BAGL_BACKUP_SSKR_L1_NANOS),
+    ENTRY(UI_STR_BAGL_BACKUP_SSKR_L2_NANOS),
+    ENTRY(UI_STR_BAGL_SSKR_THRESHOLD_CONCEPT_L1),
+    ENTRY(UI_STR_BAGL_SSKR_THRESHOLD_CONCEPT_L2),
+    ENTRY(UI_STR_BAGL_SSKR_THRESHOLD_CONCEPT_L3),
+    ENTRY(UI_STR_BAGL_SSKR_THRESHOLD_CONCEPT_L1_NANOS),
+    ENTRY(UI_STR_BAGL_SSKR_THRESHOLD_CONCEPT_L2_NANOS),
+    ENTRY(UI_STR_BAGL_BACKUP_EXPLAIN_L1_NANOS),
+    ENTRY(UI_STR_BAGL_BACKUP_EXPLAIN_L2_NANOS),
+    ENTRY(UI_STR_BAGL_RECOVER_EXPLAIN_L1),
+    ENTRY(UI_STR_BAGL_RECOVER_EXPLAIN_L2),
+    ENTRY(UI_STR_BAGL_RECOVER_EXPLAIN_L3),
+    ENTRY(UI_STR_BAGL_RECOVER_EXPLAIN_L1_NANOS),
+    ENTRY(UI_STR_BAGL_RECOVER_EXPLAIN_L2_NANOS),
     ENTRY(UI_STR_NBGL_HOME_DESCRIPTION),
     ENTRY(UI_STR_NBGL_HOME_ACTION),
     ENTRY(UI_STR_NBGL_HOME_COPYRIGHT),
@@ -111,9 +127,12 @@ static const struct {
     ENTRY(UI_STR_BAGL_NANOX_SELECT_WORD),
     ENTRY(UI_STR_BAGL_ENTER_LABEL),
     ENTRY(UI_STR_BAGL_RETURN_TO_MENU),
-    ENTRY(UI_STR_NBGL_RESULT_INVALID_TITLE),
-    ENTRY(UI_STR_NBGL_RESULT_NOMATCH_TITLE),
-    ENTRY(UI_STR_NBGL_RESULT_VALID_TITLE),
+    ENTRY(UI_STR_NBGL_RESULT_PHRASE_INVALID_TITLE),
+    ENTRY(UI_STR_NBGL_RESULT_PHRASE_NOMATCH_TITLE),
+    ENTRY(UI_STR_NBGL_RESULT_PHRASE_VALID_TITLE),
+    ENTRY(UI_STR_NBGL_RESULT_SHARES_INVALID_TITLE),
+    ENTRY(UI_STR_NBGL_RESULT_SHARES_NOMATCH_TITLE),
+    ENTRY(UI_STR_NBGL_RESULT_SHARES_VALID_TITLE),
     ENTRY(UI_STR_NBGL_RESULT_BIP39_INVALID),
     ENTRY(UI_STR_NBGL_RESULT_SSKR_INVALID),
     ENTRY(UI_STR_NBGL_RESULT_BIP39_NOMATCH),
@@ -127,32 +146,85 @@ static const struct {
     ENTRY(UI_STR_NBGL_RESULT_INVALID_ADVICE),
     ENTRY(UI_STR_BAGL_INVALID_ADVICE_L1),
     ENTRY(UI_STR_BAGL_INVALID_ADVICE_L2),
-    ENTRY(UI_STR_BAGL_BIP39_INVALID_TITLE_L1),
     ENTRY(UI_STR_BAGL_BIP39_INVALID_TITLE_L2),
     ENTRY(UI_STR_BAGL_BIP39_REENTER_PHRASE),
     ENTRY(UI_STR_BAGL_BIP39_NOMATCH_TITLE_L2),
     ENTRY(UI_STR_BAGL_BIP39_MATCH_TITLE_L2),
     ENTRY(UI_STR_BAGL_BACKUP_NOMATCH_L1),
     ENTRY(UI_STR_BAGL_BACKUP_NOMATCH_L2),
-    ENTRY(UI_STR_BAGL_SSKR_INVALID_TITLE_L1),
+    ENTRY(UI_STR_BAGL_SSKR_SHARES_TITLE),
     ENTRY(UI_STR_BAGL_SSKR_INVALID_TITLE_L2),
     ENTRY(UI_STR_BAGL_SSKR_REENTER_SHARES),
-    ENTRY(UI_STR_BAGL_SSKR_NOMATCH_TITLE_L1),
     ENTRY(UI_STR_BAGL_SSKR_NOMATCH_TITLE_L2),
-    ENTRY(UI_STR_BAGL_SSKR_MATCH_TITLE_L1),
     ENTRY(UI_STR_BAGL_SSKR_MATCH_TITLE_L2),
-    ENTRY(UI_STR_NBGL_RECOVER_BIP39_TITLE),
-    ENTRY(UI_STR_NBGL_RECOVER_BIP39_DESC),
-    ENTRY(UI_STR_NBGL_RECOVER_BIP39_CONFIRM),
+    ENTRY(UI_STR_NBGL_RECOVER_WARN_TITLE),
+    ENTRY(UI_STR_NBGL_RECOVER_WARN_DESC),
     ENTRY(UI_STR_NBGL_CANCEL),
-    ENTRY(UI_STR_NBGL_BACKUP_EXPLAIN_TITLE),
-    ENTRY(UI_STR_NBGL_BACKUP_EXPLAIN_DESC),
+    ENTRY(UI_STR_NBGL_EXPLANATION_CONTINUE),
+    ENTRY(UI_STR_NBGL_SSKR_NUMBERS_TITLE),
+    ENTRY(UI_STR_NBGL_SSKR_NUMBERS_ROW_CREATE),
+    ENTRY(UI_STR_NBGL_SSKR_NUMBERS_ROW_WORDS),
+    ENTRY(UI_STR_NBGL_SSKR_THRESHOLD_CONCEPT_TITLE),
+    ENTRY(UI_STR_NBGL_SSKR_THRESHOLD_CONCEPT_ROW_REBUILD),
+    ENTRY(UI_STR_NBGL_SSKR_THRESHOLD_CONCEPT_ROW_LOST),
+    ENTRY(UI_STR_NBGL_PHRASE_NOT_READABLE),
+    ENTRY(UI_STR_NBGL_BIP85_INDEX_CONCEPT_TITLE),
+    ENTRY(UI_STR_NBGL_BIP85_INDEX_CONCEPT_ROW_TELLS),
+    ENTRY(UI_STR_NBGL_BIP85_INDEX_CONCEPT_ROW_COUNT),
+    ENTRY(UI_STR_NBGL_BIP85_TITLE),
+    ENTRY(UI_STR_NBGL_BIP85_ROW_DERIVED),
+    ENTRY(UI_STR_NBGL_BIP85_ROW_PATH),
+    ENTRY(UI_STR_NBGL_BIP85_ROW_LOST),
+    ENTRY(UI_STR_NBGL_RECOVER_TITLE),
+    ENTRY(UI_STR_NBGL_RECOVER_ROW_SUBSET),
+    ENTRY(UI_STR_NBGL_RECOVER_ROW_ORDER),
+    ENTRY(UI_STR_NBGL_BACKUP_SSKR_TITLE),
+    ENTRY(UI_STR_NBGL_BACKUP_ROW_SPLIT),
+    ENTRY(UI_STR_NBGL_BACKUP_ROW_APART),
+    ENTRY(UI_STR_NBGL_BACKUP_PHRASE_TITLE),
+    ENTRY(UI_STR_NBGL_BACKUP_ROW_CHECKED),
     ENTRY(UI_STR_NBGL_BACKUP_EXPLAIN_CONFIRM),
     ENTRY(UI_STR_NBGL_CLOSE),
+    ENTRY(UI_STR_NBGL_CONTINUE_ANYWAY),
+    ENTRY(UI_STR_NBGL_BACK_TO_SAFETY),
+    ENTRY(UI_STR_NBGL_SSKR_REVIEW_FINISH),
+    ENTRY(UI_STR_NBGL_SSKR_REVIEW_ITEM_FORMAT),
+    ENTRY(UI_STR_NBGL_SSKR_REVIEW_ITEM_SHARES),
+    ENTRY(UI_STR_NBGL_SSKR_REVIEW_ITEM_THRESHOLD),
+    ENTRY(UI_STR_NBGL_SSKR_REVIEW_ITEM_WORDS),
+    ENTRY(UI_STR_NBGL_SSKR_REVIEW_FORMAT_VALUE),
+    ENTRY(UI_STR_NBGL_SSKR_REVIEW_COUNT_VALUE),
+    ENTRY(UI_STR_NBGL_SSKR_REVIEW_WORDS_VALUE),
+    ENTRY(UI_STR_NBGL_SSKR_REVIEW_WORDS_VALUE_SINGLE),
+    ENTRY(UI_STR_NBGL_SSKR_REVEAL_WARN),
+    ENTRY(UI_STR_NBGL_SSKR_CLOSE_CONFIRM_TITLE),
+    ENTRY(UI_STR_NBGL_SSKR_CLOSE_CONFIRM_DESC),
+    ENTRY(UI_STR_NBGL_SSKR_CLOSE_CONFIRM_YES),
+    ENTRY(UI_STR_NBGL_SSKR_CLOSE_CONFIRM_NO),
     ENTRY(UI_STR_BAGL_GENERATE_SSKR_L1),
     ENTRY(UI_STR_BAGL_GENERATE_SSKR_L2),
     ENTRY(UI_STR_BAGL_RECOVER_BIP39_L1),
     ENTRY(UI_STR_BAGL_RECOVER_BIP39_L2),
+    ENTRY(UI_STR_BAGL_SSKR_REVIEW_TITLE_L1),
+    ENTRY(UI_STR_BAGL_SSKR_REVIEW_TITLE_L2),
+    ENTRY(UI_STR_BAGL_SSKR_REVIEW_SHARES),
+    ENTRY(UI_STR_BAGL_SSKR_REVIEW_WORDS),
+    ENTRY(UI_STR_BAGL_SSKR_REVIEW_CONFIRM_L1),
+    ENTRY(UI_STR_BAGL_SSKR_REVIEW_CONFIRM_L2),
+    ENTRY(UI_STR_BAGL_SSKR_REVEAL_WARN_L1),
+    ENTRY(UI_STR_BAGL_SSKR_REVEAL_WARN_L2),
+    ENTRY(UI_STR_BAGL_SCREEN_PRIVACY_L1),
+    ENTRY(UI_STR_BAGL_SCREEN_PRIVACY_L2),
+    ENTRY(UI_STR_BAGL_SSKR_REVEAL_WARN_L5),
+    ENTRY(UI_STR_BAGL_SSKR_REVEAL_WARN_L6),
+    ENTRY(UI_STR_BAGL_SSKR_CLOSE_CONFIRM_L1),
+    ENTRY(UI_STR_BAGL_SSKR_CLOSE_CONFIRM_L2),
+    ENTRY(UI_STR_BAGL_RECOVER_WARN_L1),
+    ENTRY(UI_STR_BAGL_RECOVER_WARN_L2),
+    ENTRY(UI_STR_BAGL_RECOVER_WARN_L5),
+    ENTRY(UI_STR_BAGL_RECOVER_WARN_L6),
+    ENTRY(UI_STR_NBGL_SSKR_SHARE_HEADER),
+    ENTRY(UI_STR_BAGL_SSKR_SHARE_HEADER),
     ENTRY(UI_STR_NBGL_SSKR_NUMSHARES_TITLE),
     ENTRY(UI_STR_NBGL_SSKR_NUMSHARES_RANGE_ERROR),
     ENTRY(UI_STR_BAGL_SSKR_NUMSHARES_TITLE_L1),
@@ -174,6 +246,19 @@ static const struct {
     ENTRY(UI_STR_NBGL_BIP85_BIP39_HEADER),
     ENTRY(UI_STR_NBGL_BIP85_BASE64_HEADER),
     ENTRY(UI_STR_NBGL_BIP85_BASE85_HEADER),
+    ENTRY(UI_STR_NBGL_BIP85_RESULT_LABEL),
+    ENTRY(UI_STR_NBGL_BIP85_REVIEW_FINISH),
+    ENTRY(UI_STR_NBGL_BIP85_REVIEW_ITEM_APP),
+    ENTRY(UI_STR_NBGL_BIP85_REVIEW_ITEM_LENGTH),
+    ENTRY(UI_STR_NBGL_BIP85_REVIEW_ITEM_INDEX),
+    ENTRY(UI_STR_NBGL_BIP85_REVIEW_ITEM_PATH),
+    ENTRY(UI_STR_NBGL_BIP85_LANGUAGE_ENGLISH),
+    ENTRY(UI_STR_NBGL_BIP85_REVIEW_APP_WITH_LANGUAGE),
+    ENTRY(UI_STR_NBGL_BIP85_REVIEW_INDEX_VALUE),
+    ENTRY(UI_STR_NBGL_BIP85_REVIEW_LENGTH_WORDS),
+    ENTRY(UI_STR_NBGL_BIP85_REVIEW_LENGTH_CHARACTERS),
+    ENTRY(UI_STR_NBGL_BIP85_REVEAL_WARN_BIP39),
+    ENTRY(UI_STR_NBGL_BIP85_REVEAL_WARN_PWD),
     ENTRY(UI_STR_NBGL_BIP85_INDEX_TITLE),
     ENTRY(UI_STR_NBGL_BIP85_INDEX_RANGE_ERROR),
     ENTRY(UI_STR_NBGL_BIP85_PWD_LENGTH_TITLE),
@@ -191,24 +276,24 @@ static const struct {
  * own layout actually draws it in.
  */
 static const unsigned char k_nanos_char_width_regular[96] = {
-    3,  3,  4,  7,  6,  9,  8,  2,  3,  3,  6,  6,  3,  4,  3,  4,  /* 0x20-0x2F */
-    6,  6,  6,  6,  8,  6,  6,  6,  6,  6,  3,  3,  6,  6,  6,  5,  /* 0x30-0x3F */
-    10, 7,  7,  7,  8,  6,  6,  8,  8,  3,  4,  7,  6,  10, 8,  9,  /* 0x40-0x4F */
-    7,  9,  7,  6,  7,  8,  7,  10, 6,  6,  6,  4,  4,  4,  6,  5,  /* 0x50-0x5F */
-    6,  6,  7,  5,  7,  6,  5,  6,  7,  3,  4,  6,  3,  10, 7,  7,  /* 0x60-0x6F */
-    7,  7,  4,  5,  4,  7,  6,  9,  6,  6,  5,  4,  6,  4,  6,  7,  /* 0x70-0x7F */
+    3,  3, 4, 7, 6, 9, 8, 2,  3, 3, 6, 6, 3, 4,  3, 4, /* 0x20-0x2F */
+    6,  6, 6, 6, 8, 6, 6, 6,  6, 6, 3, 3, 6, 6,  6, 5, /* 0x30-0x3F */
+    10, 7, 7, 7, 8, 6, 6, 8,  8, 3, 4, 7, 6, 10, 8, 9, /* 0x40-0x4F */
+    7,  9, 7, 6, 7, 8, 7, 10, 6, 6, 6, 4, 4, 4,  6, 5, /* 0x50-0x5F */
+    6,  6, 7, 5, 7, 6, 5, 6,  7, 3, 4, 6, 3, 10, 7, 7, /* 0x60-0x6F */
+    7,  7, 4, 5, 4, 7, 6, 9,  6, 6, 5, 4, 6, 4,  6, 7, /* 0x70-0x7F */
 };
 static const unsigned char k_nanos_char_width_bold[96] = {
-    3,  3,  6,  7,  6,  10, 9,  3,  4,  4,  6,  6,  3,  4,  3,  5,  /* 0x20-0x2F */
-    8,  6,  7,  7,  8,  6,  8,  7,  8,  8,  3,  3,  5,  6,  5,  6,  /* 0x30-0x3F */
-    10, 8,  7,  7,  8,  6,  6,  8,  8,  4,  5,  8,  6,  11, 9,  9,  /* 0x40-0x4F */
-    7,  9,  8,  6,  6,  8,  6,  11, 8,  7,  7,  5,  5,  5,  7,  6,  /* 0x50-0x5F */
-    7,  7,  7,  6,  7,  7,  6,  7,  7,  4,  5,  7,  4,  10, 7,  7,  /* 0x60-0x6F */
-    7,  7,  5,  6,  5,  7,  7,  10, 7,  7,  6,  5,  6,  5,  6,  6,  /* 0x70-0x7F */
+    3,  3, 6, 7, 6, 10, 9, 3,  4, 4, 6, 6, 3, 4,  3, 5, /* 0x20-0x2F */
+    8,  6, 7, 7, 8, 6,  8, 7,  8, 8, 3, 3, 5, 6,  5, 6, /* 0x30-0x3F */
+    10, 8, 7, 7, 8, 6,  6, 8,  8, 4, 5, 8, 6, 11, 9, 9, /* 0x40-0x4F */
+    7,  9, 8, 6, 6, 8,  6, 11, 8, 7, 7, 5, 5, 5,  7, 6, /* 0x50-0x5F */
+    7,  7, 7, 6, 7, 7,  6, 7,  7, 4, 5, 7, 4, 10, 7, 7, /* 0x60-0x6F */
+    7,  7, 5, 6, 5, 7,  7, 10, 7, 7, 6, 5, 6, 5,  6, 6, /* 0x70-0x7F */
 };
 
 #define NANOS_FIRST_CHAR 0x20
-#define NANOS_LAST_CHAR  0x7F
+#define NANOS_LAST_CHAR 0x7F
 
 /*
  * Every string below appears on at least one BAGL target through a fixed
@@ -238,30 +323,28 @@ static const unsigned char k_nanos_char_width_bold[96] = {
  * the tighter 87px in the bold font -- the more conservative of the two
  * combinations -- rather than guessed at a wider or lighter one.
  *
- * One string still fails the bound below and is deliberately not asserted:
- * "BIP39 Recovery" (UI_STR_BAGL_BIP39_INVALID_TITLE_L1), 90px bold against
- * the 87px PBB budget on nanos. It predates this header and no change since
- * has touched that screen's wording.
- *
- * There were two. The other was "recovery phrase", 93px, which the two idle
- * entries used to end on; the three entries that replaced them were written
- * against this budget and are asserted below like everything else. Recording
- * the gap here rather than only in a PR body is what made it visible enough
- * to close when those lines were next rewritten.
+ * Nothing below is exempt any more. Two strings used to be, and both were
+ * recorded here rather than only in a PR body, which is what made them visible
+ * enough to close when their screens were next touched: "recovery phrase" at
+ * 93px, which the two idle entries ended on, and "BIP39 Recovery" at 90px,
+ * which titled the invalid verdict. The first was rewritten when the idle menu
+ * was; the second stopped existing when the three BIP-39 verdict screens were
+ * given one title between them. Every macro reaching a fixed layout is now
+ * asserted.
  */
-#define BOUND_WIDE           116
-#define BOUND_TIGHT          87
+#define BOUND_WIDE 116
+#define BOUND_TIGHT 87
 #define BOUND_KEYBOARD_TITLE 128
 
 static const struct {
-    const char *name;
-    const char *value;
+    const char* name;
+    const char* value;
     unsigned int budget_px;
     bool bold;
 } k_nano_bounded_strings[] = {
     BOUNDED(UI_STR_QUIT, BOUND_WIDE, true),
     BOUNDED(UI_STR_VERSION_LABEL, BOUND_WIDE, true),
-    BOUNDED(UI_STR_BIP39_PHRASE_TITLE, BOUND_TIGHT, true),
+    BOUNDED(UI_STR_BAGL_BIP39_PHRASE_TITLE, BOUND_TIGHT, true),
     BOUNDED(UI_STR_WORDS_12, BOUND_WIDE, true),
     BOUNDED(UI_STR_WORDS_18, BOUND_WIDE, true),
     BOUNDED(UI_STR_WORDS_24, BOUND_WIDE, true),
@@ -282,6 +365,29 @@ static const struct {
     BOUNDED(UI_STR_BAGL_BACKUP_EXPLAIN_L1, BOUND_WIDE, false),
     BOUNDED(UI_STR_BAGL_BACKUP_EXPLAIN_L2, BOUND_WIDE, false),
     BOUNDED(UI_STR_BAGL_BACKUP_EXPLAIN_L3, BOUND_WIDE, false),
+    BOUNDED(UI_STR_BAGL_RECOVER_EXPLAIN_L1, BOUND_WIDE, false),
+    BOUNDED(UI_STR_BAGL_RECOVER_EXPLAIN_L2, BOUND_WIDE, false),
+    BOUNDED(UI_STR_BAGL_RECOVER_EXPLAIN_L3, BOUND_WIDE, false),
+    /*
+     * The Nano S pair. Same 116px box as the three lines above -- that target
+     * is the same width and one line shorter -- and this assertion is the only
+     * check they will ever get, since Speculos does not emulate it.
+     */
+    BOUNDED(UI_STR_BAGL_BACKUP_EXPLAIN_L1_NANOS, BOUND_WIDE, false),
+    BOUNDED(UI_STR_BAGL_BACKUP_EXPLAIN_L2_NANOS, BOUND_WIDE, false),
+    BOUNDED(UI_STR_BAGL_RECOVER_EXPLAIN_L1_NANOS, BOUND_WIDE, false),
+    BOUNDED(UI_STR_BAGL_RECOVER_EXPLAIN_L2_NANOS, BOUND_WIDE, false),
+    /* The two screens the Nano was missing, both variants of each. */
+    BOUNDED(UI_STR_BAGL_BACKUP_SSKR_L1, BOUND_WIDE, false),
+    BOUNDED(UI_STR_BAGL_BACKUP_SSKR_L2, BOUND_WIDE, false),
+    BOUNDED(UI_STR_BAGL_BACKUP_SSKR_L3, BOUND_WIDE, false),
+    BOUNDED(UI_STR_BAGL_BACKUP_SSKR_L1_NANOS, BOUND_WIDE, false),
+    BOUNDED(UI_STR_BAGL_BACKUP_SSKR_L2_NANOS, BOUND_WIDE, false),
+    BOUNDED(UI_STR_BAGL_SSKR_THRESHOLD_CONCEPT_L1, BOUND_WIDE, false),
+    BOUNDED(UI_STR_BAGL_SSKR_THRESHOLD_CONCEPT_L2, BOUND_WIDE, false),
+    BOUNDED(UI_STR_BAGL_SSKR_THRESHOLD_CONCEPT_L3, BOUND_WIDE, false),
+    BOUNDED(UI_STR_BAGL_SSKR_THRESHOLD_CONCEPT_L1_NANOS, BOUND_WIDE, false),
+    BOUNDED(UI_STR_BAGL_SSKR_THRESHOLD_CONCEPT_L2_NANOS, BOUND_WIDE, false),
     BOUNDED(UI_STR_BAGL_BACKUP_NOMATCH_L1, BOUND_WIDE, false),
     BOUNDED(UI_STR_BAGL_BACKUP_NOMATCH_L2, BOUND_WIDE, false),
     BOUNDED(UI_STR_BAGL_BIP39_LENGTH_TITLE_L1_NANOS, BOUND_WIDE, false),
@@ -312,20 +418,42 @@ static const struct {
     BOUNDED(UI_STR_BAGL_RETURN_TO_MENU, BOUND_WIDE, true),
     BOUNDED(UI_STR_BAGL_INVALID_ADVICE_L1, BOUND_WIDE, false),
     BOUNDED(UI_STR_BAGL_INVALID_ADVICE_L2, BOUND_WIDE, false),
-    /* BIP39_INVALID_TITLE_L1 ("BIP39 Recovery") -- see the file comment above. */
     BOUNDED(UI_STR_BAGL_BIP39_INVALID_TITLE_L2, BOUND_TIGHT, true),
     BOUNDED(UI_STR_BAGL_BIP39_REENTER_PHRASE, BOUND_WIDE, true),
     BOUNDED(UI_STR_BAGL_BIP39_NOMATCH_TITLE_L2, BOUND_TIGHT, true),
     BOUNDED(UI_STR_BAGL_BIP39_MATCH_TITLE_L2, BOUND_TIGHT, true),
-    BOUNDED(UI_STR_BAGL_SSKR_INVALID_TITLE_L1, BOUND_TIGHT, true),
+    BOUNDED(UI_STR_BAGL_SSKR_SHARES_TITLE, BOUND_TIGHT, true),
     BOUNDED(UI_STR_BAGL_SSKR_INVALID_TITLE_L2, BOUND_TIGHT, true),
     BOUNDED(UI_STR_BAGL_SSKR_REENTER_SHARES, BOUND_WIDE, true),
-    BOUNDED(UI_STR_BAGL_SSKR_NOMATCH_TITLE_L1, BOUND_TIGHT, true),
     BOUNDED(UI_STR_BAGL_SSKR_NOMATCH_TITLE_L2, BOUND_TIGHT, true),
-    BOUNDED(UI_STR_BAGL_SSKR_MATCH_TITLE_L1, BOUND_TIGHT, true),
     BOUNDED(UI_STR_BAGL_SSKR_MATCH_TITLE_L2, BOUND_TIGHT, true),
     BOUNDED(UI_STR_BAGL_GENERATE_SSKR_L1, BOUND_TIGHT, true),
     BOUNDED(UI_STR_BAGL_GENERATE_SSKR_L2, BOUND_TIGHT, true),
+    /*
+     * The review and the two warnings added in front of the two places a Nano
+     * reveals something. The pbb titles take the tight icon-flanked box, the
+     * nn bodies the wide one, as everything above does.
+     *
+     * UI_STR_BAGL_SSKR_REVIEW_WORDS and _SHARES are not here: both compose a
+     * value that reaches three digits, which is one more than
+     * expand_worst_case() substitutes, so they are measured against their real
+     * bounds by test_sskr_review_lines_fit_the_nano_box() below.
+     */
+    BOUNDED(UI_STR_BAGL_SSKR_REVIEW_TITLE_L1, BOUND_TIGHT, true),
+    BOUNDED(UI_STR_BAGL_SSKR_REVIEW_TITLE_L2, BOUND_TIGHT, true),
+    BOUNDED(UI_STR_BAGL_SSKR_REVIEW_CONFIRM_L1, BOUND_TIGHT, true),
+    BOUNDED(UI_STR_BAGL_SSKR_REVIEW_CONFIRM_L2, BOUND_TIGHT, true),
+    BOUNDED(UI_STR_BAGL_SSKR_REVEAL_WARN_L1, BOUND_TIGHT, true),
+    BOUNDED(UI_STR_BAGL_SSKR_REVEAL_WARN_L2, BOUND_TIGHT, true),
+    BOUNDED(UI_STR_BAGL_SCREEN_PRIVACY_L1, BOUND_WIDE, false),
+    BOUNDED(UI_STR_BAGL_SCREEN_PRIVACY_L2, BOUND_WIDE, false),
+    BOUNDED(UI_STR_BAGL_SSKR_REVEAL_WARN_L5, BOUND_WIDE, false),
+    BOUNDED(UI_STR_BAGL_SSKR_REVEAL_WARN_L6, BOUND_WIDE, false),
+    BOUNDED(UI_STR_BAGL_SSKR_CLOSE_CONFIRM_L1, BOUND_WIDE, false),
+    BOUNDED(UI_STR_BAGL_RECOVER_WARN_L1, BOUND_TIGHT, true),
+    BOUNDED(UI_STR_BAGL_RECOVER_WARN_L2, BOUND_TIGHT, true),
+    BOUNDED(UI_STR_BAGL_RECOVER_WARN_L5, BOUND_WIDE, false),
+    BOUNDED(UI_STR_BAGL_RECOVER_WARN_L6, BOUND_WIDE, false),
     BOUNDED(UI_STR_BAGL_RECOVER_BIP39_L1, BOUND_TIGHT, true),
     BOUNDED(UI_STR_BAGL_RECOVER_BIP39_L2, BOUND_TIGHT, true),
     BOUNDED(UI_STR_BAGL_SSKR_NUMSHARES_TITLE_L1, BOUND_WIDE, false),
@@ -345,7 +473,8 @@ static const struct {
  * to 46, share indices up to 16), so replacing each "%d" with "99" measures
  * the worst case those templates can actually reach.
  */
-static void expand_worst_case(const char *template, char *out, size_t out_size) {
+static void expand_worst_case(const char* template, char* out,
+                              size_t out_size) {
     size_t o = 0;
     for (size_t i = 0; template[i] != '\0' && o + 1 < out_size; i++) {
         if (template[i] == '%' && template[i + 1] == 'd') {
@@ -361,39 +490,45 @@ static void expand_worst_case(const char *template, char *out, size_t out_size) 
     out[o] = '\0';
 }
 
-static unsigned int text_width_px(const char *text, bool bold) {
-    const unsigned char *table = bold ? k_nanos_char_width_bold : k_nanos_char_width_regular;
+static unsigned int text_width_px(const char* text, bool bold) {
+    const unsigned char* table =
+        bold ? k_nanos_char_width_bold : k_nanos_char_width_regular;
     unsigned int width = 0;
     for (size_t i = 0; text[i] != '\0'; i++) {
-        unsigned char c = (unsigned char) text[i];
+        unsigned char c = (unsigned char)text[i];
         assert_true(c >= NANOS_FIRST_CHAR && c <= NANOS_LAST_CHAR);
         width += table[c - NANOS_FIRST_CHAR];
     }
     return width;
 }
 
-static void test_every_string_is_non_empty(void **state) {
-    (void) state;
+static void test_every_string_is_non_empty(void** state) {
+    (void)state;
 
-    for (size_t i = 0; i < sizeof(k_all_strings) / sizeof(k_all_strings[0]); i++) {
+    for (size_t i = 0; i < sizeof(k_all_strings) / sizeof(k_all_strings[0]);
+         i++) {
         if (strlen(k_all_strings[i].value) == 0) {
             fail_msg("%s is empty", k_all_strings[i].name);
         }
     }
 }
 
-static void test_nano_fixed_layout_strings_fit_their_budget(void **state) {
-    (void) state;
+static void test_nano_fixed_layout_strings_fit_their_budget(void** state) {
+    (void)state;
 
-    for (size_t i = 0; i < sizeof(k_nano_bounded_strings) / sizeof(k_nano_bounded_strings[0]);
-        i++) {
+    for (size_t i = 0;
+         i < sizeof(k_nano_bounded_strings) / sizeof(k_nano_bounded_strings[0]);
+         i++) {
         char expanded[128];
-        expand_worst_case(k_nano_bounded_strings[i].value, expanded, sizeof(expanded));
+        expand_worst_case(k_nano_bounded_strings[i].value, expanded,
+                          sizeof(expanded));
 
-        unsigned int width = text_width_px(expanded, k_nano_bounded_strings[i].bold);
+        unsigned int width =
+            text_width_px(expanded, k_nano_bounded_strings[i].bold);
         if (width > k_nano_bounded_strings[i].budget_px) {
-            fail_msg("%s (\"%s\") is %upx wide, over its %upx budget", k_nano_bounded_strings[i].name,
-                     expanded, width, k_nano_bounded_strings[i].budget_px);
+            fail_msg("%s (\"%s\") is %upx wide, over its %upx budget",
+                     k_nano_bounded_strings[i].name, expanded, width,
+                     k_nano_bounded_strings[i].budget_px);
         }
     }
 }
@@ -426,11 +561,11 @@ static void test_nano_fixed_layout_strings_fit_their_budget(void **state) {
  * Using "99" for both, as expand_worst_case() would, gives 116px and fails a
  * layout that is actually fine: 99 shares cannot be generated.
  */
-#define NANO_PIXEL_PER_LINE     114
+#define NANO_PIXEL_PER_LINE 114
 #define SSKR_MAX_PAGES_PER_SHARE 23
 
-static void test_sskr_share_label_fits_the_nano_title_line(void **state) {
-    (void) state;
+static void test_sskr_share_label_fits_the_nano_title_line(void** state) {
+    (void)state;
 
     char title[64];
     snprintf(title, sizeof(title), UI_STR_BAGL_SSKR_SHARE_HEADER " (%d/%d)",
@@ -440,9 +575,104 @@ static void test_sskr_share_label_fits_the_nano_title_line(void **state) {
     /* a bnnn_paging title is drawn in the bold font */
     unsigned int width = text_width_px(title, true);
     if (width > NANO_PIXEL_PER_LINE) {
-        fail_msg("the widest SSKR share title (\"%s\") is %upx, over the %upx a "
-                 "Nano line holds -- bnnn_paging would clip it with no warning",
-                 title, width, NANO_PIXEL_PER_LINE);
+        fail_msg(
+            "the widest SSKR share title (\"%s\") is %upx, over the %upx a "
+            "Nano line holds -- bnnn_paging would clip it with no warning",
+            title, width, NANO_PIXEL_PER_LINE);
+    }
+}
+
+/*
+ * The same measurement for the other label a bnnn_paging title carries, and
+ * the reason this test exists at all: this one was clipped in production.
+ *
+ * src/bagl/ux_bip39.c heads the recovered phrase with
+ * UI_STR_BAGL_BIP39_PHRASE_TITLE, and the widget appends the counter here too.
+ * The macro was in k_nano_bounded_strings[] all along and passed -- "BIP39
+ * Phrase" is 75px against the 87px PBB box -- because measuring a macro on its
+ * own cannot see a counter the macro does not contain. What reached the screen
+ * was "BIP39 Phrase (24/24)" at 121px on a 114px line, drawn as "BIP39 Phrase
+ * (12/1".
+ *
+ * The worst case is the widest counter, and the counter's two halves are both
+ * page numbers of one phrase, so both are bounded by the same thing: a page
+ * break falls between words, never inside one, so a phrase of
+ * BIP39_MNEMONIC_SIZE_24 words cannot paginate past 24 pages -- reached on the
+ * 128x32 Nano S, where UX_LAYOUT_PAGING_LINE_COUNT is 1 and a line of two
+ * eight-letter words does not fit.
+ */
+static void test_phrase_title_fits_the_nano_title_line(void** state) {
+    (void)state;
+
+    char title[64];
+    snprintf(title, sizeof(title), UI_STR_BAGL_BIP39_PHRASE_TITLE " (%d/%d)",
+             BIP39_MNEMONIC_SIZE_24, BIP39_MNEMONIC_SIZE_24);
+
+    unsigned int width = text_width_px(title, true);
+    if (width > NANO_PIXEL_PER_LINE) {
+        fail_msg(
+            "the widest phrase title (\"%s\") is %upx, over the %upx a "
+            "Nano line holds -- bnnn_paging would clip it with no warning",
+            title, width, NANO_PIXEL_PER_LINE);
+    }
+}
+
+/*
+ * The three composed lines of the Nano backup review and its close question,
+ * measured against the numbers they can actually carry.
+ *
+ * They are not in k_nano_bounded_strings[] because expand_worst_case()
+ * substitutes "99" for every "%d", and the word total is the one string in this
+ * header that goes past two digits: SSS_MAX_SHARE_COUNT shares of
+ * SSKR_LONGEST_SHARE_WORDCOUNT ByteWords is 460 under TARGET_NANOS and 736
+ * elsewhere. "99" would measure a narrower line than the one that gets drawn,
+ * which is the failure mode this file exists to prevent.
+ *
+ * All three are nn lines: the wide 116px box, the regular font, and no
+ * wrapping -- they clip.
+ */
+/* the same 46 src/nbgl/ui.c static-asserts against SSS_MAX_SHARE_COUNT */
+#define SSKR_LONGEST_SHARE_WORDCOUNT 46
+
+static void test_sskr_review_lines_fit_the_nano_box(void** state) {
+    (void)state;
+
+    char line[64];
+
+    snprintf(line, sizeof(line), UI_STR_BAGL_SSKR_REVIEW_WORDS,
+             SSS_MAX_SHARE_COUNT * SSKR_LONGEST_SHARE_WORDCOUNT);
+    unsigned int width = text_width_px(line, false);
+    if (width > BOUND_WIDE) {
+        fail_msg(
+            "the widest backup review word total (\"%s\") is %upx, over "
+            "the %upx a nn line holds -- it would be clipped with no warning",
+            line, width, BOUND_WIDE);
+    }
+
+    /*
+     * Both counts at their maximum: the threshold cannot exceed the share
+     * count, so SSS_MAX_SHARE_COUNT twice is the widest this line reaches, and
+     * it is the value the generation menu is actually capped to rather than a
+     * placeholder.
+     */
+    snprintf(line, sizeof(line), UI_STR_BAGL_SSKR_REVIEW_SHARES,
+             SSS_MAX_SHARE_COUNT, SSS_MAX_SHARE_COUNT);
+    width = text_width_px(line, false);
+    if (width > BOUND_WIDE) {
+        fail_msg(
+            "the widest backup review scheme line (\"%s\") is %upx, over "
+            "the %upx a nn line holds -- it would be clipped with no warning",
+            line, width, BOUND_WIDE);
+    }
+
+    snprintf(line, sizeof(line), UI_STR_BAGL_SSKR_CLOSE_CONFIRM_L2,
+             SSS_MAX_SHARE_COUNT);
+    width = text_width_px(line, false);
+    if (width > BOUND_WIDE) {
+        fail_msg(
+            "the widest close question (\"%s\") is %upx, over the %upx a "
+            "nn line holds",
+            line, width, BOUND_WIDE);
     }
 }
 
@@ -472,7 +702,7 @@ static void test_sskr_share_label_fits_the_nano_title_line(void **state) {
  * "9999999", so a title promising ten times what the keypad accepts would go
  * through. Comparing whole runs fails in both directions.
  */
-static void strip_commas(const char *in, char *out, size_t out_size) {
+static void strip_commas(const char* in, char* out, size_t out_size) {
     size_t o = 0;
     for (size_t i = 0; in[i] != '\0' && o + 1 < out_size; i++) {
         if (in[i] != ',') {
@@ -482,7 +712,7 @@ static void strip_commas(const char *in, char *out, size_t out_size) {
     out[o] = '\0';
 }
 
-static bool has_digit_run(const char *text, const char *bound) {
+static bool has_digit_run(const char* text, const char* bound) {
     size_t bound_len = strlen(bound);
     for (size_t i = 0; text[i] != '\0';) {
         if (text[i] < '0' || text[i] > '9') {
@@ -494,28 +724,32 @@ static bool has_digit_run(const char *text, const char *bound) {
             i++;
         }
         size_t run_len = i - start;
-        if (run_len == bound_len && strncmp(text + start, bound, bound_len) == 0) {
+        if (run_len == bound_len &&
+            strncmp(text + start, bound, bound_len) == 0) {
             return true;
         }
     }
     return false;
 }
 
-static void assert_announces(const char *name, const char *value, const char *bound) {
+static void assert_announces(const char* name, const char* value,
+                             const char* bound) {
     char plain[256];
     strip_commas(value, plain, sizeof(plain));
     if (!has_digit_run(plain, bound)) {
-        fail_msg("%s (\"%s\") does not name %s, the bound the code applies", name, value, bound);
+        fail_msg("%s (\"%s\") does not name %s, the bound the code applies",
+                 name, value, bound);
     }
 }
 
-static void test_announced_bounds_are_the_applied_ones(void **state) {
-    (void) state;
+static void test_announced_bounds_are_the_applied_ones(void** state) {
+    (void)state;
 
     char bound[32];
 
     snprintf(bound, sizeof(bound), "%d", SSS_MAX_SHARE_COUNT);
-    assert_announces("UI_STR_NBGL_SSKR_NUMSHARES_TITLE", UI_STR_NBGL_SSKR_NUMSHARES_TITLE, bound);
+    assert_announces("UI_STR_NBGL_SSKR_NUMSHARES_TITLE",
+                     UI_STR_NBGL_SSKR_NUMSHARES_TITLE, bound);
     assert_announces("UI_STR_NBGL_SSKR_NUMSHARES_RANGE_ERROR",
                      UI_STR_NBGL_SSKR_NUMSHARES_RANGE_ERROR, bound);
 
@@ -525,9 +759,10 @@ static void test_announced_bounds_are_the_applied_ones(void **state) {
         index_max *= 10;
     }
     snprintf(bound, sizeof(bound), "%lu", index_max - 1);
-    assert_announces("UI_STR_NBGL_BIP85_INDEX_TITLE", UI_STR_NBGL_BIP85_INDEX_TITLE, bound);
-    assert_announces("UI_STR_NBGL_BIP85_INDEX_RANGE_ERROR", UI_STR_NBGL_BIP85_INDEX_RANGE_ERROR,
-                     bound);
+    assert_announces("UI_STR_NBGL_BIP85_INDEX_TITLE",
+                     UI_STR_NBGL_BIP85_INDEX_TITLE, bound);
+    assert_announces("UI_STR_NBGL_BIP85_INDEX_RANGE_ERROR",
+                     UI_STR_NBGL_BIP85_INDEX_RANGE_ERROR, bound);
 }
 
 /*
@@ -541,7 +776,7 @@ static void test_announced_bounds_are_the_applied_ones(void **state) {
  * its "%d" drops the bound the screen was changed to show, and nothing warns.
  * A title that gains one reads an argument that was never pushed.
  */
-static size_t count_conversions(const char *format) {
+static size_t count_conversions(const char* format) {
     size_t n = 0;
     for (size_t i = 0; format[i] != '\0'; i++) {
         if (format[i] == '%' && format[i + 1] == 'd') {
@@ -552,27 +787,34 @@ static size_t count_conversions(const char *format) {
     return n;
 }
 
-static void test_composed_titles_take_the_arguments_passed_to_them(void **state) {
-    (void) state;
+static void test_composed_titles_take_the_arguments_passed_to_them(
+    void** state) {
+    (void)state;
 
     static const struct {
-        const char *name;
-        const char *value;
+        const char* name;
+        const char* value;
         size_t expected;
     } k_composed[] = {
-        /* display_sskr_select_threshold_page(): the floor, then the share count */
-        {"UI_STR_NBGL_SSKR_THRESHOLD_TITLE", UI_STR_NBGL_SSKR_THRESHOLD_TITLE, 2},
+        /* display_sskr_select_threshold_page(): the floor, then the share count
+         */
+        {"UI_STR_NBGL_SSKR_THRESHOLD_TITLE", UI_STR_NBGL_SSKR_THRESHOLD_TITLE,
+         2},
         /* display_bip85_select_password_length_page(): minimum, maximum */
-        {"UI_STR_NBGL_BIP85_PWD_LENGTH_TITLE", UI_STR_NBGL_BIP85_PWD_LENGTH_TITLE, 2},
+        {"UI_STR_NBGL_BIP85_PWD_LENGTH_TITLE",
+         UI_STR_NBGL_BIP85_PWD_LENGTH_TITLE, 2},
         /* bip85_password_length_validate(): the same pair */
-        {"UI_STR_NBGL_BIP85_PWD_LENGTH_RANGE_ERROR", UI_STR_NBGL_BIP85_PWD_LENGTH_RANGE_ERROR, 2},
+        {"UI_STR_NBGL_BIP85_PWD_LENGTH_RANGE_ERROR",
+         UI_STR_NBGL_BIP85_PWD_LENGTH_RANGE_ERROR, 2},
     };
 
     for (size_t i = 0; i < sizeof(k_composed) / sizeof(k_composed[0]); i++) {
         size_t found = count_conversions(k_composed[i].value);
         if (found != k_composed[i].expected) {
-            fail_msg("%s (\"%s\") takes %zu \"%%d\", but its call site passes %zu",
-                     k_composed[i].name, k_composed[i].value, found, k_composed[i].expected);
+            fail_msg(
+                "%s (\"%s\") takes %zu \"%%d\", but its call site passes %zu",
+                k_composed[i].name, k_composed[i].value, found,
+                k_composed[i].expected);
         }
     }
 }
@@ -606,8 +848,9 @@ static void test_composed_titles_take_the_arguments_passed_to_them(void **state)
 
 #define MACRO_PREFIX "#define UI_STR_"
 
-static bool table_names(const char *name) {
-    for (size_t i = 0; i < sizeof(k_all_strings) / sizeof(k_all_strings[0]); i++) {
+static bool table_names(const char* name) {
+    for (size_t i = 0; i < sizeof(k_all_strings) / sizeof(k_all_strings[0]);
+         i++) {
         if (strcmp(k_all_strings[i].name, name) == 0) {
             return true;
         }
@@ -615,19 +858,22 @@ static bool table_names(const char *name) {
     return false;
 }
 
-static void test_the_table_names_every_macro_of_the_header(void **state) {
-    (void) state;
+static void test_the_table_names_every_macro_of_the_header(void** state) {
+    (void)state;
 
     /* no entry names the same macro twice */
-    for (size_t i = 0; i < sizeof(k_all_strings) / sizeof(k_all_strings[0]); i++) {
-        for (size_t j = i + 1; j < sizeof(k_all_strings) / sizeof(k_all_strings[0]); j++) {
+    for (size_t i = 0; i < sizeof(k_all_strings) / sizeof(k_all_strings[0]);
+         i++) {
+        for (size_t j = i + 1;
+             j < sizeof(k_all_strings) / sizeof(k_all_strings[0]); j++) {
             if (strcmp(k_all_strings[i].name, k_all_strings[j].name) == 0) {
-                fail_msg("k_all_strings[] lists %s twice", k_all_strings[i].name);
+                fail_msg("k_all_strings[] lists %s twice",
+                         k_all_strings[i].name);
             }
         }
     }
 
-    FILE *header = fopen(UI_STRINGS_HEADER_PATH, "r");
+    FILE* header = fopen(UI_STRINGS_HEADER_PATH, "r");
     if (header == NULL) {
         fail_msg("cannot open %s", UI_STRINGS_HEADER_PATH);
     }
@@ -641,24 +887,26 @@ static void test_the_table_names_every_macro_of_the_header(void **state) {
         declared++;
 
         /* the macro name is the token after "#define " */
-        const char *start = line + strlen("#define ");
+        const char* start = line + strlen("#define ");
         size_t len = 0;
-        while (start[len] != '\0' && !isspace((unsigned char) start[len]) &&
+        while (start[len] != '\0' && !isspace((unsigned char)start[len]) &&
                start[len] != '(') {
             len++;
         }
         char name[128];
         if (len >= sizeof(name)) {
-            fail_msg("%s declares a macro name longer than this test can hold", MACRO_PREFIX);
+            fail_msg("%s declares a macro name longer than this test can hold",
+                     MACRO_PREFIX);
         }
         memcpy(name, start, len);
         name[len] = '\0';
 
         if (!table_names(name)) {
             fclose(header);
-            fail_msg("%s declares %s, k_all_strings[] does not list it; a macro "
-                     "missing from that table is checked by nothing in this file",
-                     UI_STRINGS_HEADER_PATH, name);
+            fail_msg(
+                "%s declares %s, k_all_strings[] does not list it; a macro "
+                "missing from that table is checked by nothing in this file",
+                UI_STRINGS_HEADER_PATH, name);
         }
     }
     fclose(header);
@@ -679,8 +927,11 @@ int main(void) {
         cmocka_unit_test(test_the_table_names_every_macro_of_the_header),
         cmocka_unit_test(test_nano_fixed_layout_strings_fit_their_budget),
         cmocka_unit_test(test_sskr_share_label_fits_the_nano_title_line),
+        cmocka_unit_test(test_phrase_title_fits_the_nano_title_line),
+        cmocka_unit_test(test_sskr_review_lines_fit_the_nano_box),
         cmocka_unit_test(test_announced_bounds_are_the_applied_ones),
-        cmocka_unit_test(test_composed_titles_take_the_arguments_passed_to_them),
+        cmocka_unit_test(
+            test_composed_titles_take_the_arguments_passed_to_them),
     };
     return cmocka_run_group_tests(tests, NULL, NULL);
 }

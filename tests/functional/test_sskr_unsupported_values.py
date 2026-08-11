@@ -6,6 +6,8 @@ from ragger.conftest import configuration
 from ragger.firmware.touch.use_cases import UseCaseHomeExt, UseCaseViewDetails, UseCaseChoice
 from ragger.firmware.touch.layouts import CenteredFooter, LetterOnlyKeyboard, Suggestions, ChoiceList
 from keypad import Keypad
+import reviews
+import explanations
 from genericlayout import GenericLayout, MENU_BACKUP
 
 # The threshold keypad names the values it accepts. Its upper bound is the
@@ -40,17 +42,17 @@ def all_eink_unsupported_values(backend, device):
     # user asked for rather than the only door into it.
     backend.wait_for_text_on_screen("Seed Tool", 10)
     home_page.action()
-    backend.wait_for_text_on_screen("Generate backup shares", 5)
+    backend.wait_for_text_on_screen("Generate Backup Shares", 5)
     genericbuttons.choose(MENU_BACKUP)
-    backend.wait_for_text_on_screen("Enter your recovery", 5)
-    choice.confirm()
-    backend.wait_for_text_on_screen("12 words", 5)
+    explanations.pass_explanation(
+        backend, device, explanations.EXPLAIN_BACKUP, "12 words",
+        button=explanations.ENTER_PHRASE, action=True)
     genericbuttons.choose(1)
     backend.wait_for_text_on_screen("Enter word", 5)
     for word in configuration.OPTIONAL.CUSTOM_SEED.split():
         keyboard.write(word[:4])
         suggestion.choose(1)
-    backend.wait_for_text_on_screen("Valid Secret", 5)
+    backend.wait_for_text_on_screen("Valid", 5)
     backend.wait_for_text_on_screen("Recovery Phrase", 1)
     check_result.tap()
 
@@ -58,7 +60,9 @@ def all_eink_unsupported_values(backend, device):
     # that asked for it. Each refusal is waited for on its own: the status page
     # does not carry the keypad title, so reaching the title afterwards is a
     # screen change and not the screen we were already on.
-    backend.wait_for_text_on_screen("Enter number of SSKR shares", 5)
+    explanations.pass_explanation(
+        backend, device, explanations.EXPLAIN_NUMBERS,
+        "Enter number of SSKR Shares")
     # The range on its own line, matched whole. This title carries a
     # hand-placed line break for the same reason the password one does, and a
     # layout that wrapped inside the range would draw "to generate (1 - " and
@@ -68,16 +72,26 @@ def all_eink_unsupported_values(backend, device):
     keypad.write("0")
     keypad.enter()
     backend.wait_for_text_on_screen("Number of SSKR", 5)
-    backend.wait_for_text_on_screen("Enter number of SSKR shares", 10)
+    backend.wait_for_text_on_screen("Enter number of SSKR Shares", 10)
     keypad.write("17")
     keypad.enter()
     backend.wait_for_text_on_screen("Number of SSKR", 5)
-    backend.wait_for_text_on_screen("Enter number of SSKR shares", 10)
+    backend.wait_for_text_on_screen("Enter number of SSKR Shares", 10)
 
     # From here the share count is entered exactly once, and the rest of the
     # test never types it again. Everything below depends on it still being 3.
     keypad.write("3")
     keypad.enter()
+    # The threshold explanation stands between the two keypads on the first
+    # pass, and only there: the three refusals below come back to the keypad
+    # itself, which is what the rest of this test asserts.
+    # Not THRESHOLD_TITLE_3_SHARES: that constant is escaped for
+    # wait_for_text_on_screen(), which matches with re.match, while
+    # pass_explanation() compares with str.startswith. The line below is
+    # asserted whole two statements further down anyway.
+    explanations.pass_explanation(
+        backend, device, explanations.EXPLAIN_THRESHOLD,
+        "Enter threshold value")
     backend.wait_for_text_on_screen(THRESHOLD_TITLE_3_SHARES, 5)
 
     # Each of the three threshold refusals comes back to the threshold keypad,
@@ -94,7 +108,7 @@ def all_eink_unsupported_values(backend, device):
 
     keypad.write("1")
     keypad.enter()
-    backend.wait_for_text_on_screen("1-of-m shares", 5)
+    backend.wait_for_text_on_screen("A threshold of 1", 5)
     backend.wait_for_text_on_screen(THRESHOLD_TITLE_3_SHARES, 10)
 
     # And a threshold this one does accept generates a 2-of-3 straight away.
@@ -104,9 +118,17 @@ def all_eink_unsupported_values(backend, device):
     # count entered once is the count that was used.
     keypad.write("2")
     keypad.enter()
-    backend.wait_for_text_on_screen("SSKR share 1 of 3", 5)
+
+    # The review now stands between the accepted threshold and the shares, and
+    # it is where the count entered once becomes visible as a number rather
+    # than only as a share label: "3" against the "2" just typed.
+    backend.wait_for_text_on_screen("Number of Shares", 5)
+    reviews.approve(backend, device, "Generate Backup Shares")
+
+    backend.wait_for_text_on_screen("SSKR Share 1 of 3", 5)
     backend.wait_for_text_on_screen("tuna next keep gyro", 1)
     review.exit()
+    reviews.close_shares(backend, device)
     backend.wait_for_text_on_screen("Seed Tool", 5)
     home_page.quit()
 

@@ -325,6 +325,103 @@ uint8_t bip85_finalize_pwd(const char* buffer_pwd, char* pwd, uint8_t pwd_len) {
  *
  * @return The number of path components written.
  */
+// See common_bip85.h.
+//
+// Written out by hand rather than with snprintf(): the nanos SDK returns 0
+// from every exit of it and documents that, so the "did it fit" answer is not
+// available there. No BAGL target compiles a BIP-85 screen today, but a
+// formatter whose bound depends on which SDK compiled it is a trap to leave
+// behind, and the loop below is no longer than the call would have been.
+bool bip85_path_format(const unsigned int* path, unsigned int path_len,
+                       char* out, size_t out_len) {
+    if (out == NULL || out_len == 0) {
+        return false;
+    }
+    out[0] = '\0';
+    // A zero-component path is not "m", it is a path that was never built --
+    // bip85_app_path_build() returns 0 for an application it does not know.
+    // Displaying a bare "m" for it would be displaying a derivation nobody
+    // performed.
+    if (path == NULL || path_len == 0) {
+        return false;
+    }
+
+    size_t pos = 0;
+// Every write below goes through this, so the bound is applied in one
+// place and the null terminator is always accounted for.
+#define BIP85_PATH_PUT(c)         \
+    do {                          \
+        if (pos + 1 >= out_len) { \
+            out[0] = '\0';        \
+            return false;         \
+        }                         \
+        out[pos++] = (c);         \
+    } while (0)
+
+    BIP85_PATH_PUT('m');
+
+    for (unsigned int i = 0; i < path_len; i++) {
+        BIP85_PATH_PUT('/');
+
+        // BIP-85 hardens every component; the apostrophe below is what says
+        // so, and printing the raw value would show 2231369032 where the
+        // specification says 83696968.
+        unsigned int value = path[i] & 0x7FFFFFFFu;
+
+        // Ten digits is the most a 31-bit value takes.
+        char digits[10];
+        unsigned int ndigits = 0;
+        do {
+            digits[ndigits++] = (char)('0' + (value % 10));
+            value /= 10;
+        } while (value != 0);
+
+        while (ndigits > 0) {
+            BIP85_PATH_PUT(digits[--ndigits]);
+        }
+
+        BIP85_PATH_PUT('\'');
+    }
+
+#undef BIP85_PATH_PUT
+
+    out[pos] = '\0';
+    return true;
+}
+
+/*
+ * One path formatter per derivation entry point, taking the same arguments.
+ *
+ * They are here, beside the builders and the `bolos_ux_bip85_*` functions that
+ * call them, rather than in the interface layer, so that the path a review
+ * displays and the path the derivation walks are produced by the same builder
+ * call with the same parameter list. A screen that assembled the components
+ * itself would be a second definition of the path, and a BIP-85 path that is
+ * wrong in one component still derives a well-formed secret -- just not the
+ * one that was promised, and with nothing on screen to say so.
+ */
+bool bolos_ux_bip85_bip39_path_format(uint8_t language, uint8_t words,
+                                      unsigned int index, char* out,
+                                      size_t out_len) {
+    unsigned int path[BIP85_PATH_LEN_BIP39];
+    return bip85_path_format(
+        path, bip85_path_bip39(path, language, words, index), out, out_len);
+}
+
+bool bolos_ux_bip85_pwd_base64_path_format(uint8_t pwd_len, unsigned int index,
+                                           char* out, size_t out_len) {
+    unsigned int path[BIP85_PATH_LEN_PWD_BASE64];
+    return bip85_path_format(path, bip85_path_pwd_base64(path, pwd_len, index),
+                             out, out_len);
+}
+
+bool bolos_ux_bip85_pwd_base85_path_format(uint8_t pwd_len, unsigned int index,
+                                           char* out, size_t out_len) {
+    unsigned int path[BIP85_PATH_LEN_PWD_BASE85];
+    return bip85_path_format(path, bip85_path_pwd_base85(path, pwd_len, index),
+                             out, out_len);
+}
+
 unsigned int bip85_path_drng(unsigned int* path, unsigned int index) {
     // m / purpose'   / app_no' / index'
     // m / 83696968'  / 0'      / index'

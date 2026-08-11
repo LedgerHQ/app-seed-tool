@@ -54,10 +54,7 @@ def test_sskr_entry_two_button(device, backend, navigator, set_seed):
         skip("Two-button devices only; the touch path is covered elsewhere")
 
     nano.select_in_menu(navigator, "Recover")
-    # The SSKR flow opens on an instruction screen whose callback starts the
-    # entry; the BIP-39 flow reaches the keyboard through its word-count menu
-    # instead, which is why the other two-button test needs no equivalent.
-    nano.confirm(backend)
+    nano.open_sskr_entry(backend)
 
     for shard in SHARDS:
         for word in shard.split():
@@ -67,4 +64,4 @@ def test_sskr_entry_two_button(device, backend, navigator, set_seed):
     # that says the phrase does not match, so asserting it on its own would
     # assert nothing about the answer -- the same reason
     # test_bip39_seed_match.py checks two lines.
-    nano.wait_for_lines(backend, "SSKR Phrase", "is correct")
+    nano.wait_for_lines(backend, "SSKR Shares", "are correct")

@@ -17,6 +17,7 @@
 
 #pragma once
 
+#include <stdbool.h>
 #include <stdint.h>
 #include <stddef.h>
 
@@ -113,3 +114,71 @@ int32_t bolos_ux_bip85_dice(uint32_t *out,
                             uint32_t sides,
                             uint32_t rolls,
                             uint32_t index);
+
+/*
+ * The derivation path, written the way the specification writes it.
+ *
+ * A BIP-85 result is only worth anything if it can be reproduced somewhere
+ * else -- that is the whole point of deriving rather than storing. Reproducing
+ * it needs the path, and no screen in this application has ever shown one.
+ *
+ * The longest path this application builds has five components, each a 32-bit
+ * value whose hardening bit is stripped before printing, so at most ten digits
+ * and an apostrophe apiece, after a leading "m".
+ */
+#define BIP85_PATH_STRING_MAX_LENGTH (1 + 5 * (1 + 10 + 1) + 1)
+
+/**
+ * @brief Renders a built BIP-85 path as "m/83696968'/39'/0'/24'/42'".
+ *
+ * @details Takes the component array a `bip85_path_*()` builder filled rather
+ *          than the values a screen collected, so what is displayed is what
+ *          was built. Every component of a BIP-85 path is hardened; the
+ *          hardening bit is removed for display and reported by the trailing
+ *          apostrophe, exactly as BIP-32 notation does.
+ *
+ *          Does not use snprintf(): its return value is unusable on one of the
+ *          SDKs this repository targets (nanos returns 0 from every exit), and
+ *          a bound that cannot be checked is not a bound.
+ *
+ * @param[in]  path     Components, as written by a `bip85_path_*()` builder.
+ * @param[in]  path_len Number of components in `path`.
+ * @param[out] out      Destination, always null-terminated on success.
+ * @param[in]  out_len  Capacity of `out`, in bytes.
+ *
+ * @return true if the whole path was written. false, with `out` set to the
+ *         empty string, if it would not fit or if `path_len` is 0 -- a caller
+ *         must never display a path that has been silently cut short, since a
+ *         truncated path is a wrong path rather than an incomplete one.
+ */
+bool bip85_path_format(const unsigned int *path, unsigned int path_len, char *out, size_t out_len);
+
+/**
+ * @brief Renders the path `bolos_ux_bip85_bip39()` derives over, for the same
+ *        arguments.
+ *
+ * @return What bip85_path_format() returned.
+ */
+bool bolos_ux_bip85_bip39_path_format(uint8_t language,
+                                      uint8_t words,
+                                      unsigned int index,
+                                      char *out,
+                                      size_t out_len);
+
+/**
+ * @brief Renders the path `bolos_ux_bip85_pwd_base64()` derives over, for the
+ *        same arguments.
+ */
+bool bolos_ux_bip85_pwd_base64_path_format(uint8_t pwd_len,
+                                           unsigned int index,
+                                           char *out,
+                                           size_t out_len);
+
+/**
+ * @brief Renders the path `bolos_ux_bip85_pwd_base85()` derives over, for the
+ *        same arguments.
+ */
+bool bolos_ux_bip85_pwd_base85_path_format(uint8_t pwd_len,
+                                           unsigned int index,
+                                           char *out,
+                                           size_t out_len);
