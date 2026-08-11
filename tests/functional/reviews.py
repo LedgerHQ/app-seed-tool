@@ -49,6 +49,33 @@ def _on_screen(backend, text):
     return any(drawn.startswith(text) for drawn in _texts(backend))
 
 
+def screen_text(backend):
+    """The screen's text with the renderer's line breaks removed.
+
+    Joined with nothing between the events, deliberately. A tag/value pair
+    wraps where the renderer decides and on characters, not on words, so a
+    derivation path arrives as two events -- Flex draws
+    "m/83696968'/89101'/10" and "'/6'/0'" -- and a value asserted against one
+    drawn line would be an assertion about the font. Joining with a space
+    instead would put one inside the path.
+
+    Use this rather than wait_for_text_on_screen() for anything containing a
+    parenthesis: that helper matches with re.match(), so "PIN (Index #0)"
+    asks for a group and matches "PIN Index #0".
+    """
+    return "".join(_texts(backend))
+
+
+def assert_on_screen(backend, text):
+    joined = screen_text(backend)
+    assert text in joined, f"{text!r} is not on screen; saw {joined!r}"
+
+
+def assert_not_on_screen(backend, text):
+    joined = screen_text(backend)
+    assert text not in joined, f"{text!r} is still on screen; saw {joined!r}"
+
+
 def assert_body_clears_button(backend, button_text):
     """Fail if the button is drawn over the end of the description.
 
