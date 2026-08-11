@@ -48,15 +48,21 @@ def _two_button_only(device):
 
 
 @mark.use_on_backend("speculos")
-def test_backup_explains_why_the_phrase_is_asked_for(device, backend, navigator, set_seed):
+def test_backup_explains_itself_before_asking_for_the_phrase(device, backend, navigator, set_seed):
     _two_button_only(device)
 
-    # The step this change adds to the Nano flow, between the menu and the
-    # length list. Its first two lines are a whole sentence because a nanos nn
-    # step shows only two -- and this device shows three, so the third is
-    # there as well.
+    # Two steps between the menu and the length list, and they answer two
+    # different questions in the order a reader needs them: what the journey
+    # makes, then why it wants the Phrase. Both are asserted, and asserted in
+    # order -- walking straight to the second would pass on a build that had
+    # lost the first.
+    #
+    # Two lines of each are matched rather than three. A nanos nn step shows
+    # only two, so the first two carry the whole sentence there; this device
+    # shows three and the third is present as well.
     nano.select_in_menu(navigator, "Generate")
-    nano.wait_for_lines(backend, "This Ledger cannot", "read back its Phrase.")
+    nano.wait_for_lines(backend, "Your Phrase is split", "into Shares to write.")
+    nano.walk_to_lines(backend, "This Ledger cannot", "read back its Phrase.")
 
     nano.select_in_menu(navigator, "12 words")
     nano.enter_phrase(backend, DEVICE_PHRASE)
