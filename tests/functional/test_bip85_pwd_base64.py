@@ -8,7 +8,7 @@ from ragger.firmware.touch.layouts import ChoiceList
 from keypad import Keypad
 import reviews
 import explanations
-from genericlayout import GenericLayout, MENU_DERIVE, BIP85_APP_PWD_BASE64
+from choicelist import MENU_DERIVE, BIP85_APP_PWD_BASE64
 
 @fixture(scope='session')
 def set_seed():
@@ -20,7 +20,7 @@ def all_eink_bip85_pwd_base64(backend, device):
     select_tool = ChoiceList(backend, device)
     keypad = Keypad(backend, device)
     review = UseCaseViewDetails(backend, device)
-    genericbuttons = GenericLayout(backend, device)
+    genericbuttons = ChoiceList(backend, device)
 
     backend.wait_for_text_on_screen("Seed Tool", 10)
     home_page.action()

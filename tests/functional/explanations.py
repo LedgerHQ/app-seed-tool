@@ -26,9 +26,10 @@ of the screen before, so an explanation reached from a keypad still lists that
 keypad's digits at the bottom of the screen.
 
 **Why these helpers touch a label rather than call a use-case method.** ragger's
-UseCaseChoice and GenericLayout.choose() drive components these screens are
-not, and the screen-change notification their helpers wait on does not arrive
-in time. So the control's own drawn rectangle is touched, and the destination
+UseCaseChoice and ChoiceList drive components these screens are not -- an
+explanation is nbgl_layoutGet() with a left content, not a choice and not a
+list -- and the screen-change notification their helpers wait on does not
+arrive in time. So the control's own drawn rectangle is touched, and the destination
 is polled for -- the application only processes a touch when it receives a
 tick, so reading straight after a tap returns the page that was already there.
 """
