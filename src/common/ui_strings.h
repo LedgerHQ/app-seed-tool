@@ -107,7 +107,7 @@
  */
 
 /*
- * NBGL: the four buttons of the menu (src/nbgl/ui.c), one per intention.
+ * NBGL: the four entries of the menu (src/nbgl/ui.c), one per intention.
  *
  * They used to name formats -- "BIP39 Check", "SSKR Check", "BIP85 Generate"
  * -- and generating a backup was not among them: it was only offered after a
@@ -122,39 +122,40 @@
  * see UI_STR_NBGL_SSKR_SHARE_HEADER below.
  *
  * The Recover entry says "from Backup" and not "from Backup Shares", which is
- * both shorter and, on reflection, the better half to drop. Measured first:
- * the longer form is 268px in a 268px button on apex_p -- not clipped, but
- * with no margin at all, which is the state just before clipping and
- * indistinguishable from it on a screenshot. And "shares" is the format's
- * word while "backup" is the word of someone holding the paper, which is who
- * this entry is for.
+ * both shorter and, on reflection, the better half to drop. Measured first,
+ * against the button stack this menu was then drawn as: the longer form was
+ * 268px in a 268px button on apex_p -- not clipped, but with no margin at
+ * all, which is the state just before clipping and indistinguishable from it
+ * on a screenshot. The list these entries are drawn in now uses a smaller
+ * font and gives them more room -- the widest of the four, "Generate Backup
+ * Shares", measures 229px from x=16 on the 300px apex_p screen, clear of the
+ * chevron -- so the entry is no longer the one at risk. The wording stands on
+ * its other half: "shares" is the format's word while "backup" is the word of
+ * someone holding the paper, which is who this entry is for.
  */
 #define UI_STR_NBGL_MENU_CHECK   "Check Recovery Phrase"
 #define UI_STR_NBGL_MENU_BACKUP  "Generate Backup Shares"
 #define UI_STR_NBGL_MENU_RECOVER "Recover from Backup"
 #define UI_STR_NBGL_MENU_DERIVE  "Derive with BIP85"
 /*
- * The break is placed rather than left to the layout. The text area this is
- * drawn in breaks on characters because generic_screen_set_top_title()
- * (src/nbgl/layout_generic_screen.c) leaves `wrapping` clear, as every title
- * in that file does; without the break Stax drew "What do you want to d" and
- * "o?". Setting the field would wrap on words instead -- the break is kept
- * because these two halves are chosen rather than discovered.
+ * No placed break. This is drawn in the header of the SDK list every "choose
+ * among N" screen is built on (display_choice_list(), src/nbgl/ui.c), and
+ * that header wraps on words by itself. The break used to be here because the
+ * hand-built title area broke on *characters* -- without it Stax drew "What
+ * do you want to d" and "o?" -- and it goes with the area.
  *
  * Nothing under it, though two of the four entries would be the better for a
  * line of their own -- "Check Recovery Phrase" does not say what it is
  * checked against, and "Derive with BIP85" says nothing to someone who does
- * not already know. There is no room on any of the three screens. Between the
- * back button and the fourth entry Flex has 96px, of which a single title
- * line takes 44; a subtitle wrapped to two lines was measured under Speculos
- * drawing its second line *under the first button*, which does not clip it,
- * it deletes it. One line would fit, and one line is 26 characters on apex_p.
- *
- * The list component that carries a subtitle per entry does not fit either:
- * nbgl_layoutAddTouchableBar() makes an entry 94px on apex_p with a one-line
- * subtitle, and four of them come to 376px against 340px of usable height.
+ * not already know. There is nowhere to put it. The content behind this list
+ * is an nbgl_contentBarsList_t, which is texts and tokens and nothing else:
+ * the `subText` field belongs to nbgl_layoutBar_t, one layer below, and
+ * reaching it means building the list and its pagination by hand. It would
+ * not fit either -- nbgl_layoutAddTouchableBar() makes an entry 94px on
+ * apex_p with a one-line subtitle, and four of them come to 376px against
+ * 340px of usable height.
  */
-#define UI_STR_NBGL_MENU_TITLE "What do you want\nto do?"
+#define UI_STR_NBGL_MENU_TITLE "What do you want to do?"
 
 /*
  * BAGL: the same intentions on the Nano idle menu (src/bagl/ui.c).
@@ -288,8 +289,8 @@
  * choice (src/bagl/ui.c), worded for the Check flow only, and split 2 lines
  * on nanos, 3 lines on nanox/nanos+.
  */
-#define UI_STR_NBGL_BIP39_LENGTH_TITLE_CHECK    "How long is your\nRecovery Phrase?"
-#define UI_STR_NBGL_BIP39_LENGTH_TITLE_DERIVE   "Length of BIP39\nPhrase?"
+#define UI_STR_NBGL_BIP39_LENGTH_TITLE_CHECK    "How long is your Recovery Phrase?"
+#define UI_STR_NBGL_BIP39_LENGTH_TITLE_DERIVE   "Length of BIP39 Phrase?"
 #define UI_STR_BAGL_BIP39_LENGTH_TITLE_L1_NANOS "How long is your"
 #define UI_STR_BAGL_BIP39_LENGTH_TITLE_L2_NANOS "Recovery Phrase?"
 #define UI_STR_BAGL_BIP39_LENGTH_TITLE_L1       "Select the number of"
@@ -1278,7 +1279,7 @@
 #define UI_STR_NBGL_BIP85_PIN_HEADER    "PIN (Index #%d)"
 
 /*
- * How long a PIN, asked with three buttons rather than with the keypad the
+ * How long a PIN, asked as a list of three rather than with the keypad the
  * password length uses.
  *
  * The keypad exists because a password length is any number in a range of
@@ -1287,11 +1288,11 @@
  * front of someone about to be shown a number, with a range error waiting
  * behind every other value they could type.
  *
- * The unit is named on every button, as the phrase-length screen names words:
- * "4" alone on a screen reached from a menu of secrets does not say four of
+ * The unit is named on every entry, as the phrase-length screen names words:
+ * "4" alone on a screen reached from a list of secrets does not say four of
  * what.
  */
-#define UI_STR_NBGL_BIP85_PIN_LENGTH_TITLE "How many digits\nin the PIN?"
+#define UI_STR_NBGL_BIP85_PIN_LENGTH_TITLE "How many digits in the PIN?"
 #define UI_STR_NBGL_BIP85_PIN_DIGITS_4     "4 digits"
 #define UI_STR_NBGL_BIP85_PIN_DIGITS_6     "6 digits"
 #define UI_STR_NBGL_BIP85_PIN_DIGITS_8     "8 digits"
