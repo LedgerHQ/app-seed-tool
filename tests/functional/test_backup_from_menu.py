@@ -39,8 +39,8 @@ from pytest import skip
 from ledgered.devices import DeviceType
 from ragger.conftest import configuration
 from ragger.firmware.touch.use_cases import UseCaseHomeExt, UseCaseChoice
-from ragger.firmware.touch.layouts import CenteredFooter, LetterOnlyKeyboard, Suggestions
-from genericlayout import GenericLayout, MENU_BACKUP, MENU_CHECK
+from ragger.firmware.touch.layouts import CenteredFooter, ChoiceList, LetterOnlyKeyboard, Suggestions
+from choicelist import MENU_BACKUP, MENU_CHECK, WORDS_12
 import explanations
 
 # https://github.com/BlockchainCommons/crypto-commons/blob/master/Docs/sskr-test-vector.md#128-bit-seed
@@ -73,7 +73,7 @@ def _enter(backend, device, phrase):
 def _walk_to_verdict(backend, device, entry, phrase):
     """Menu -> the chosen entry -> a 12-word phrase -> the verdict screen."""
     home_page = UseCaseHomeExt(backend, device)
-    genericbuttons = GenericLayout(backend, device)
+    genericbuttons = ChoiceList(backend, device)
     choice = UseCaseChoice(backend, device)
 
     backend.wait_for_text_on_screen("Seed Tool", 10)
@@ -96,7 +96,7 @@ def _walk_to_verdict(backend, device, entry, phrase):
     else:
         backend.wait_for_text_on_screen("How long is your", 5)
 
-    genericbuttons.choose(1)
+    genericbuttons.choose(WORDS_12)
     backend.wait_for_text_on_screen("Enter word", 5)
     _enter(backend, device, phrase)
 

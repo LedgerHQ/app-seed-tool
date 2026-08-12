@@ -8,7 +8,7 @@ from ragger.firmware.touch.layouts import CenteredFooter, LetterOnlyKeyboard, Su
 from keypad import Keypad
 import reviews
 import explanations
-from genericlayout import GenericLayout, MENU_BACKUP
+from choicelist import MENU_BACKUP, WORDS_12
 
 # The threshold keypad names the values it accepts. Its upper bound is the
 # share count entered on the screen before it, so this string is also the
@@ -34,7 +34,7 @@ def all_eink_unsupported_values(backend, device):
     keypad = Keypad(backend, device)
     review = UseCaseViewDetails(backend, device)
     choice = UseCaseChoice(backend, device)
-    genericbuttons = GenericLayout(backend, device)
+    genericbuttons = ChoiceList(backend, device)
 
     # Reached from the menu entry, not from a verdict that happened to offer
     # it. The verdict is still crossed on the way -- the phrase has to be the
@@ -47,7 +47,7 @@ def all_eink_unsupported_values(backend, device):
     explanations.pass_explanation(
         backend, device, explanations.EXPLAIN_BACKUP, "12 words",
         button=explanations.ENTER_PHRASE, action=True)
-    genericbuttons.choose(1)
+    genericbuttons.choose(WORDS_12)
     backend.wait_for_text_on_screen("Enter word", 5)
     for word in configuration.OPTIONAL.CUSTOM_SEED.split():
         keyboard.write(word[:4])

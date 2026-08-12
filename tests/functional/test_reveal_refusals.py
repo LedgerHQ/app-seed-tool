@@ -38,8 +38,8 @@ from ragger.firmware.touch.layouts import (CenteredFooter, ChoiceList,
 from keypad import Keypad
 import reviews
 import explanations
-from genericlayout import (GenericLayout, MENU_BACKUP, MENU_RECOVER,
-                           MENU_DERIVE, BIP85_APP_BIP39)
+from choicelist import (MENU_BACKUP, MENU_RECOVER, MENU_DERIVE,
+                        BIP85_APP_BIP39, WORDS_12)
 
 # https://github.com/BlockchainCommons/crypto-commons/blob/master/Docs/sskr-test-vector.md#128-bit-seed
 DEVICE_PHRASE = "fly mule excess resource treat plunge nose soda reflect adult ramp planet"
@@ -72,7 +72,7 @@ def _enter(backend, device, words):
 def _walk_to_sskr_review(backend, device):
     """Menu -> backup -> the device's own phrase -> share count -> threshold."""
     home_page = UseCaseHomeExt(backend, device)
-    buttons = GenericLayout(backend, device)
+    buttons = ChoiceList(backend, device)
     choice = UseCaseChoice(backend, device)
     check_result = CenteredFooter(backend, device)
     keypad = Keypad(backend, device)
@@ -84,7 +84,7 @@ def _walk_to_sskr_review(backend, device):
     explanations.pass_explanation(
         backend, device, explanations.EXPLAIN_BACKUP, "12 words",
         button=explanations.ENTER_PHRASE, action=True)
-    buttons.choose(1)
+    buttons.choose(WORDS_12)
     backend.wait_for_text_on_screen("Enter word", 5)
     _enter(backend, device, DEVICE_PHRASE)
     backend.wait_for_text_on_screen("Valid", 5)
@@ -142,7 +142,7 @@ def test_refusing_the_reveal_warning_shows_no_shares(device, backend, set_seed):
 def test_going_back_to_safety_shows_no_rebuilt_phrase(device, backend, set_seed):
     _touch_only(device)
     home_page = UseCaseHomeExt(backend, device)
-    buttons = GenericLayout(backend, device)
+    buttons = ChoiceList(backend, device)
     check_result = CenteredFooter(backend, device)
 
     backend.wait_for_text_on_screen("Seed Tool", 10)
@@ -170,7 +170,7 @@ def test_going_back_to_safety_shows_no_rebuilt_phrase(device, backend, set_seed)
 def test_refusing_the_derivation_review_derives_nothing(device, backend, set_seed):
     _touch_only(device)
     home_page = UseCaseHomeExt(backend, device)
-    buttons = GenericLayout(backend, device)
+    buttons = ChoiceList(backend, device)
     keypad = Keypad(backend, device)
 
     backend.wait_for_text_on_screen("Seed Tool", 10)
@@ -179,12 +179,11 @@ def test_refusing_the_derivation_review_derives_nothing(device, backend, set_see
     buttons.choose(MENU_DERIVE)
     explanations.pass_explanation(
         backend, device, explanations.EXPLAIN_BIP85, "Which BIP85")
-    # The secret list is the SDK's own, so it is driven by ragger's ChoiceList
-    # and counted from the top; the phrase length below it is still one of
-    # this application's own button screens, counted from the bottom.
+    # Both of the next two screens are the same SDK list, counted from the
+    # top, so one driver walks them.
     ChoiceList(backend, device).choose(BIP85_APP_BIP39)
     backend.wait_for_text_on_screen("Length of BIP39", 5)
-    buttons.choose(1)
+    buttons.choose(WORDS_12)
     explanations.pass_explanation(
         backend, device, explanations.EXPLAIN_INDEX, "Enter index")
     keypad.write("0")

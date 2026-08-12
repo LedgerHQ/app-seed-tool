@@ -38,8 +38,45 @@
 #include "../ui.h"
 #include "./bip39_mnemonic.h"
 #include "./bip85_app.h"
-#include "./layout_generic_screen.h"
 #include "./sskr_shares.h"
+
+/*
+ * What every screen in this file agrees on.
+ *
+ * Three signals are used across families, so none of them can be settled at a
+ * single screen. Each is written once, here, with what it excludes -- a rule
+ * that does not say what it rules out is a preference.
+ *
+ * **A black control means an act with a consequence.** Entering a Phrase,
+ * generating Shares, revealing a derived secret: the black button of an
+ * explanation (display_explanation_page()) and the long-press that ends a
+ * review (display_review()) are the only two shapes it takes. It does not
+ * mean "the recommended option" and it does not mean "the largest of these
+ * amounts" -- it meant the latter on the two length screens, which is the
+ * third meaning that made this paragraph necessary. Screens that only carry
+ * the reader on get the grey tap-to-continue instead, and screens that offer
+ * peers -- every "choose among N" -- emphasise nothing.
+ *
+ * **An icon says a state or an identity, never a format.** The verdicts and
+ * the warnings keep theirs (CHECK_CIRCLE_ICON, DENIED_CIRCLE_ICON,
+ * IMPORTANT_CIRCLE_ICON) and so does the home page, because those say what
+ * has happened or whose application this is. The icons this repository
+ * authored -- icon_bip39, icon_sskr, icon_bip85 -- name formats, and a format
+ * over a question about a quantity ("how many digits in the PIN?") answers a
+ * question nobody asked; they were on the two length screens and are not any
+ * more. Where a format icon *does* still appear it is beside a row of an
+ * explanation, naming the thing that row is about, which is an identity.
+ *
+ * **A title belongs to the component that draws it.** There are two left, and
+ * both wrap on words by themselves: the header of the list use case
+ * (display_choice_list()), and the title of an explanation
+ * (nbgl_layoutLeftContent_t::title). Two hand-built mechanisms are gone with
+ * the button stacks -- they hung a text area under an icon or under the back
+ * button, left `wrapping` clear, and so broke on *characters*, which is why
+ * every title they drew carried a hand-placed "\n". No title in
+ * src/common/ui_strings.h needs one now, and a new one that seems to is a
+ * title in the wrong component rather than a string that needs a break.
+ */
 
 /*
  * Sized on the BIP85 result label, which is the longest thing written into it:
@@ -266,136 +303,193 @@ static void reset_globals() {
 static void on_quit(void) { os_sched_exit(-1); }
 
 /*
- * The menu: one entry per intention
+ * Choosing among N, and the rule for it.
+ *
+ * Every screen of this application that asks for one of a fixed set of
+ * entries is drawn by nbgl_useCaseGenericConfiguration() over a single
+ * BARS_LIST content, through this function. There are four of them -- the
+ * menu of intentions, the BIP-39 phrase length, the PIN length, and the list
+ * of BIP-85 secrets -- and there is no second idiom.
+ *
+ * What the rule excludes is the point of writing it down: no screen of this
+ * family is built from nbgl_screenSet() and a stack of nbgl_button_t. Three
+ * of the four were, and the four-entry one is what ended it. That stack grows
+ * upwards from the bottom margin, so the entry that pushes it too far is
+ * drawn *over* the title, and nothing in a test can see it -- Speculos
+ * reports every text event at its full height with its full text, which is
+ * the same silence reviews.assert_body_clears_button() exists to break. A
+ * list paginates instead, so a fifth entry on any of these screens costs a
+ * page rather than a silent overlap.
+ *
+ * Three further properties come with the component and are not separately
+ * decided here:
+ *
+ *   - entries read top-down, in the order of the array they are given in. The
+ *     button stack read bottom-up, so its first entry was the last line on
+ *     screen, and the functional tests counted from the end the code did not;
+ *
+ *   - there is one back arrow, the SDK's, in the header that carries the
+ *     title. generic_screen_set_back_button() drew a second one of its own
+ *     geometry -- a BUTTON_DIAMETER square 4px from the top, against the
+ *     SDK's BACK_BUTTON_HEADER_HEIGHT band -- and the two coincided on the
+ *     three current devices by arithmetic rather than by design;
+ *
+ *   - the title wraps on words by itself, so none of these titles carries a
+ *     hand-placed "\n". The two hand-built title mechanisms leave `wrapping`
+ *     unset and break on characters, which is why every title they drew had
+ *     one.
+ *
+ * No entry is emphasised, and the component is only half the reason:
+ * nbgl_contentBarsList_t carries texts and tokens and nothing else, and a
+ * black control in this application means an act with a consequence -- see
+ * the note above display_explanation_page(). "The largest of three amounts"
+ * was a third meaning for that signal, drawn on the two length screens, and
+ * on the phrase length it answered a question about a fact ("how long *is*
+ * your Recovery Phrase?") with a recommendation.
+ *
+ * The three-entry screens were captured both ways on all three devices
+ * before this rule was settled, because a list of three on a large screen was
+ * the objection to it: a list leaves the bottom of the screen empty -- about
+ * 45% of Stax, 35% of apex_p -- where the button stack filled it. That is the
+ * cost, and it buys the entries reading in the order they are written, one
+ * back arrow instead of two geometries, and the overprint class of defect
+ * gone from screens nothing could check. A short list at the top of a large
+ * screen is also what the SDK's own settings screens look like, so it reads
+ * as this device's shape rather than as an unfinished screen.
+ *
+ * And what it costs elsewhere: a bar has no second line here.
+ * nbgl_layoutBar_t has a `subText` field, but the content that reaches it
+ * through a generic
+ * configuration does not -- nbgl_contentBarsList_t is barTexts, tokens,
+ * nbBars and a tune. An entry says what it has to say in its own label or it
+ * is renamed. Reaching subText would mean nbgl_layoutGet() and
+ * nbgl_layoutAddTouchableBar(), which is the hand-built idiom again with the
+ * pagination and the header to write by hand.
  */
-enum __attribute__((packed)) select_menu {
-    SELECT_MENU_TEXT_INDEX = 0,
+static void display_choice_list(const char* title, const char* const* entries,
+                                const uint8_t* tokens, uint8_t nbEntries,
+                                nbgl_contentActionCallback_t onTouch,
+                                nbgl_callback_t onBack) {
     /*
-     * generic_screen_configure_buttons() stacks its buttons upwards from the
-     * bottom of the screen, so the first button child is the *last* line the
-     * user reads. These four are declared in that order -- bottom entry
-     * first -- and named for the intention they carry rather than for where
-     * they sit, which is how the reading order stays Check, Generate,
-     * Recover, Derive from the top without any of the code below depending
-     * on knowing that.
+     * Static, and it has to be, for the reason display_review() gives: the
+     * use case keeps the pointers it is handed and reads them again on every
+     * page turn, so a local would be a dangling read. Uninitialised, because
+     * BOLOS refuses a non-empty .data section -- hence the memset rather than
+     * an initialiser.
+     *
+     * One set for all four screens: they are reached from different branches
+     * and no two of them are on display at once.
      */
-    SELECT_MENU_DERIVE_INDEX,
-    SELECT_MENU_RECOVER_INDEX,
-    SELECT_MENU_BACKUP_INDEX,
-    SELECT_MENU_CHECK_INDEX,
-    SELECT_MENU_BACK_BUTTON_INDEX,
-    SELECT_MENU_NB_CHILDREN
+    static nbgl_content_t contents[1];
+    static nbgl_genericContents_t generic;
+
+    memset(contents, 0, sizeof(contents));
+
+    contents[0].type = BARS_LIST;
+    contents[0].content.barsList.barTexts = entries;
+    contents[0].content.barsList.tokens = tokens;
+    contents[0].content.barsList.nbBars = nbEntries;
+    contents[0].content.barsList.tuneId = TUNE_TAP_CASUAL;
+    contents[0].contentActionCallback = onTouch;
+
+    generic.callbackCallNeeded = false;
+    generic.contentsList = contents;
+    generic.nbContents = 1;
+
+    nbgl_useCaseGenericConfiguration(title, 0, &generic, onBack);
+}
+
+/*
+ * The menu: one entry per intention.
+ *
+ * No icon, where the three-entry menu had the application's, and the reason
+ * outlives the layout it was measured against: the icons this repository has
+ * name formats -- icon_bip39, icon_sskr, icon_bip85 -- while these entries
+ * name intentions. Generate and Recover would both have taken icon_sskr,
+ * which is exactly what the previous menu did to its BIP85 entry: it wore the
+ * SSKR icon, so two of three buttons were illustrated identically. A list
+ * does not offer per-entry icons at all, so nothing here has to hold that
+ * line any more -- it is written down because it is why nobody should go
+ * looking for a component that would.
+ *
+ * One token per entry rather than one token read with the row index, for the
+ * reason the BIP85 list gives at length: the index the SDK reports is a
+ * position on the page it drew, and a fifth intention would put an entry on a
+ * page of its own with an index of 0.
+ */
+enum __attribute__((packed)) select_menu_token {
+    SELECT_MENU_CHECK_TOKEN = FIRST_USER_TOKEN,
+    SELECT_MENU_BACKUP_TOKEN,
+    SELECT_MENU_RECOVER_TOKEN,
+    SELECT_MENU_DERIVE_TOKEN,
 };
 
-// One button per intention. Asserted against the enumeration rather than
-// counted by hand, because this number is what nbgl_objPoolGetArray() below
-// writes into consecutive children: a value smaller than the run of button
-// indices leaves an unallocated child, a larger one runs into the back
-// button.
-#define SELECT_MENU_NB_BUTTONS 4
-_Static_assert(SELECT_MENU_BACK_BUTTON_INDEX - SELECT_MENU_DERIVE_INDEX ==
-                   SELECT_MENU_NB_BUTTONS,
-               "the menu allocates SELECT_MENU_NB_BUTTONS buttons into the "
-               "children between SELECT_MENU_DERIVE_INDEX and the back "
-               "button; adding an entry means changing both");
-_Static_assert(USER_INTENT_NB == SELECT_MENU_NB_BUTTONS,
+// In reading order, top-down, which is also the order the screen draws them.
+static const char* const select_menu_entries[] = {
+    UI_STR_NBGL_MENU_CHECK, UI_STR_NBGL_MENU_BACKUP, UI_STR_NBGL_MENU_RECOVER,
+    UI_STR_NBGL_MENU_DERIVE};
+
+static const uint8_t select_menu_tokens[] = {
+    SELECT_MENU_CHECK_TOKEN, SELECT_MENU_BACKUP_TOKEN,
+    SELECT_MENU_RECOVER_TOKEN, SELECT_MENU_DERIVE_TOKEN};
+
+_Static_assert(ARRAYLEN(select_menu_tokens) == ARRAYLEN(select_menu_entries),
+               "every entry of the menu needs the token that says which "
+               "intention it is; the SDK reads the two arrays in step");
+_Static_assert(USER_INTENT_NB == ARRAYLEN(select_menu_entries),
                "the menu shows one entry per intention");
 
-static void select_menu_callback(nbgl_obj_t* obj, nbgl_touchType_t eventType) {
-    nbgl_obj_t** screenChildren = nbgl_screenGetElements(0);
-    if (eventType != TOUCHED) {
-        return;
-    }
-    io_seproxyhal_play_tune(TUNE_TAP_CASUAL);
-    nbgl_layoutRelease(layout);
+static void select_menu_action(int token, uint8_t index, int page) {
+    UNUSED(index);
+    UNUSED(page);
+
     // Each entry sets both: the intention, and the kind of data the screens
     // it leads to will be handed. Checking a phrase and backing one up are
     // the same tool and different intentions, which is the whole reason the
     // two are separate variables.
-    if (obj == screenChildren[SELECT_MENU_CHECK_INDEX]) {
-        user_intent = USER_INTENT_CHECK;
-        tool_type = TOOL_TYPE_BIP39;
-        /*
-         * Straight to the length choice, with nothing explaining why the
-         * Phrase is wanted -- the shape app-recovery-check has, and the one
-         * this journey had before the menu existed.
-         *
-         * Entering the Phrase *is* the task here. Someone who chose "Check
-         * Recovery Phrase" is not owed a screen telling them a check needs
-         * the Phrase. The Backup journey keeps its own, because there the
-         * user asked for Shares and being asked for twenty-four words is a
-         * surprise that has to be accounted for.
-         */
-        display_bip39_select_phrase_length_page();
-    } else if (obj == screenChildren[SELECT_MENU_BACKUP_INDEX]) {
-        user_intent = USER_INTENT_BACKUP;
-        tool_type = TOOL_TYPE_BIP39;
-        display_backup_explain_page();
-    } else if (obj == screenChildren[SELECT_MENU_RECOVER_INDEX]) {
-        user_intent = USER_INTENT_RECOVER;
-        tool_type = TOOL_TYPE_SSKR;
-        display_recover_concept_page();
-    } else if (obj == screenChildren[SELECT_MENU_DERIVE_INDEX]) {
-        user_intent = USER_INTENT_DERIVE;
-        tool_type = TOOL_TYPE_BIP85;
-        display_bip85_concept_page();
-    } else if (obj == screenChildren[SELECT_MENU_BACK_BUTTON_INDEX]) {
-        display_home_page();
-        return;
+    //
+    // No default: the tokens are this screen's own enumeration, and a fifth
+    // intention has to say here where it goes rather than falling through to
+    // whichever branch was last.
+    switch ((enum select_menu_token)token) {
+        case SELECT_MENU_CHECK_TOKEN:
+            user_intent = USER_INTENT_CHECK;
+            tool_type = TOOL_TYPE_BIP39;
+            /*
+             * Straight to the length choice, with nothing explaining why the
+             * Phrase is wanted -- the shape app-recovery-check has, and the
+             * one this journey had before the menu existed.
+             *
+             * Entering the Phrase *is* the task here. Someone who chose
+             * "Check Recovery Phrase" is not owed a screen telling them a
+             * check needs the Phrase. The Backup journey keeps its own,
+             * because there the user asked for Shares and being asked for
+             * twenty-four words is a surprise that has to be accounted for.
+             */
+            display_bip39_select_phrase_length_page();
+            break;
+        case SELECT_MENU_BACKUP_TOKEN:
+            user_intent = USER_INTENT_BACKUP;
+            tool_type = TOOL_TYPE_BIP39;
+            display_backup_explain_page();
+            break;
+        case SELECT_MENU_RECOVER_TOKEN:
+            user_intent = USER_INTENT_RECOVER;
+            tool_type = TOOL_TYPE_SSKR;
+            display_recover_concept_page();
+            break;
+        case SELECT_MENU_DERIVE_TOKEN:
+            user_intent = USER_INTENT_DERIVE;
+            tool_type = TOOL_TYPE_BIP85;
+            display_bip85_concept_page();
+            break;
     }
 }
 
 static void display_select_menu_page(void) {
-    nbgl_obj_t** screenChildren;
-
-    // From top to bottom:
-    // <return back arrow> + <text> + <4 buttons>
-    //
-    // No icon, where the three-entry menu had the application's. Two reasons,
-    // both checked rather than preferred:
-    //
-    //   - there is no room. On apex_p a button is 56px on a 400px screen and
-    //     the stack starts BORDER_MARGIN from the bottom, so the fourth one
-    //     occupies y=136 to 192, and the icon and the title together ran from
-    //     74 to 200. The title alone, hung under the back button, ends well
-    //     above it;
-    //   - the icons this repository has name formats -- icon_bip39,
-    //     icon_sskr, icon_bip85 -- while these entries name intentions.
-    //     Generate and Recover would both have taken icon_sskr, which is
-    //     exactly what the previous menu did to its BIP85 entry: it wore the
-    //     SSKR icon, so two of three buttons were illustrated identically.
-    //
-    // No emphasised button either. The black button of an NBGL screen is its
-    // primary action, and these four are peers.
-    nbgl_screenSet(&screenChildren, SELECT_MENU_NB_CHILDREN, NULL,
-                   (nbgl_touchCallback_t)&select_menu_callback);
-
-    screenChildren[SELECT_MENU_TEXT_INDEX] =
-        (nbgl_obj_t*)generic_screen_set_top_title();
-    ((nbgl_text_area_t*)screenChildren[SELECT_MENU_TEXT_INDEX])->text =
-        UI_STR_NBGL_MENU_TITLE;
-
-    nbgl_objPoolGetArray(
-        BUTTON, SELECT_MENU_NB_BUTTONS, 0,
-        (nbgl_obj_t**)&screenChildren[SELECT_MENU_DERIVE_INDEX]);
-    generic_screen_configure_buttons(
-        (nbgl_button_t**)&screenChildren[SELECT_MENU_DERIVE_INDEX],
-        SELECT_MENU_NB_BUTTONS);
-
-    ((nbgl_button_t*)screenChildren[SELECT_MENU_CHECK_INDEX])->text =
-        UI_STR_NBGL_MENU_CHECK;
-    ((nbgl_button_t*)screenChildren[SELECT_MENU_BACKUP_INDEX])->text =
-        UI_STR_NBGL_MENU_BACKUP;
-    ((nbgl_button_t*)screenChildren[SELECT_MENU_RECOVER_INDEX])->text =
-        UI_STR_NBGL_MENU_RECOVER;
-    ((nbgl_button_t*)screenChildren[SELECT_MENU_DERIVE_INDEX])->text =
-        UI_STR_NBGL_MENU_DERIVE;
-
-    // create back button
-    screenChildren[SELECT_MENU_BACK_BUTTON_INDEX] =
-        (nbgl_obj_t*)generic_screen_set_back_button();
-
-    nbgl_screenRedraw();
+    display_choice_list(UI_STR_NBGL_MENU_TITLE, select_menu_entries,
+                        select_menu_tokens, ARRAYLEN(select_menu_entries),
+                        &select_menu_action, &display_home_page);
 }
 
 /*
@@ -750,59 +844,77 @@ static void display_backup_explain_page(void) {
 
 /*
  * Select mnemonic size page
+ *
+ * A choice among three, so it is the list of display_choice_list() and not a
+ * keypad: see the note above display_sskr_select_numshares_page() for where
+ * the line between the two is drawn.
+ *
+ * No icon, where this screen carried BIP39_ICON. The icons this repository
+ * has name formats, and this screen asks a quantity; an icon saying "BIP39"
+ * over "How long is your Recovery Phrase?" adds nothing the title has not
+ * already said. The same reasoning that kept one off the menu.
  */
-enum __attribute__((packed)) select_bip39_phrase_length {
-    SELECT_BIP39_PHRASE_LENGTH_ICON_INDEX = 0,
-    SELECT_BIP39_PHRASE_LENGTH_TEXT_INDEX,
-    SELECT_BIP39_PHRASE_LENGTH_BUTTON_12_INDEX,
-    SELECT_BIP39_PHRASE_LENGTH_BUTTON_18_INDEX,
-    SELECT_BIP39_PHRASE_LENGTH_BUTTON_24_INDEX,
-    SELECT_BIP39_PHRASE_LENGTH_BACK_BUTTON_INDEX,
-    SELECT_BIP39_PHRASE_LENGTH_NB_CHILDREN,
-    KBD_TEXT_TOKEN
+enum __attribute__((packed)) select_bip39_phrase_length_token {
+    SELECT_BIP39_PHRASE_LENGTH_12_TOKEN = FIRST_USER_TOKEN,
+    SELECT_BIP39_PHRASE_LENGTH_18_TOKEN,
+    SELECT_BIP39_PHRASE_LENGTH_24_TOKEN,
 };
 
-static const char* bip39_passphraseLength[] = {UI_STR_WORDS_12, UI_STR_WORDS_18,
-                                               UI_STR_WORDS_24};
-static void select_bip39_phrase_length_callback(nbgl_obj_t* obj,
-                                                nbgl_touchType_t eventType) {
-    nbgl_obj_t** screenChildren = nbgl_screenGetElements(0);
-    if (eventType != TOUCHED) {
-        return;
+// Ascending, which is the order the list draws them in. The button stack read
+// 24, 18, 12 from the top, because it stacked upwards from the bottom and 12
+// was written first; nothing chose that order, the layout did.
+static const char* const bip39_phrase_length_entries[] = {
+    UI_STR_WORDS_12, UI_STR_WORDS_18, UI_STR_WORDS_24};
+
+static const uint8_t bip39_phrase_length_tokens[] = {
+    SELECT_BIP39_PHRASE_LENGTH_12_TOKEN, SELECT_BIP39_PHRASE_LENGTH_18_TOKEN,
+    SELECT_BIP39_PHRASE_LENGTH_24_TOKEN};
+
+_Static_assert(ARRAYLEN(bip39_phrase_length_tokens) ==
+                   ARRAYLEN(bip39_phrase_length_entries),
+               "every length this screen offers needs the token that says "
+               "which one it is; the SDK reads the two arrays in step");
+
+// Back goes to whatever asked for this screen, which is three different
+// things. Written on the intention rather than on the tool because Check and
+// Backup share the tool and do not share a caller.
+static void bip39_phrase_length_back(void) {
+    switch (user_intent) {
+        case USER_INTENT_DERIVE:
+            display_bip85_select_app_page();
+            break;
+        case USER_INTENT_BACKUP:
+            display_backup_explain_page();
+            break;
+        case USER_INTENT_CHECK:
+        case USER_INTENT_RECOVER:
+        case USER_INTENT_NB:
+            // Recover enters ByteWords and never chooses a BIP-39 length; it
+            // is grouped with Check so that this switch stays exhaustive and
+            // a new intention is a -Wswitch diagnostic rather than a silent
+            // fall onto someone else's back button.
+            display_select_menu_page();
+            break;
     }
-    io_seproxyhal_play_tune(TUNE_TAP_CASUAL);
-    nbgl_layoutRelease(layout);
-    if (obj == screenChildren[SELECT_BIP39_PHRASE_LENGTH_BUTTON_12_INDEX]) {
-        bip39_mnemonic_final_size_set(BIP39_MNEMONIC_SIZE_12);
-    } else if (obj ==
-               screenChildren[SELECT_BIP39_PHRASE_LENGTH_BUTTON_18_INDEX]) {
-        bip39_mnemonic_final_size_set(BIP39_MNEMONIC_SIZE_18);
-    } else if (obj ==
-               screenChildren[SELECT_BIP39_PHRASE_LENGTH_BUTTON_24_INDEX]) {
-        bip39_mnemonic_final_size_set(BIP39_MNEMONIC_SIZE_24);
-    } else if (obj ==
-               screenChildren[SELECT_BIP39_PHRASE_LENGTH_BACK_BUTTON_INDEX]) {
-        // Back goes to whatever asked for this screen, which is now three
-        // different things. Written on the intention rather than on the tool
-        // because Check and Backup share the tool and do not share a caller.
-        switch (user_intent) {
-            case USER_INTENT_DERIVE:
-                display_bip85_select_app_page();
-                break;
-            case USER_INTENT_BACKUP:
-                display_backup_explain_page();
-                break;
-            case USER_INTENT_CHECK:
-            case USER_INTENT_RECOVER:
-            case USER_INTENT_NB:
-                // Recover enters ByteWords and never chooses a BIP-39 length;
-                // it is grouped with Check so that this switch stays
-                // exhaustive and a new intention is a -Wswitch diagnostic
-                // rather than a silent fall onto someone else's back button.
-                display_select_menu_page();
-                break;
-        }
-        return;
+}
+
+static void select_bip39_phrase_length_action(int token, uint8_t index,
+                                              int page) {
+    UNUSED(index);
+    UNUSED(page);
+
+    // No default, as on every screen of this family: a fourth length has to
+    // say here what size it sets.
+    switch ((enum select_bip39_phrase_length_token)token) {
+        case SELECT_BIP39_PHRASE_LENGTH_12_TOKEN:
+            bip39_mnemonic_final_size_set(BIP39_MNEMONIC_SIZE_12);
+            break;
+        case SELECT_BIP39_PHRASE_LENGTH_18_TOKEN:
+            bip39_mnemonic_final_size_set(BIP39_MNEMONIC_SIZE_18);
+            break;
+        case SELECT_BIP39_PHRASE_LENGTH_24_TOKEN:
+            bip39_mnemonic_final_size_set(BIP39_MNEMONIC_SIZE_24);
+            break;
     }
     if (user_intent == USER_INTENT_DERIVE) {
         // The explanation, not the keypad. Only on this path: the same keypad
@@ -836,47 +948,10 @@ static const char* bip39_length_title(void) {
 }
 
 static void display_bip39_select_phrase_length_page(void) {
-    nbgl_obj_t** screenChildren;
-
-    // From top to bottom:
-    // <return back arrow> + <icon> + <text> + <3 buttons>
-    nbgl_screenSet(&screenChildren, SELECT_BIP39_PHRASE_LENGTH_NB_CHILDREN,
-                   NULL,
-                   (nbgl_touchCallback_t)&select_bip39_phrase_length_callback);
-
-    screenChildren[SELECT_BIP39_PHRASE_LENGTH_ICON_INDEX] =
-        (nbgl_obj_t*)generic_screen_set_icon(&BIP39_ICON);
-    screenChildren[SELECT_BIP39_PHRASE_LENGTH_TEXT_INDEX] =
-        (nbgl_obj_t*)generic_screen_set_title(
-            screenChildren[SELECT_BIP39_PHRASE_LENGTH_ICON_INDEX]);
-    ((nbgl_text_area_t*)screenChildren[SELECT_BIP39_PHRASE_LENGTH_TEXT_INDEX])
-        ->text = bip39_length_title();
-    // create nb words buttons
-    nbgl_objPoolGetArray(BUTTON, ARRAYLEN(bip39_passphraseLength), 0,
-                         (nbgl_obj_t**)&screenChildren
-                             [SELECT_BIP39_PHRASE_LENGTH_BUTTON_12_INDEX]);
-    generic_screen_configure_buttons(
-        (nbgl_button_t**)&screenChildren
-            [SELECT_BIP39_PHRASE_LENGTH_BUTTON_12_INDEX],
-        ARRAYLEN(bip39_passphraseLength));
-    ((nbgl_button_t*)screenChildren[SELECT_BIP39_PHRASE_LENGTH_BUTTON_12_INDEX])
-        ->text = bip39_passphraseLength[0];
-    ((nbgl_button_t*)screenChildren[SELECT_BIP39_PHRASE_LENGTH_BUTTON_18_INDEX])
-        ->text = bip39_passphraseLength[1];
-    ((nbgl_button_t*)screenChildren[SELECT_BIP39_PHRASE_LENGTH_BUTTON_24_INDEX])
-        ->text = bip39_passphraseLength[2];
-    ((nbgl_button_t*)screenChildren[SELECT_BIP39_PHRASE_LENGTH_BUTTON_24_INDEX])
-        ->borderColor = BLACK;
-    ((nbgl_button_t*)screenChildren[SELECT_BIP39_PHRASE_LENGTH_BUTTON_24_INDEX])
-        ->innerColor = BLACK;
-    ((nbgl_button_t*)screenChildren[SELECT_BIP39_PHRASE_LENGTH_BUTTON_24_INDEX])
-        ->foregroundColor = WHITE;
-
-    // create back button
-    screenChildren[SELECT_BIP39_PHRASE_LENGTH_BACK_BUTTON_INDEX] =
-        (nbgl_obj_t*)generic_screen_set_back_button();
-
-    nbgl_screenRedraw();
+    display_choice_list(
+        bip39_length_title(), bip39_phrase_length_entries,
+        bip39_phrase_length_tokens, ARRAYLEN(bip39_phrase_length_entries),
+        &select_bip39_phrase_length_action, &bip39_phrase_length_back);
 }
 
 /*
@@ -889,6 +964,23 @@ enum __attribute__((packed)) check {
     CHECK_FIRST_SUGGESTION_TOKEN,
     CHECK_RESULT_TOKEN,
 };
+
+/*
+ * The token the entered-text area carries, and why it is a small number.
+ *
+ * Neither dispatcher below handles it: they answer CHECK_BACK_BUTTON_TOKEN
+ * and treat anything at or above CHECK_FIRST_SUGGESTION_TOKEN as the n-th
+ * suggestion button. So this token has to stay *below* that run, or touching
+ * the word being typed would be read as picking a suggestion that is not
+ * there. It sat in the middle of the phrase-length screen's enumeration until
+ * that screen became a list; it belongs to the keyboard and lives here now.
+ */
+enum __attribute__((packed)) keyboard_text {
+    KBD_TEXT_TOKEN = 1,
+};
+_Static_assert((int)KBD_TEXT_TOKEN < (int)CHECK_FIRST_SUGGESTION_TOKEN,
+               "the text area's token must not fall in the run the "
+               "suggestion buttons occupy");
 
 static char textToEnter[BIP39_MAX_WORD_LENGTH + 1] = {0};
 static int keyboardIndex = 0;
@@ -1366,6 +1458,31 @@ _Static_assert(sizeof(UI_STR_NBGL_BIP85_BASE64_HEADER) + 5 + 1 +
 _Static_assert(SSS_MAX_SHARE_COUNT <= 99,
                "UI_STR_NBGL_SSKR_CLOSE_CONFIRM_TITLE sizes its buffer on its "
                "format literal, which assumes a two-digit share count");
+
+/*
+ * Asking for a number, and when it is typed rather than chosen.
+ *
+ * A number is typed on nbgl_useCaseKeypad() when what is being asked for is a
+ * value in an interval: the share count (1..16), the threshold (2..the count
+ * just entered), the BIP-85 index (0..2^31-1), the password length (a
+ * sixty-odd-value range that depends on the application). Four screens, and
+ * they all share the same shape -- a title composed with the bound, a
+ * validation callback, and an nbgl_useCaseStatus() that returns to this same
+ * keypad rather than to the head of the flow, because the only thing wrong is
+ * the number that was just typed.
+ *
+ * A number is chosen from display_choice_list() when the answer is one of a
+ * handful of named values: three phrase lengths, three PIN lengths. What that
+ * excludes is a keypad in front of a screen that would then refuse most of
+ * what the keypad can express -- a PIN keypad accepts 5 and then rejects it,
+ * and a range error for a value the screen itself offered to type is a screen
+ * arguing with its own control.
+ *
+ * The line is the interval, not the count. Sixteen shares are typed although
+ * sixteen is a small number, because 1..16 is an interval and a list of
+ * sixteen bars is four pages of scrolling for something a keypad answers in
+ * one gesture.
+ */
 
 // The smallest threshold this screen accepts, and the one its title announces.
 // A threshold of 1 over more than one share means any single share rebuilds
@@ -2221,13 +2338,22 @@ void display_bip85_select_password_length_page() {
 }
 
 /*
- * How many digits, asked with three buttons rather than with a keypad.
+ * How many digits, asked as a list of three rather than with a keypad.
  *
  * The password length is a number in a range of sixty-odd values and gets the
  * keypad it needs; a PIN is one of three lengths, and a keypad for it would
  * put a number pad in front of someone about to be shown a number, with a
  * range error waiting behind every other value it accepts. Same shape as the
  * phrase-length screen, for the same reason.
+ *
+ * No icon, where this screen carried BIP85_ICON, and no emphasised entry,
+ * where the longest PIN was drawn black. Both go for the reasons written
+ * above display_choice_list(): the icons this repository has name formats and
+ * this screen asks a quantity, and a black control in this application means
+ * an act with a consequence. What the black entry said -- "8 is the safest of
+ * the three" -- a bar cannot say, because a bar is one line of text; it is
+ * not said elsewhere either, and that is a loss this rule pays for rather
+ * than a detail that was overlooked.
  *
  * These are the three values the derivation is asked for, so they are named
  * here and bounded against the preset rather than typed as literals beside
@@ -2247,41 +2373,43 @@ _Static_assert(BIP85_PIN_DIGITS_SHORT >= BIP85_DICE_PIN_DIGITS_MIN &&
                "every length this screen offers has to be one the PIN "
                "derivation accepts, in the order the buttons are drawn");
 
-enum __attribute__((packed)) select_bip85_pin_length {
-    SELECT_BIP85_PIN_LENGTH_ICON_INDEX = 0,
-    SELECT_BIP85_PIN_LENGTH_TEXT_INDEX,
-    SELECT_BIP85_PIN_LENGTH_BUTTON_4_INDEX,
-    SELECT_BIP85_PIN_LENGTH_BUTTON_6_INDEX,
-    SELECT_BIP85_PIN_LENGTH_BUTTON_8_INDEX,
-    SELECT_BIP85_PIN_LENGTH_BACK_BUTTON_INDEX,
-    SELECT_BIP85_PIN_LENGTH_NB_CHILDREN,
+enum __attribute__((packed)) select_bip85_pin_length_token {
+    SELECT_BIP85_PIN_LENGTH_SHORT_TOKEN = FIRST_USER_TOKEN,
+    SELECT_BIP85_PIN_LENGTH_MEDIUM_TOKEN,
+    SELECT_BIP85_PIN_LENGTH_LONG_TOKEN,
 };
 
-static const char* bip85_pin_lengths[] = {UI_STR_NBGL_BIP85_PIN_DIGITS_4,
-                                          UI_STR_NBGL_BIP85_PIN_DIGITS_6,
-                                          UI_STR_NBGL_BIP85_PIN_DIGITS_8};
+// Ascending, which is the order the list draws them in, and the order the
+// three constants above are declared in.
+static const char* const bip85_pin_length_entries[] = {
+    UI_STR_NBGL_BIP85_PIN_DIGITS_4, UI_STR_NBGL_BIP85_PIN_DIGITS_6,
+    UI_STR_NBGL_BIP85_PIN_DIGITS_8};
 
-static void select_bip85_pin_length_callback(nbgl_obj_t* obj,
-                                             nbgl_touchType_t eventType) {
-    nbgl_obj_t** screenChildren = nbgl_screenGetElements(0);
-    if (eventType != TOUCHED) {
-        return;
-    }
-    io_seproxyhal_play_tune(TUNE_TAP_CASUAL);
-    nbgl_layoutRelease(layout);
-    if (obj == screenChildren[SELECT_BIP85_PIN_LENGTH_BUTTON_4_INDEX]) {
-        bip85_dice_rolls_set(BIP85_PIN_DIGITS_SHORT);
-    } else if (obj == screenChildren[SELECT_BIP85_PIN_LENGTH_BUTTON_6_INDEX]) {
-        bip85_dice_rolls_set(BIP85_PIN_DIGITS_MEDIUM);
-    } else if (obj == screenChildren[SELECT_BIP85_PIN_LENGTH_BUTTON_8_INDEX]) {
-        bip85_dice_rolls_set(BIP85_PIN_DIGITS_LONG);
-    } else if (obj ==
-               screenChildren[SELECT_BIP85_PIN_LENGTH_BACK_BUTTON_INDEX]) {
-        display_bip85_select_app_page();
-        return;
-    } else {
-        display_home_page();
-        return;
+static const uint8_t bip85_pin_length_tokens[] = {
+    SELECT_BIP85_PIN_LENGTH_SHORT_TOKEN, SELECT_BIP85_PIN_LENGTH_MEDIUM_TOKEN,
+    SELECT_BIP85_PIN_LENGTH_LONG_TOKEN};
+
+_Static_assert(ARRAYLEN(bip85_pin_length_tokens) ==
+                   ARRAYLEN(bip85_pin_length_entries),
+               "every length this screen offers needs the token that says "
+               "which one it is; the SDK reads the two arrays in step");
+
+static void select_bip85_pin_length_action(int token, uint8_t index, int page) {
+    UNUSED(index);
+    UNUSED(page);
+
+    // No default, as on every screen of this family: a fourth length has to
+    // say here how many rolls it asks for.
+    switch ((enum select_bip85_pin_length_token)token) {
+        case SELECT_BIP85_PIN_LENGTH_SHORT_TOKEN:
+            bip85_dice_rolls_set(BIP85_PIN_DIGITS_SHORT);
+            break;
+        case SELECT_BIP85_PIN_LENGTH_MEDIUM_TOKEN:
+            bip85_dice_rolls_set(BIP85_PIN_DIGITS_MEDIUM);
+            break;
+        case SELECT_BIP85_PIN_LENGTH_LONG_TOKEN:
+            bip85_dice_rolls_set(BIP85_PIN_DIGITS_LONG);
+            break;
     }
     // The explanation of what an index is, as both other branches of this
     // flow reach it: the index means the same thing for all four
@@ -2290,73 +2418,24 @@ static void select_bip85_pin_length_callback(nbgl_obj_t* obj,
 }
 
 static void display_bip85_select_pin_length_page(void) {
-    nbgl_obj_t** screenChildren;
-
-    // From top to bottom:
-    // <return back arrow> + <icon> + <text> + <3 buttons>
-    nbgl_screenSet(&screenChildren, SELECT_BIP85_PIN_LENGTH_NB_CHILDREN, NULL,
-                   (nbgl_touchCallback_t)&select_bip85_pin_length_callback);
-
-    screenChildren[SELECT_BIP85_PIN_LENGTH_ICON_INDEX] =
-        (nbgl_obj_t*)generic_screen_set_icon(&BIP85_ICON);
-    screenChildren[SELECT_BIP85_PIN_LENGTH_TEXT_INDEX] =
-        (nbgl_obj_t*)generic_screen_set_title(
-            screenChildren[SELECT_BIP85_PIN_LENGTH_ICON_INDEX]);
-    ((nbgl_text_area_t*)screenChildren[SELECT_BIP85_PIN_LENGTH_TEXT_INDEX])
-        ->text = UI_STR_NBGL_BIP85_PIN_LENGTH_TITLE;
-
-    // create digit count buttons
-    nbgl_objPoolGetArray(
-        BUTTON, ARRAYLEN(bip85_pin_lengths), 0,
-        (nbgl_obj_t**)&screenChildren[SELECT_BIP85_PIN_LENGTH_BUTTON_4_INDEX]);
-    generic_screen_configure_buttons(
-        (nbgl_button_t**)&screenChildren
-            [SELECT_BIP85_PIN_LENGTH_BUTTON_4_INDEX],
-        ARRAYLEN(bip85_pin_lengths));
-    ((nbgl_button_t*)screenChildren[SELECT_BIP85_PIN_LENGTH_BUTTON_4_INDEX])
-        ->text = bip85_pin_lengths[0];
-    ((nbgl_button_t*)screenChildren[SELECT_BIP85_PIN_LENGTH_BUTTON_6_INDEX])
-        ->text = bip85_pin_lengths[1];
-    ((nbgl_button_t*)screenChildren[SELECT_BIP85_PIN_LENGTH_BUTTON_8_INDEX])
-        ->text = bip85_pin_lengths[2];
-    // The longest PIN is the emphasised one, as the 24-word phrase is on the
-    // length screen this is modelled on: where the choice is how much of
-    // something to have, the black button is the safest amount rather than
-    // the first one.
-    ((nbgl_button_t*)screenChildren[SELECT_BIP85_PIN_LENGTH_BUTTON_8_INDEX])
-        ->borderColor = BLACK;
-    ((nbgl_button_t*)screenChildren[SELECT_BIP85_PIN_LENGTH_BUTTON_8_INDEX])
-        ->innerColor = BLACK;
-    ((nbgl_button_t*)screenChildren[SELECT_BIP85_PIN_LENGTH_BUTTON_8_INDEX])
-        ->foregroundColor = WHITE;
-
-    // create back button
-    screenChildren[SELECT_BIP85_PIN_LENGTH_BACK_BUTTON_INDEX] =
-        (nbgl_obj_t*)generic_screen_set_back_button();
-
-    nbgl_screenRedraw();
+    display_choice_list(
+        UI_STR_NBGL_BIP85_PIN_LENGTH_TITLE, bip85_pin_length_entries,
+        bip85_pin_length_tokens, ARRAYLEN(bip85_pin_length_entries),
+        &select_bip85_pin_length_action, &display_bip85_select_app_page);
 }
 
 /*
  * Which secret to derive, as a list.
  *
- * This screen was four hand-built buttons stacked from the bottom of the
- * screen, and the fourth is what ended that: the stack grew up into the
- * title, and Flex drew "PIN" across the second line of the question. Nothing
- * in a test could see it -- every text event is still reported at full height
- * with its full text, which is the same silence reviews.assert_body_clears_
- * button() exists to break.
+ * The first screen of this family to be drawn as one, and the reason the
+ * other three followed: it was four hand-built buttons stacked from the
+ * bottom, and the fourth grew up into the title -- Flex drew "PIN" across the
+ * second line of the question. The rule that came out of it, and everything
+ * it excludes, is written above display_choice_list().
  *
- * So the list is the SDK's own. nbgl_useCaseGenericConfiguration() draws a
- * BARS_LIST: a titled header with a back arrow, and one touchable bar per
- * entry with a chevron saying it leads somewhere -- which is what each of
- * these does. It also paginates by itself, so the fifth secret this flow
- * grows costs nothing here rather than another silent overlap, and the entry
- * order stops being a claim about where the buttons ended up on screen.
- *
- * The list reads top-down in the order of the table above, where the buttons
- * read bottom-up. Nothing in the application depended on that order; the
- * functional tests did, and they now count from the top as the screen does.
+ * The list reads top-down in the order of the table above. Nothing in the
+ * application depended on the bottom-up order the buttons had; the functional
+ * tests did, and they now count from the top as the screen does.
  */
 static void bip85_select_app_action(int token, uint8_t index, int page) {
     UNUSED(index);
@@ -2391,33 +2470,11 @@ static void bip85_select_app_action(int token, uint8_t index, int page) {
 }
 
 static void display_bip85_select_app_page(void) {
-    /*
-     * Static, and it has to be, for the reason display_review() gives: the
-     * use case keeps the pointers it is handed and reads them again on every
-     * page turn, so a local would be a dangling read. Uninitialised, because
-     * BOLOS refuses a non-empty .data section -- hence the memset rather than
-     * an initialiser.
-     */
-    static nbgl_content_t contents[1];
-    static nbgl_genericContents_t generic;
-
-    memset(contents, 0, sizeof(contents));
-
-    contents[0].type = BARS_LIST;
-    contents[0].content.barsList.barTexts = bip85_select_app;
-    contents[0].content.barsList.tokens = bip85_select_app_tokens;
-    contents[0].content.barsList.nbBars = ARRAYLEN(bip85_select_app);
-    contents[0].content.barsList.tuneId = TUNE_TAP_CASUAL;
-    contents[0].contentActionCallback = &bip85_select_app_action;
-
-    generic.callbackCallNeeded = false;
-    generic.contentsList = contents;
-    generic.nbContents = 1;
-
     // Back goes to the menu, which is where this screen is reached from --
     // the same destination the hand-built back arrow had.
-    nbgl_useCaseGenericConfiguration(UI_STR_NBGL_BIP85_SELECT_APP_TITLE, 0,
-                                     &generic, &display_select_menu_page);
+    display_choice_list(UI_STR_NBGL_BIP85_SELECT_APP_TITLE, bip85_select_app,
+                        bip85_select_app_tokens, ARRAYLEN(bip85_select_app),
+                        &bip85_select_app_action, &display_select_menu_page);
 }
 
 /*

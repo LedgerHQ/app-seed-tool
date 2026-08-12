@@ -40,8 +40,8 @@ from pytest import mark
 from ledgered.devices import DeviceType
 from ragger.conftest import configuration
 from ragger.firmware.touch.use_cases import UseCaseHomeExt
-from ragger.firmware.touch.layouts import LetterOnlyKeyboard, Suggestions
-from genericlayout import GenericLayout, MENU_CHECK
+from ragger.firmware.touch.layouts import ChoiceList, LetterOnlyKeyboard, Suggestions
+from choicelist import MENU_CHECK, WORDS_12
 import explanations
 import nano
 
@@ -75,7 +75,7 @@ def _touch_check(backend, device, phrase, title, verdict):
     home_page = UseCaseHomeExt(backend, device)
     keyboard = LetterOnlyKeyboard(backend, device)
     suggestion = Suggestions(backend, device)
-    genericbuttons = GenericLayout(backend, device)
+    genericbuttons = ChoiceList(backend, device)
 
     backend.wait_for_text_on_screen("Seed Tool", 10)
     home_page.action()
@@ -84,7 +84,7 @@ def _touch_check(backend, device, phrase, title, verdict):
     # Straight to the length choice: this journey has no explanation in front
     # of it, because entering the Phrase is the thing the entry asked for.
     backend.wait_for_text_on_screen("12 words", 5)
-    genericbuttons.choose(1)
+    genericbuttons.choose(WORDS_12)
     backend.wait_for_text_on_screen("Enter word", 5)
     for word in phrase.split():
         keyboard.write(word[:4])

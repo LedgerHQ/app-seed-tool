@@ -9,7 +9,7 @@ from ragger.firmware.touch.layouts import CenteredFooter, LetterOnlyKeyboard, Su
 from keypad import Keypad
 import reviews
 import explanations
-from genericlayout import GenericLayout, MENU_BACKUP
+from choicelist import MENU_BACKUP, WORDS_24
 
 @fixture(scope='session')
 def set_seed():
@@ -473,7 +473,7 @@ def all_eink_bip39_24word(backend, device):
     keypad = Keypad(backend, device)
     review = UseCaseViewDetails(backend, device)
     choice = UseCaseChoice(backend, device)
-    genericbuttons = GenericLayout(backend, device)
+    genericbuttons = ChoiceList(backend, device)
 
     backend.wait_for_text_on_screen("Seed Tool", 10)
     home_page.action()
@@ -488,7 +488,7 @@ def all_eink_bip39_24word(backend, device):
     explanations.pass_explanation(
         backend, device, explanations.EXPLAIN_BACKUP, "24 words",
         button=explanations.ENTER_PHRASE, action=True)
-    genericbuttons.choose(3)
+    genericbuttons.choose(WORDS_24)
     backend.wait_for_text_on_screen("Enter word", 5)
     for word in configuration.OPTIONAL.CUSTOM_SEED.split():
         keyboard.write(word[:4])

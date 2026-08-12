@@ -26,7 +26,8 @@ from ragger.firmware.touch.layouts import ChoiceList
 from keypad import Keypad
 import reviews
 import explanations
-from genericlayout import GenericLayout, MENU_DERIVE, BIP85_APP_PIN
+from choicelist import (MENU_DERIVE, BIP85_APP_PIN,
+                        DIGITS_4, DIGITS_6, DIGITS_8)
 
 # Seed taken from https://github.com/bitcoin/bips/blob/master/bip-0085.mediawiki
 BIP85_SEED = ("install scatter logic circle pencil average fall shoe "
@@ -39,13 +40,6 @@ BIP85_SEED = ("install scatter logic circle pencil average fall shoe "
 PIN_6_INDEX_0 = "039262"
 PIN_4_INDEX_1 = "0934"
 PIN_8_INDEX_3 = "61615716"
-
-# The buttons of the "How many digits" screen, counting up from the bottom as
-# genericlayout.py does. The secret list before it is the SDK's own and is
-# counted from the top instead -- see BIP85_APP_PIN.
-DIGITS_4 = 1
-DIGITS_6 = 2
-DIGITS_8 = 3
 
 
 @fixture(scope='session')
@@ -61,7 +55,7 @@ def _touch_only(device):
 def _walk_to_pin_length(backend, device):
     """Home -> Derive -> the BIP85 explanation -> PIN -> the length screen."""
     home_page = UseCaseHomeExt(backend, device)
-    buttons = GenericLayout(backend, device)
+    buttons = ChoiceList(backend, device)
 
     backend.wait_for_text_on_screen("Seed Tool", 10)
     home_page.action()
@@ -77,7 +71,7 @@ def _walk_to_pin_length(backend, device):
 
 def _walk_to_review(backend, device, digits, index):
     """...and on through the length, the index explanation and the index."""
-    buttons = GenericLayout(backend, device)
+    buttons = ChoiceList(backend, device)
     keypad = Keypad(backend, device)
 
     _walk_to_pin_length(backend, device)
@@ -214,10 +208,14 @@ def test_leaving_the_length_screen_goes_back_to_the_applications(
     password length's own back button.
     """
     _touch_only(device)
-    buttons = GenericLayout(backend, device)
 
     _walk_to_pin_length(backend, device)
-    buttons.back()
+    # The SDK's header arrow, which is now the only back arrow in the
+    # application: the length screen is a list like the one it returns to, and
+    # both carry the arrow lib_nbgl puts in a BACK_BUTTON_HEADER_HEIGHT
+    # header. There is no longer a second, hand-placed square to confuse it
+    # with.
+    UseCaseSubSettings(backend, device).exit()
 
     backend.wait_for_text_on_screen("Which BIP85", 5)
 
@@ -231,19 +229,14 @@ def test_leaving_the_index_keypad_goes_back_to_the_applications(
     display_bip85_select_app_page() for all four applications.
     """
     _touch_only(device)
-    buttons = GenericLayout(backend, device)
+    buttons = ChoiceList(backend, device)
 
     _walk_to_pin_length(backend, device)
     buttons.choose(DIGITS_6)
     explanations.pass_explanation(
         backend, device, explanations.EXPLAIN_INDEX, "Enter index")
-    # The SDK's own header arrow, not this application's: nbgl_useCaseKeypad()
-    # draws the one lib_nbgl puts in a BACK_BUTTON_HEADER_HEIGHT header, where
-    # GenericLayout.back() aims at the centre of the BUTTON_DIAMETER square
-    # generic_screen_set_back_button() places. The two overlap on today's three
-    # devices and would stop overlapping on a device whose header is shorter
-    # than that square -- a touch that misses would fail this test on a
-    # timeout somewhere else rather than on the navigation it means to assert.
+    # The arrow nbgl_useCaseKeypad() draws, which is the same header arrow the
+    # two lists before it carry.
     UseCaseSubSettings(backend, device).exit()
 
     backend.wait_for_text_on_screen("Which BIP85", 5)

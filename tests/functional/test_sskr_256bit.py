@@ -9,7 +9,7 @@ from ragger.firmware.touch.layouts import CenteredFooter, LetterOnlyKeyboard, Su
 from keypad import Keypad
 import reviews
 import explanations
-from genericlayout import GenericLayout, MENU_RECOVER
+from choicelist import MENU_RECOVER
 
 @fixture(scope='session')
 def set_seed():
@@ -1235,7 +1235,7 @@ def all_eink_sskr_256bit(backend, device):
     keypad = Keypad(backend, device)
     review = UseCaseViewDetails(backend, device)
     choice = UseCaseChoice(backend, device)
-    genericbuttons = GenericLayout(backend, device)
+    genericbuttons = ChoiceList(backend, device)
 
     backend.wait_for_text_on_screen("Seed Tool", 10)
     home_page.action()
