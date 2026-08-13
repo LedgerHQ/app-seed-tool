@@ -1,20 +1,22 @@
 # Application menus demos
 
-Below are demos of some of the menu flows on different hardware devices
+These videos were recorded in August 2024, on Nano S and Stax only, from the interface as it stood then. They are kept as a record of that version and they no longer show what the application draws: the menus they walk — *Check BIP39*, *Generate SSKR*, *Check SSKR*, *Recover BIP39* — have since been replaced by a menu of four intentions on the touch devices and a single flow of three on the Nanos. What is drawn today is in the [menu flow diagrams](/README.md#application-menu-flow).
 
-## Nano S
+The recordings are hosted by GitHub and cannot be remade for the current interface, which is why they are dated rather than replaced. Each thumbnail below links to its video.
+
+## Nano S — interface of August 2024
 ### Check BIP39 & Generate SSKR menus
-https://github.com/user-attachments/assets/3f3ce02b-1b46-45b1-a86d-25fbff7bf216)](https://github.com/user-attachments/assets/b3ea239a-e9f8-40b4-b048-d85ec398ab59
+[![Nano S Check BIP39 & Generate SSKR menus, as they were in August 2024](nanos/bip39/demo.png)](https://github.com/user-attachments/assets/b3ea239a-e9f8-40b4-b048-d85ec398ab59)
 
 ### Check SSKR & Recover BIP39 menus
-https://github.com/aido/app-seed-tool/raw/demos/demos/nanos/sskr/demo.png)](https://github.com/user-attachments/assets/467030c3-4476-42a9-b90f-d29f2f35d423
+[![Nano S Check SSKR & Recover BIP39 menus, as they were in August 2024](nanos/sskr/demo.png)](https://github.com/user-attachments/assets/467030c3-4476-42a9-b90f-d29f2f35d423)
 
-## Stax
+## Stax — interface of August 2024
 ### Check BIP39 & Generate SSKR menus
-https://github.com/aido/app-seed-tool/raw/demos/demos/stax/bip39/demo.png)](https://github.com/user-attachments/assets/ff5728aa-3c2d-468e-9ad7-c9eb6b056e17
+[![Stax Check BIP39 & Generate SSKR menus, as they were in August 2024](stax/bip39/demo.png)](https://github.com/user-attachments/assets/ff5728aa-3c2d-468e-9ad7-c9eb6b056e17)
 
 ### Check SSKR & Recover BIP39 menus
-https://github.com/aido/app-seed-tool/raw/demos/demos/stax/sskr/demo.png)](https://github.com/user-attachments/assets/3f3f44e5-ba4a-491d-897e-3b2842c0309f
+[![Stax Check SSKR & Recover BIP39 menus, as they were in August 2024](stax/sskr/demo.png)](https://github.com/user-attachments/assets/3f3f44e5-ba4a-491d-897e-3b2842c0309f)
 
 > [!TIP]
 > Enable subtitles when viewing the videos
