@@ -57,67 +57,133 @@ Not all Ledger devices are equal. The older, less capable devices do not have th
 </div>
 
 ## Application menu flow
+
+Seed Tool draws two interfaces, and which one a device gets follows its screen rather than its age: Stax, Flex and Nano Gen5 are driven by touch, Nano S, Nano S+ and Nano X by two buttons. The two do not offer the same utilities and do not arrange them the same way, so each has its own diagram below. Every box is a screen the application draws, named with the words that screen shows; every labelled arrow is the control that carries the flow on, or the outcome that chooses between them; and the diamond is the screen whose outcome the application decides rather than the user.
+
+### Stax, Flex and Nano Gen5
+
+The home page carries the version, the copyright and *Quit*, and its action button opens a menu of four intentions. Those four are the flows below.
+
 ```mermaid
 ---
-title: Seed Tool menu flow
+title: Seed Tool menu flow - Stax, Flex and Nano Gen5
+---
+flowchart LR
+    1 --- 2 --- 3 --- 4
+    subgraph 1[Check Recovery Phrase]
+        direction TB
+        1.1["How long is your Recovery Phrase?"] --> 1.2["Enter word no. 1 of 24 of your Recovery Phrase"]
+        1.2 --> 1.3{"Valid, Mismatched or Invalid Recovery Phrase"}
+        1.3 --> 1.4[Tap to dismiss]
+    end
+    subgraph 2[Generate Backup Shares]
+        direction TB
+        2.1[How the backup works] --> 2.2[Why your Phrase?] --> 2.3["How long is your Recovery Phrase?"]
+        2.3 --> 2.4["Enter word no. 1 of 24 of your Recovery Phrase"]
+        2.4 --> 2.5{"Valid, Mismatched or Invalid Recovery Phrase"}
+        2.5 --> |Invalid or mismatched| 2.6[Tap to dismiss]
+        2.5 --> |Tap to continue| 2.7
+        subgraph 2.7[Generate the Shares]
+            direction TB
+            2.7.1[How many Shares?] --> 2.7.2["Enter number of SSKR Shares to generate (1 - 16)"]
+            2.7.2 --> 2.7.3[What is a threshold?] --> 2.7.4[Enter threshold value]
+            2.7.4 --> 2.7.5["SSKR · Shares: 3 · Threshold: 2 · 138 words to write"]
+            2.7.5 --> 2.7.6["Enough of these Shares rebuild your Recovery Phrase"]
+            2.7.6 --> |Generate Backup Shares| 2.7.7[SSKR Share 1 of 3]
+            2.7.7 --> 2.7.8["Close and erase all 3 Shares?"]
+        end
+    end
+    subgraph 3[Recover from Backup]
+        direction TB
+        3.1[How recovery works] --> 3.2["Enter Share 1 Word 1 of your SSKR Backup"]
+        3.2 --> 3.3{"Valid, Mismatched or Invalid SSKR Shares"}
+        3.3 --> |Invalid| 3.4[Tap to dismiss]
+        3.3 --> |Valid or mismatched| 3.5["A Recovery Phrase will be shown"]
+        3.5 --> |Continue anyway| 3.6[Recovery Phrase]
+    end
+    subgraph 4[Derive with BIP85]
+        direction TB
+        4.1[How BIP85 works] --> 4.2{Which BIP85 secret?}
+        4.2 --> |BIP39| 4.3[Length of BIP39 Phrase?]
+        4.2 --> |"Password (Base64) or (Base85)"| 4.4[Enter password length]
+        4.2 --> |PIN| 4.5["How many digits in the PIN?"]
+        4.3 --> 4.6[What is an index?]
+        4.4 --> 4.6
+        4.5 --> 4.6
+        4.6 --> 4.7["Enter index (0 - 9,999,999)"]
+        4.7 --> 4.8["BIP39 · 24 words · Index 0 · m/83696968'/39'/0'/24'/0'"]
+        4.8 --> 4.9["Anyone who sees this secret can use it."]
+        4.9 --> |Derive this secret| 4.10["BIP39 Phrase (Index #0) · m/83696968'/39'/0'/24'/0'"]
+    end
+```
+
+Three things the diagram does not say on its own:
+
+* **Going back.** Every screen carries a back arrow, and going back far enough reaches the home page — which erases whatever was typed on the way there.
+* **Why recovery goes on from a mismatch.** Checking and backing up stop on anything but *Valid*; recovery does not, and that is deliberate. It rebuilds the phrase whenever the shares recombine, matching this Ledger or not, because the device that needs a backup is precisely the one that no longer holds the phrase.
+* **The path.** The BIP-85 derivation path is drawn twice: on the review, where the parameters are still being chosen, and again above the derived secret, so that what gets written down carries the path that reproduces it.
+
+### Nano S, Nano S+ and Nano X
+
+There is no home page with a menu behind it. The idle screen is a single flow walked left and right with the two buttons, and *Version* and *Quit* are steps of that flow, beside the three intentions rather than behind them. BIP-85 is absent: no Nano draws a single BIP-85 screen.
+
+```mermaid
+---
+title: Seed Tool menu flow - Nano S, Nano S+ and Nano X
 ---
 flowchart LR
     1 --- 2 --- 3 --- 4 --- 5
-    subgraph 1[BIP-39]
+    subgraph 1[Check Phrase on this Ledger]
         direction TB
-        1.1[Check BIP-39]
-        1.1 --> 1.2.1[Enter 12 Words] --> 1.3{Validate BIP-39 Phrases}
-        1.1 --> 1.2.2[Enter 18 Words] --> 1.3
-        1.1 --> 1.2.3[Enter 24 Words] --> 1.3
-        1.3 --> |Matching BIP-39| 1.4
-        1.3 --> |Invalid BIP-39| 1.3.1[Quit]
-        subgraph 1.4[Generate SSKR Shares]
+        1.1["Select the number of words on your Recovery Sheet"] --> 1.2["Enter word #1"]
+        1.2 --> 1.3{"Your Phrase: not valid, doesn't match or correct"}
+        1.3 --> |is not valid| 1.4["Check length, order and spelling"]
+        1.4 --> 1.5[Re-enter Phrase]
+        1.3 --> |is correct| 1.6[Quit]
+        1.3 --> |doesn't match| 1.7[Return to menu]
+        1.5 --> 1.7
+    end
+    subgraph 2[Generate Backup Shares]
+        direction TB
+        2.1["Your Phrase is split into Shares. Keep them apart."] --> 2.2["This Ledger cannot read its Phrase. Enter it to split it."]
+        2.2 --> 2.3["Select the number of words on your Recovery Sheet"] --> 2.4["Enter word #1"]
+        2.4 --> 2.5{"Your Phrase: not valid, doesn't match or correct"}
+        2.5 --> |is not valid| 2.6["Check length, order and spelling"] --> 2.7[Re-enter Phrase]
+        2.5 --> |doesn't match| 2.8["It would not restore this Ledger"] --> 2.9[Return to menu]
+        2.5 --> |is correct| 2.10["Set up SSKR Backup"]
+        2.10 --> 2.11
+        subgraph 2.11[Generate the Shares]
             direction TB
-            1.4.1[Select number of shares] --> 1.4.2[Select threshold] --> 1.4.3[Generate SSKR Shares] --> 1.4.4[Display SSKR Shares] --> 1.4.5[Quit]
+            2.11.1["Select number of SSKR Shares"] --> 2.11.2["How many Shares rebuild your Phrase"]
+            2.11.2 --> 2.11.3[Select threshold] --> 2.11.4["Review your Backup"]
+            2.11.4 --> 2.11.5["SSKR: any 2 of 3 · 138 words to write"] --> 2.11.6["Shares will be shown"]
+            2.11.6 --> 2.11.7["Make sure no one can see the screen"] --> 2.11.8["Enough Shares rebuild your Phrase"]
+            2.11.8 --> |Generate Backup Shares| 2.11.9["SSKR 1/3"] --> 2.11.10["Written down all 3 Shares?"]
         end
     end
-    subgraph 2[SSKR]
+    subgraph 3[Recover from Backup]
         direction TB
-        2.1[Check SSKR] --> 2.2[Enter SSKR Shares] --> 2.3{Validate SSKR Shares}
-        2.3 --> |Valid SSKR| 2.4
-        2.3 --> |Invalid SSKR| 2.3.1[Quit]
-        subgraph 2.4[Recover BIP-39 Phrases]
-            direction TB
-            2.4.1[Recover BIP-39 Phrases] --> 2.4.2[Display BIP-39 Phrases] --> 2.4.3[Quit]
-        end
+        3.1["Not all your Shares are needed. Any order works."] --> 3.2["Enter first word of your first Share"]
+        3.2 --> 3.3{"SSKR Shares: not valid, don't match or correct"}
+        3.3 --> |are not valid| 3.4["Check length, order and spelling"] --> 3.5[Re-enter Shares]
+        3.3 --> |"don't match or are correct"| 3.6["Phrase will be shown"]
+        3.6 --> 3.7["Make sure no one can see the screen"] --> 3.8["Not necessarily this Ledger's Phrase"]
+        3.8 --> |Show the Phrase| 3.9["Your Phrase"]
     end
-    subgraph 3[BIP-85]
-        direction TB
-        3.1[Select BIP-85 Application] --> 3.2{BIP-85 Application choice}
-        3.2 --> |BIP-39| 3.3
-        3.2 --> |Base64 Password| 3.4
-        3.2 --> |Base85 Password| 3.5
-        subgraph 3.3[BIP-39 Application]
-            direction TB
-            3.3.1[Select phrase length] --> 3.3.2[Enter index] --> 3.3.3[Display BIP-39 phrase] --> 3.3.4[Quit]
-        end
-        subgraph 3.4[Base64 Password Application]
-            direction TB
-            3.4.1[Enter password length] --> 3.4.2[Enter index] --> 3.4.3[Display password] --> 3.4.4[Quit]
-        end
-        subgraph 3.5[Base85 Password Application]
-            direction TB
-            3.5.1[Enter password length] --> 3.5.2[Enter index] --> 3.5.3[Display password] --> 3.5.4[Quit]
-        end
-	end
     subgraph 4[Version]
         direction TB
         4.1[Version]
-        end
+    end
     subgraph 5[Quit]
         direction TB
         5.1[Quit]
     end
 ```
-> [!TIP]
-> Demo videos of some of the menu flows on different hardware devices are available [here](demos/README.md).
->
-> Alternatively, animations of some of the menu flows on different hardware devices are available [here](tests/functional/screenshots/README.md).
+
+A Nano S has two lines where the others have three, so several of those sentences are shortened on it.
+
+> [!NOTE]
+> This repository also holds [demo videos](demos/README.md) and [animations](tests/functional/screenshots/README.md) of the menu flows. Both were recorded in 2024, on Nano S and Stax only, from an interface that has since been redrawn — they show the menus the two diagrams above replaced, and are kept as a record of that version rather than as a picture of this one.
 
 ## Check BIP-39
 The application invites the user to type a [BIP-39](https://github.com/bitcoin/bips/blob/master/bip-0039.mediawiki) mnemonic on their Ledger device. The BIP-39 mnemonic is compared to the onboarded seed and the application notifies the user whether both seeds match or not.
