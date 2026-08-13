@@ -2058,6 +2058,36 @@ static const char* bip85_review_app_name(void) {
     return (const char*)PIC(bip85_select_app[bip85_type_get()]);
 }
 
+// The third arm of the same distinction the two switches in the review make. A
+// BIP39 derivation is twenty-four words that would restore *a* wallet, so its
+// warning says which one it is not; a password cannot be mistaken for a
+// recovery phrase, so saying it is not one would be a sentence about nothing.
+// See UI_STR_NBGL_BIP85_REVEAL_WARN_BIP39 in ui_strings.h.
+//
+// A switch rather than the pair of ifs this was: the warning is the last thing
+// between the user and the secret, and a fifth application must not inherit
+// whichever sentence happened to be the fallback. That is why there is no
+// `default:` -- adding one would silence -Wswitch, which is exactly the
+// compiler error a fifth application has to hit.
+//
+// One return per case rather than a variable assigned in each: assigning
+// leaves the initialiser dead on every path, which the Clang static analyzer
+// reports as deadcode.DeadStores. The trailing return is not that initialiser
+// moved -- it is reachable only if the stored type is outside the enum, and
+// returns the sentence that claims the least.
+static const char* bip85_reveal_warning(void) {
+    switch ((enum bip85_app_type)bip85_type_get()) {
+        case BIP85_APP_BIP39:
+            return UI_STR_NBGL_BIP85_REVEAL_WARN_BIP39;
+        case BIP85_APP_DICE:
+            return UI_STR_NBGL_BIP85_REVEAL_WARN_PIN;
+        case BIP85_APP_PWD_BASE64:
+        case BIP85_APP_PWD_BASE85:
+            return UI_STR_NBGL_BIP85_REVEAL_WARN_PWD;
+    }
+    return UI_STR_NBGL_BIP85_REVEAL_WARN_PWD;
+}
+
 /*
  * The review, and the path.
  *
@@ -2156,31 +2186,8 @@ static void display_bip85_generate_review_page(void) {
     pairs[3].item = UI_STR_NBGL_BIP85_REVIEW_ITEM_PATH;
     pairs[3].value = PIC(reviewValuePath);
 
-    // The third arm of the same distinction the two switches above make. A
-    // BIP39 derivation is twenty-four words that would restore *a* wallet, so
-    // its warning says which one it is not; a password cannot be mistaken for
-    // a recovery phrase, so saying it is not one would be a sentence about
-    // nothing. See UI_STR_NBGL_BIP85_REVEAL_WARN_BIP39 in ui_strings.h.
-    //
-    // A switch rather than the pair of ifs this was, for the same reason as
-    // the two above: the warning is the last thing between the user and the
-    // secret, and a fifth application must not inherit whichever sentence
-    // happened to be the fallback.
-    const char* warning = UI_STR_NBGL_BIP85_REVEAL_WARN_PWD;
-    switch ((enum bip85_app_type)bip85_type_get()) {
-        case BIP85_APP_BIP39:
-            warning = UI_STR_NBGL_BIP85_REVEAL_WARN_BIP39;
-            break;
-        case BIP85_APP_DICE:
-            warning = UI_STR_NBGL_BIP85_REVEAL_WARN_PIN;
-            break;
-        case BIP85_APP_PWD_BASE64:
-        case BIP85_APP_PWD_BASE85:
-            warning = UI_STR_NBGL_BIP85_REVEAL_WARN_PWD;
-            break;
-    }
-
-    display_review(pairs, 4, warning, UI_STR_NBGL_BIP85_REVIEW_FINISH,
+    display_review(pairs, 4, bip85_reveal_warning(),
+                   UI_STR_NBGL_BIP85_REVIEW_FINISH,
                    &bip85_generate_and_display);
 }
 
