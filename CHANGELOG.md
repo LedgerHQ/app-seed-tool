@@ -19,16 +19,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add Flex and Stax function tests for base85 password application of BIP85
 - Add `cx_bn_gf2_n_mul` to unit test helper functions
 - Port to Ledger Nano Gen5
+- Add an explanation to the backup, recovery and BIP85 flows, and a warning before any secret
+- Add a review of the chosen values, and of the BIP85 derivation path, before generating or deriving
+- Add PIN derivation, as BIP85's DICE application with a ten-sided die
+- Add a separate result screen when a valid phrase or share set does not match the seed
+- Add advice on Flex and Stax to check length, order and spelling when a phrase is invalid
+
+### Changed
+
+- Change the menu and phrase length screens to SDK lists, the menu offering actions not formats
+- Say which values are accepted on the share count and threshold screens
+- Label the reject buttons 'Cancel' and 'Close' rather than 'Done'
 
 ### Fixed
 
 - Fix Stax and Flex function tests to work better with generic screen layouts
 - Fix unit tests
 - Refactor app_main.c
+- Name the whole set on each generated SSKR share, 'SSKR Share 1 of 3' rather than 'SSKR Share #1'
+- Return to the screen that asked, when a share count or threshold is refused
 
 ### Security
 
 - Wipe text buffers on Stax and Flex as early as possible
+- Make the seed comparison result survive a single bit flip, so an injected fault cannot fake a match
+- Erase the whole SSKR share entry buffer on the Nano devices, and the BIP39 word candidates on Flex and Stax
 
 ## [1.8.1] - 2025-07-24
 
