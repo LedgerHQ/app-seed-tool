@@ -611,13 +611,21 @@ than trusting a single `recv()`.)
 
 ## Adapting to stax/apex, or another scenario
 
-The touch coordinates in each script are flex-only (480×600).
-`tests/functional/keypad.py` and `genericlayout.py` have the equivalent
-stax/apex positions if this needs extending; those are Ragger-side helpers
-and are not reused here directly, since these scripts do not go through
-Ragger at all — the GDB/breakpoint machinery has nothing to do with
-Ragger's navigator/backend layer, and mixing the two would add coupling
-for no benefit in single-scenario scripts like these.
+The touch coordinates in each script are flex-only (480×600) and are written
+out by hand here, since these scripts do not go through Ragger at all — the
+GDB/breakpoint machinery has nothing to do with Ragger's navigator/backend
+layer, and mixing the two would add coupling for no benefit in single-scenario
+scripts like these.
+
+One Ragger-side helper still carries positions that could be borrowed if this
+needs extending: `tests/functional/keypad.py`, whose `KEYPAD_POSITIONS` table
+gives the twelve keys for `STAX`, `FLEX` and `APEX_P`. The screens that ask
+"which one?" have nothing to borrow. They are the SDK's own `BARS_LIST`, drawn
+by `display_choice_list()` (`src/nbgl/ui.c`), and Ragger's own `ChoiceList`
+knows where their rows are; `tests/functional/choicelist.py` is therefore names
+only — `MENU_CHECK`, `WORDS_12` and the rest — with no coordinates at all.
+Extending these scripts past flex means measuring those rows on the device,
+not copying a table from there.
 
 `rsp_client.py` and the `MemorySampler` breakpoint-snapshot pattern are
 generic and are reused as-is across checks 1, 3, 4, and 6 (all R9-relative
