@@ -611,11 +611,19 @@ than trusting a single `recv()`.)
 
 ## Adapting to stax/apex, or another scenario
 
-The touch coordinates in each script are flex-only (480×600) and are written
-out by hand here, since these scripts do not go through Ragger at all — the
-GDB/breakpoint machinery has nothing to do with Ragger's navigator/backend
-layer, and mixing the two would add coupling for no benefit in single-scenario
-scripts like these.
+The touch coordinates are flex-only (480×600) and are written out by hand
+here, since these scripts do not go through Ragger at all — the GDB/breakpoint
+machinery has nothing to do with Ragger's navigator/backend layer, and mixing
+the two would add coupling for no benefit in single-scenario scripts like
+these.
+
+They live in `screens.py`, once, and the scripts name rows rather than points:
+`screens.list_row(screens.MENU_CHECK)`, not `(358, 524)`. That is not tidiness.
+Each script used to carry its own copy, so when the menus changed, all six went
+stale at the same moment and none of them said so — these are run by hand,
+never in CI, so a wrong tap surfaces as a failure several screens later, in
+whichever script someone happens to run. One copy means one edit, and a wrong
+row is wrong everywhere at once.
 
 One Ragger-side helper still carries positions that could be borrowed if this
 needs extending: `tests/functional/keypad.py`, whose `KEYPAD_POSITIONS` table

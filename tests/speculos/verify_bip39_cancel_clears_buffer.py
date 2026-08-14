@@ -35,6 +35,7 @@ import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from rsp_client import RSP, wait_for_gdb
+import screens
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 ELF_PATH = os.path.join(REPO_ROOT, "build", "flex", "bin", "app.elf")
@@ -246,26 +247,31 @@ class MemorySampler:
 
 
 def navigate_and_cancel():
-    """Coordinates are for the flex layout only (480x600, touch UI). See
-    README.md for how these were found and how to adapt to stax/apex."""
+    """Coordinates are for the flex layout only (480x600, touch UI); they live
+    in screens.py. See README.md for how they were found and what adapting to
+    stax/apex takes.
+
+    Checking a Recovery Phrase is the one journey with no explanation screen --
+    the menu entry already said what it does, so it goes straight to the length
+    choice. That is deliberate; the other three do have one."""
     time.sleep(3)  # let the app finish booting before the first tap
-    tap(371, 436)  # home screen: "Select Tool"
+    tap(*screens.HOME_ACTION)  # "Select an action"
     time.sleep(1)
-    tap(358, 524)  # "BIP39 Check"
+    tap(*screens.list_row(screens.MENU_CHECK))  # "Check Recovery Phrase"
     time.sleep(1)
-    tap(387, 524)  # "12 words"
+    tap(*screens.list_row(screens.WORDS_12))  # "12 words"
     time.sleep(1)
 
     # word 1: type "aban", confirm the "abandon" suggestion -> lands in
     # mnemonic.buffer via bip39_mnemonic_word_add()
-    for x, y in [(40, 474), (207, 546), (40, 474), (256, 546)]:
-        tap(x, y)
-    tap(176, 300)
+    for letter in "aban":
+        tap(*screens.LETTERS[letter])
+    tap(*screens.SUGGESTION_1)
 
     # word 2: type "aba" but never confirm it -- this is the "cancel while
     # typing" moment the scenario is about
-    for x, y in [(40, 474), (207, 546), (40, 474)]:
-        tap(x, y)
+    for letter in "aba":
+        tap(*screens.LETTERS[letter])
 
     texts = screen_texts()
     if "abandon" not in texts:
@@ -274,9 +280,9 @@ def navigate_and_cancel():
     # back out: 1st tap removes the confirmed word (bip39_mnemonic_word_remove
     # -> bip39_mnemonic_shrink, the real per-word clearing path), 2nd tap
     # exits the screen entirely (bip39_mnemonic_reset, defense in depth)
-    tap(48, 48)
+    tap(*screens.BACK)
     time.sleep(1)
-    tap(48, 48)
+    tap(*screens.BACK)
     time.sleep(1)
 
 
@@ -309,7 +315,7 @@ def main():
                     "become ready in time")
             sampler = MemorySampler(watch, mnemonic_offset, mnemonic_len)
             sampler.start()
-            print("Navigating: home -> BIP39 Check -> 12 words -> type+confirm "
+            print("Navigating: home -> Check Recovery Phrase -> 12 words -> type+confirm "
                   "'abandon' -> type partial 'aba' -> cancel (back x2) ...")
             print("(this is slow -- every guest syscall round-trips through this "
                   "script while GDB is attached; a full run takes a few minutes)")

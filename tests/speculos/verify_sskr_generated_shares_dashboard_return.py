@@ -43,6 +43,7 @@ import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from rsp_client import RSP, wait_for_gdb
+import screens
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 ELF_PATH = os.path.join(REPO_ROOT, "build", "flex", "bin", "app.elf")
@@ -86,14 +87,6 @@ FLEX_KEYS = {
 }
 SUGGESTION_1 = (140, 300)
 
-# Numeric keypad (ragger POSITIONS["Keypad"][DeviceType.FLEX]) for the SSKR
-# share-count / threshold entry screens.
-KEYPAD = {
-    "1": (80, 292), "2": (240, 292), "3": (400, 292),
-    "4": (80, 380), "5": (240, 380), "6": (400, 380),
-    "7": (80, 468), "8": (240, 468), "9": (400, 468),
-    "delete": (80, 556), "0": (240, 556), "enter": (400, 556),
-}
 
 # UseCaseChoice.confirm ("Generate SSKR" on the "Generate SSKR Phrase?"
 # screen) and the check-result page's CenteredFooter dismiss tap, both from
@@ -280,7 +273,7 @@ class MemorySampler:
 
 def type_word(word):
     for letter in word:
-        tap(*FLEX_KEYS[letter])
+        tap(*screens.LETTERS[letter])
 
 
 def type_and_confirm_word(word):
@@ -299,7 +292,44 @@ def type_and_confirm_word(word):
     else:
         die(f"expected '{word}' suggestion on screen after typing it, got: "
             f"{texts} -- navigation/keyboard-mapping assumption is wrong")
-    tap(*SUGGESTION_1)
+    tap(*screens.SUGGESTION_1)
+
+
+def long_press_until(x, y, target, timeout_s=240, poll=0.5):
+    """Hold the confirm button until the screen it leads to appears.
+
+    The review's confirm is a long press, not a tap: nbgl_useCaseGenericReview()
+    ignores a plain tap, which is the point of it standing between the user and
+    a secret. The SDK counts the hold on ticker events, and under GDB every one
+    of those is slowed by the same factor as everything else -- so a hold of a
+    fixed number of seconds is a race this loses on a slow host. Releasing early
+    cancels the press, silently, and the run then fails much later with
+    "generation was never reached".
+
+    So hold, and watch the screen rather than the clock. Released either way,
+    including on timeout, so the app is never left with a finger down.
+    """
+    def finger(action):
+        body = json.dumps({"action": action, "x": x, "y": y}).encode()
+        req = urllib.request.Request(f"{BASE_URL}/finger", data=body,
+                                     headers={"Content-Type": "application/json"},
+                                     method="POST")
+        urllib.request.urlopen(req).read()
+
+    finger("press")
+    try:
+        deadline = time.time() + timeout_s
+        texts = []
+        while time.time() < deadline:
+            texts = screen_texts()
+            if any(target in t for t in texts):
+                return texts
+            time.sleep(poll)
+        die(f"long press on {target!r} never took within {timeout_s}s, "
+            f"last seen: {texts}")
+    finally:
+        finger("release")
+        time.sleep(1)
 
 
 def wait_for_text(target, timeout_s=100, poll=0.5):
@@ -317,39 +347,63 @@ def wait_for_text(target, timeout_s=100, poll=0.5):
 def navigate_generate_view_and_return():
     """Coordinates are for the flex layout only (480x600); see README.md."""
     time.sleep(3)  # let the app finish booting before the first tap
-    tap(371, 436)  # home screen: "Select Tool"
+    tap(*screens.HOME_ACTION)  # "Select an action"
     time.sleep(1)
-    tap(358, 524)  # "BIP39 Check"
+    # Backing up is reached from the menu now, rather than by passing a check
+    # and accepting an offer nobody asked for.
+    tap(*screens.list_row(screens.MENU_BACKUP))  # "Generate Backup Shares"
     time.sleep(1)
-    tap(387, 524)  # "12 words"
+
+    # Two explanations before the ask, and the difference in how they end is
+    # deliberate: the first only leads to more reading, the second leads to an
+    # act (see tests/functional/explanations.py).
+    wait_for_text("backup", timeout_s=60)
+    tap(*screens.CONTINUE_FOOTER)  # "How the backup works"
+    time.sleep(1)
+    wait_for_text("Phrase", timeout_s=60)
+    tap(*screens.BLACK_BUTTON)  # "Why your Phrase?" -> "Enter Recovery Phrase"
+    time.sleep(1)
+
+    tap(*screens.list_row(screens.WORDS_12))  # "12 words"
     time.sleep(1)
 
     for word in MNEMONIC_WORDS:
         type_and_confirm_word(word)
 
-    # bip39_mnemonic_check() (called from bip39_keyboard_dispatcher) should
-    # now report a match against the device's own seed (booted with -s
-    # using this exact mnemonic) -- confirm the result page really says so
-    # before proceeding, rather than assuming.
-    wait_for_text("Valid Secret", timeout_s=150)
-    tap(*CHECK_RESULT_DISMISS)  # dismiss -> check_result_callback() runs
+    # bip39_mnemonic_check() should now report a match against the device's
+    # own seed (booted with -s using this exact mnemonic) -- confirm the
+    # result page really says so before proceeding, rather than assuming.
+    # "Valid" alone: the title is "Valid\nRecovery Phrase" since the three
+    # verdicts were given separate screens.
+    wait_for_text("Valid", timeout_s=150)
+    tap(*screens.RESULT_FOOTER)  # "Tap to continue"
     time.sleep(1)
 
-    wait_for_text("Generate SSKR", timeout_s=60)
-    tap(*GENERATE_SSKR_CONFIRM)  # "Generate SSKR" choice confirm
+    wait_for_text("Shares", timeout_s=60)
+    tap(*screens.CONTINUE_FOOTER)  # "How many Shares?"
     time.sleep(1)
 
-    wait_for_text("SSKR shares", timeout_s=60)
+    wait_for_text("SSKR Shares", timeout_s=60)
     for d in "3":
-        tap(*KEYPAD[d])
-    tap(*KEYPAD["enter"])  # 3 shares
+        tap(*screens.KEYPAD[d])
+    tap(*screens.KEYPAD["enter"])  # 3 shares
+    time.sleep(1)
+
+    wait_for_text("threshold", timeout_s=60)
+    tap(*screens.CONTINUE_FOOTER)  # "What is a threshold?"
     time.sleep(1)
 
     wait_for_text("threshold", timeout_s=60)
     for d in "2":
-        tap(*KEYPAD[d])
-    tap(*KEYPAD["enter"])  # threshold 2
+        tap(*screens.KEYPAD[d])
+    tap(*screens.KEYPAD["enter"])  # threshold 2
     time.sleep(1)
+
+    # The review of what was chosen, then the warning and the long press.
+    wait_for_text("Threshold", timeout_s=60)
+    tap(*screens.REVIEW_NEXT)
+    wait_for_text("Anyone who", timeout_s=60)
+    long_press_until(*screens.REVIEW_LONG_PRESS, "SSKR Share")
 
     # Sanity check: this exact 3-share/threshold-2/this-mnemonic combination
     # is already exercised for real by tests/functional/test_bip39_12word.py,
@@ -366,13 +420,13 @@ def navigate_generate_view_and_return():
     # all 3 shares, then exit. This is a realistic "user finished viewing
     # and returned to the dashboard" path, not a contrived shortcut.
     wait_for_text("SSKR Share", timeout_s=30)
-    tap(*REVIEW_NEXT)  # share 1 -> 2
+    tap(*screens.SECRET_NEXT)  # share 1 -> 2
     time.sleep(1)
     wait_for_text("SSKR Share", timeout_s=30)
-    tap(*REVIEW_NEXT)  # share 2 -> 3
+    tap(*screens.SECRET_NEXT)  # share 2 -> 3
     time.sleep(1)
     wait_for_text("SSKR Share", timeout_s=30)
-    tap(*REVIEW_EXIT)  # exit review -> review_done() -> back to dashboard
+    tap(*screens.SECRET_CLOSE)  # exit review -> review_done() -> back to dashboard
     time.sleep(2)
 
 
@@ -406,8 +460,9 @@ def main():
                     "become ready in time")
             sampler = MemorySampler(watch, shares_offset, read_len)
             sampler.start()
-            print("Navigating: home -> BIP39 Check -> 12 words -> type+confirm "
-                  "mnemonic -> Generate SSKR (3 shares, threshold 2) -> "
+            print("Navigating: home -> Generate Backup Shares -> two "
+                  "explanations -> 12 words -> type+confirm mnemonic -> "
+                  "3 shares, threshold 2 -> review -> long press -> "
                   "page through 3 shares -> exit to dashboard ...")
             print("(this is slow -- every guest syscall round-trips through this "
                   "script while GDB is attached; a full run of the 12-word entry "

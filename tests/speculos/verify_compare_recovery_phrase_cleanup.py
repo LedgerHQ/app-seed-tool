@@ -64,6 +64,7 @@ import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from rsp_client import RSP, wait_for_gdb
+import screens
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 ELF_PATH = os.path.join(REPO_ROOT, "build", "flex", "bin", "app.elf")
@@ -92,24 +93,6 @@ CODE_RUNTIME_BASE = 0x40000000
 SIGILL = 4
 SOCKET_TIMEOUT = 40
 
-# FLEX (480x600) touch-keyboard letter positions, taken from Ledger's own
-# `ragger` package (ragger/firmware/touch/positions.py,
-# POSITIONS["LetterOnlyKeyboard"][DeviceType.FLEX]) -- authoritative, not
-# guessed. Only the 26 letters are needed here (no "back"/space row).
-FLEX_KEYS = {
-    "q": (24, 415), "w": (72, 415), "e": (120, 415), "r": (168, 415),
-    "t": (216, 415), "y": (264, 415), "u": (312, 415), "i": (360, 415),
-    "o": (408, 415), "p": (456, 415),
-    "a": (48, 490), "s": (96, 490), "d": (144, 490), "f": (192, 490),
-    "g": (240, 490), "h": (288, 490), "j": (336, 490), "k": (384, 490),
-    "l": (432, 490),
-    "z": (24, 565), "x": (72, 565), "c": (120, 565), "v": (168, 565),
-    "b": (216, 565), "n": (264, 565), "m": (312, 565),
-}
-# ragger POSITIONS["Suggestions"][DeviceType.FLEX]: only slots 1 and 2 are
-# directly tappable without swiping. A fully-typed word should always rank
-# as the top (1) suggestion.
-SUGGESTION_1 = (140, 300)
 
 
 def die(msg):
@@ -396,7 +379,7 @@ def type_and_confirm_word(word):
     poll ceiling here reads as a stuck/dropped key when it's actually just
     slow to render."""
     for letter in word:
-        tap(*FLEX_KEYS[letter])
+        tap(*screens.LETTERS[letter])
     texts = []
     for _ in range(200):
         texts = screen_texts()
@@ -406,18 +389,18 @@ def type_and_confirm_word(word):
     else:
         die(f"expected '{word}' suggestion on screen after typing it, got: "
             f"{texts} -- navigation/keyboard-mapping assumption is wrong")
-    tap(*SUGGESTION_1)
+    tap(*screens.SUGGESTION_1)
 
 
 def navigate_and_check():
     """Coordinates are for the flex layout only (480x600); see README.md
     for how these were found and how to adapt to stax/apex."""
     time.sleep(3)  # let the app finish booting before the first tap
-    tap(371, 436)  # home screen: "Select Tool"
+    tap(*screens.HOME_ACTION)  # "Select an action"
     time.sleep(1)
-    tap(358, 524)  # "BIP39 Check"
+    tap(*screens.list_row(screens.MENU_CHECK))  # "Check Recovery Phrase"
     time.sleep(1)
-    tap(387, 524)  # "12 words"
+    tap(*screens.list_row(screens.WORDS_12))  # "12 words"
     time.sleep(1)
 
     for word in MNEMONIC_WORDS:
@@ -454,7 +437,7 @@ def main():
             sampler = MemorySampler(before_addr, after_addr,
                                     buffer_device_reg, buffer_reg)
             sampler.start()
-            print("Navigating: home -> BIP39 Check -> 12 words -> type+confirm "
+            print("Navigating: home -> Check Recovery Phrase -> 12 words -> type+confirm "
                   "all 12 words of the test mnemonic ...")
             print("(this is slow -- every guest syscall round-trips through this "
                   "script while GDB is attached; a full run of the 12-word entry "
