@@ -36,6 +36,7 @@ import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from rsp_client import RSP, wait_for_gdb
+import screens
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 ELF_PATH = os.path.join(REPO_ROOT, "build", "flex", "bin", "app.elf")
@@ -66,30 +67,7 @@ CODE_RUNTIME_BASE = 0x40000000
 SIGILL = 4
 SOCKET_TIMEOUT = 40
 
-# FLEX (480x600) touch-keyboard letter positions, from Ledger's own
-# `ragger` package (ragger/firmware/touch/positions.py,
-# POSITIONS["LetterOnlyKeyboard"][DeviceType.FLEX]) -- same table already
-# used by verify_compare_recovery_phrase_cleanup.py.
-FLEX_KEYS = {
-    "q": (24, 415), "w": (72, 415), "e": (120, 415), "r": (168, 415),
-    "t": (216, 415), "y": (264, 415), "u": (312, 415), "i": (360, 415),
-    "o": (408, 415), "p": (456, 415),
-    "a": (48, 490), "s": (96, 490), "d": (144, 490), "f": (192, 490),
-    "g": (240, 490), "h": (288, 490), "j": (336, 490), "k": (384, 490),
-    "l": (432, 490),
-    "z": (24, 565), "x": (72, 565), "c": (120, 565), "v": (168, 565),
-    "b": (216, 565), "n": (264, 565), "m": (312, 565),
-}
-SUGGESTION_1 = (140, 300)
 
-# Tool-select screen (POSITIONS["GenericLayout"][DeviceType.FLEX], same
-# table this repo's own tests/functional/genericlayout.py uses):
-# choice(1)=(240,540)="BIP39 Check", choice(2)=(240,430)="SSKR Check",
-# choice(3)=(240,320)="BIP85 Generate". Unlike BIP39, selecting SSKR Check
-# goes straight to the entry keyboard -- no length-selection screen
-# (see select_tool_callback() in src/nbgl/ui.c).
-SSKR_CHECK_BUTTON = (240, 430)
-BACK_BUTTON = (48, 48)
 
 
 def die(msg):
@@ -273,7 +251,7 @@ class MemorySampler:
 def type_word(word):
     """Type letters, no confirm -- used for the never-confirmed 2nd word."""
     for letter in word:
-        tap(*FLEX_KEYS[letter])
+        tap(*screens.LETTERS[letter])
 
 
 def type_and_confirm_word(word):
@@ -292,15 +270,20 @@ def type_and_confirm_word(word):
     else:
         die(f"expected '{word}' suggestion on screen after typing it, got: "
             f"{texts} -- navigation/keyboard-mapping assumption is wrong")
-    tap(*SUGGESTION_1)
+    tap(*screens.SUGGESTION_1)
 
 
 def navigate_and_cancel():
     """Coordinates are for the flex layout only (480x600); see README.md."""
     time.sleep(3)  # let the app finish booting before the first tap
-    tap(371, 436)  # home screen: "Select Tool"
+    tap(*screens.HOME_ACTION)  # "Select an action"
     time.sleep(1)
-    tap(*SSKR_CHECK_BUTTON)  # "SSKR Check" -- goes straight to the keyboard
+    tap(*screens.list_row(screens.MENU_RECOVER))  # "Recover from Backup"
+    time.sleep(1)
+    # display_recover_concept_page() explains that not all the Shares are
+    # needed and that any order works, and ends on a black button because what
+    # follows is an act rather than more reading (isAction, src/nbgl/ui.c).
+    tap(*screens.BLACK_BUTTON)
     time.sleep(1)
 
     # word 1: type "acid" in full, confirm it -> lands in shares.buffer via
@@ -314,9 +297,9 @@ def navigate_and_cancel():
     # back out: 1st tap removes the confirmed word (sskr_shares_word_remove
     # -> sskr_shares_shrink, the real per-word clearing path), 2nd tap
     # exits the screen entirely (sskr_shares_reset, defense in depth)
-    tap(*BACK_BUTTON)
+    tap(*screens.BACK)
     time.sleep(1)
-    tap(*BACK_BUTTON)
+    tap(*screens.BACK)
     time.sleep(1)
 
 
@@ -351,8 +334,9 @@ def main():
                     "become ready in time")
             sampler = MemorySampler(watch, shares_offset, read_len)
             sampler.start()
-            print("Navigating: home -> SSKR Check -> type+confirm 'acid' -> "
-                  "type partial 'al' -> cancel (back x2) ...")
+            print("Navigating: home -> Recover from Backup -> explanation -> "
+                  "type+confirm 'acid' -> type partial 'al' -> "
+                  "cancel (back x2) ...")
             print("(this is slow -- every guest syscall round-trips through this "
                   "script while GDB is attached)")
             navigate_and_cancel()

@@ -52,6 +52,7 @@ import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from rsp_client import RSP, wait_for_gdb
+import screens
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 ELF_PATH = os.path.join(REPO_ROOT, "build", "flex", "bin", "app.elf")
@@ -79,41 +80,7 @@ MNEMONIC_BUFFER_LENGTH = 216
 SIGILL = 4
 SOCKET_TIMEOUT = 40
 
-# Numeric keypad (ragger POSITIONS["Keypad"][DeviceType.FLEX]), same table
-# already used by verify_sskr_generated_shares_dashboard_return.py, for the
-# BIP-85 index entry screen.
-KEYPAD = {
-    "1": (80, 292), "2": (240, 292), "3": (400, 292),
-    "4": (80, 380), "5": (240, 380), "6": (400, 380),
-    "7": (80, 468), "8": (240, 468), "9": (400, 468),
-    "delete": (80, 556), "0": (240, 556), "enter": (400, 556),
-}
 
-# Tool-select screen: "BIP85 Generate" is the third of three buttons
-# (toolType[] = {"BIP39 Check", "SSKR Check", "BIP85 Generate"}).
-# Established convention from the existing scripts (first array item
-# renders at the bottom of the screen, later items stack upward):
-# choice(1)=(240,540), choice(2)=(240,430), choice(3)=(240,320).
-TOOL_SELECT_BIP85 = (240, 320)
-
-# display_bip85_select_app_page(): same raw button-list construction as the
-# tool-select screen (bip85_select_app[] = {"BIP39", "Password (Base64)",
-# "Password (Base85)"}) -- by the same convention, choice(1)=(240,540) is
-# "BIP39".
-BIP85_APP_BIP39 = (240, 540)
-
-# display_bip39_select_phrase_length_page(): same 3-button pattern,
-# choice(1) = "12 words" -- reusing the exact coordinate already proven
-# working for this button in verify_compare_recovery_phrase_cleanup.py and
-# verify_sskr_generated_shares_dashboard_return.py.
-PHRASE_LENGTH_12_WORDS = (387, 524)
-
-# nbgl_useCaseGenericReview's quit/"Done" control -- the same coordinate
-# verify_sskr_generated_shares_dashboard_return.py found working on the
-# (multi-page) SSKR share review. Tried first here since it's the same
-# underlying NBGL widget; the SDK's bottom nav bar is present regardless of
-# page count.
-REVIEW_DONE = (55, 530)
 
 
 def die(msg):
@@ -222,6 +189,43 @@ def screen_texts():
     return [e["text"] for e in data["events"]]
 
 
+def long_press_until(x, y, target, timeout_s=240, poll=0.5):
+    """Hold the confirm button until the screen it leads to appears.
+
+    The review's confirm is a long press, not a tap: nbgl_useCaseGenericReview()
+    ignores a plain tap, which is the point of it standing between the user and
+    a secret. The SDK counts the hold on ticker events, and under GDB every one
+    of those is slowed by the same factor as everything else -- so a hold of a
+    fixed number of seconds is a race this loses on a slow host. Releasing early
+    cancels the press, silently, and the run then fails much later with
+    "generation was never reached".
+
+    So hold, and watch the screen rather than the clock. Released either way,
+    including on timeout, so the app is never left with a finger down.
+    """
+    def finger(action):
+        body = json.dumps({"action": action, "x": x, "y": y}).encode()
+        req = urllib.request.Request(f"{BASE_URL}/finger", data=body,
+                                     headers={"Content-Type": "application/json"},
+                                     method="POST")
+        urllib.request.urlopen(req).read()
+
+    finger("press")
+    try:
+        deadline = time.time() + timeout_s
+        texts = []
+        while time.time() < deadline:
+            texts = screen_texts()
+            if any(target in t for t in texts):
+                return texts
+            time.sleep(poll)
+        die(f"long press on {target!r} never took within {timeout_s}s, "
+            f"last seen: {texts}")
+    finally:
+        finger("release")
+        time.sleep(1)
+
+
 def wait_for_text(target, timeout_s=60, poll=0.5):
     deadline = time.time() + timeout_s
     texts = []
@@ -309,29 +313,44 @@ class MemorySampler:
 def navigate_generate_view_and_return():
     """Coordinates are for the flex layout only (480x600); see README.md."""
     time.sleep(3)  # let the app finish booting before the first tap
-    tap(371, 436)  # home screen: "Select Tool"
+    tap(*screens.HOME_ACTION)  # "Select an action"
     time.sleep(1)
 
-    wait_for_text("Select the tool")
-    tap(*TOOL_SELECT_BIP85)  # "BIP85 Generate"
+    wait_for_text("do?")
+    tap(*screens.list_row(screens.MENU_DERIVE))  # "Derive with BIP85"
     time.sleep(1)
 
     wait_for_text("BIP85")
-    tap(*BIP85_APP_BIP39)  # "BIP39" app choice
+    tap(*screens.CONTINUE_FOOTER)  # "How BIP85 works"
     time.sleep(1)
 
-    wait_for_text("BIP39")
-    tap(*PHRASE_LENGTH_12_WORDS)  # "12 words"
+    wait_for_text("secret")
+    tap(*screens.list_row(screens.BIP85_APP_BIP39))  # "BIP39"
+    time.sleep(1)
+
+    wait_for_text("Length of BIP39")
+    tap(*screens.list_row(screens.WORDS_12))  # "12 words"
     time.sleep(1)
 
     wait_for_text("index", timeout_s=60)
-    tap(*KEYPAD["1"])  # index 1
-    tap(*KEYPAD["enter"])
+    tap(*screens.CONTINUE_FOOTER)  # "What is an index?"
     time.sleep(1)
 
-    # bip85_index_validate() -> bip85_app_bip39_gen() -> display_generic_review()
-    wait_for_text("BIP39 Phrase", timeout_s=60)
-    tap(*REVIEW_DONE)  # "Done" -> review_done() -> reset_globals() -> dashboard
+    wait_for_text("index", timeout_s=60)
+    tap(*screens.KEYPAD["1"])  # index 1
+    tap(*screens.KEYPAD["enter"])
+    time.sleep(1)
+
+    # The review of the three values and the path they combine into, then the
+    # warning and the long press that reveals the secret.
+    wait_for_text("Path", timeout_s=60)
+    tap(*screens.REVIEW_NEXT)
+    wait_for_text("Anyone who sees", timeout_s=60)
+
+    # bip85_generate_and_display() -> display_generic_review(); "Close" is the
+    # reject control of that review, and the only way off the screen.
+    long_press_until(*screens.REVIEW_LONG_PRESS, "Close")
+    tap(*screens.SECRET_CLOSE)  # -> review_done() -> reset_globals()
     time.sleep(2)
 
 
@@ -368,8 +387,9 @@ def main():
             sampler = MemorySampler(watch, app_data_offset, app_data_len,
                                     mnemonic_offset, mnemonic_len)
             sampler.start()
-            print("Navigating: home -> BIP85 Generate -> BIP39 -> 12 words -> "
-                  "index 1 -> review -> Done -> dashboard ...")
+            print("Navigating: home -> Derive with BIP85 -> explanation -> "
+                  "BIP39 -> 12 words -> index 1 -> review -> long press -> "
+                  "Close -> dashboard ...")
             print("(no mnemonic typing needed on this path -- should be a few "
                   "minutes, not 15-30+)")
             navigate_generate_view_and_return()
