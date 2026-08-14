@@ -1,6 +1,6 @@
 /*******************************************************************************
  *   Ledger Recovery Check application
- *   (c) 2016-2025 Ledger SAS
+ *   (c) 2016-2026 Ledger SAS
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@
 
 #include "common.h"
 
-int cx_math_shiftr_11(unsigned char *r, unsigned int len) {
+int cx_math_shiftr_11(unsigned char* r, unsigned int len) {
     unsigned int j, b11;
     b11 = r[len - 1] | ((r[len - 2] & 7) << 8);
 
@@ -32,9 +32,8 @@ int cx_math_shiftr_11(unsigned char *r, unsigned int len) {
     return b11;
 }
 
-static unsigned int bolos_ux_electrum_bip39_mnemonic_encode(const uint8_t *seed17,
-                                                            uint8_t *out,
-                                                            size_t out_length) {
+static unsigned int bolos_ux_electrum_bip39_mnemonic_encode(
+    const uint8_t* seed17, uint8_t* out, size_t out_length) {
     unsigned char tmp[17];
     unsigned int i;
     unsigned int offset = 0;
@@ -42,11 +41,13 @@ static unsigned int bolos_ux_electrum_bip39_mnemonic_encode(const uint8_t *seed1
     for (i = 0; i < 12; i++) {
         unsigned char word_length;
         unsigned int idx = cx_math_shiftr_11(tmp, sizeof(tmp));
-        word_length = BIP39_WORDLIST_OFFSETS[idx + 1] - BIP39_WORDLIST_OFFSETS[idx];
+        word_length =
+            BIP39_WORDLIST_OFFSETS[idx + 1] - BIP39_WORDLIST_OFFSETS[idx];
         if ((offset + word_length) > out_length) {
             THROW(INVALID_PARAMETER);
         }
-        memcpy(out + offset, BIP39_WORDLIST + BIP39_WORDLIST_OFFSETS[idx], word_length);
+        memcpy(out + offset, BIP39_WORDLIST + BIP39_WORDLIST_OFFSETS[idx],
+               word_length);
         offset += word_length;
         if (i < 11) {
             if (offset > out_length) {
@@ -59,7 +60,7 @@ static unsigned int bolos_ux_electrum_bip39_mnemonic_encode(const uint8_t *seed1
 }
 
 unsigned int bolos_ux_electrum_new_bip39_mnemonic(unsigned int version,
-                                                  unsigned char *out,
+                                                  unsigned char* out,
                                                   unsigned int out_length) {
     unsigned char seed[17];
     unsigned int nonce;
@@ -88,16 +89,12 @@ unsigned int bolos_ux_electrum_new_bip39_mnemonic(unsigned int version,
     return offset;
 }
 
-unsigned int bolos_ux_electrum_bip39_mnemonic_check(unsigned int version,
-                                                    unsigned char *mnemonic,
-                                                    unsigned int mnemonic_length) {
+unsigned int bolos_ux_electrum_bip39_mnemonic_check(
+    unsigned int version, unsigned char* mnemonic,
+    unsigned int mnemonic_length) {
     unsigned char tmp[64];
-    cx_hmac_sha512(ELECTRUM_SEED_VERSION,
-                   ELECTRUM_SEED_VERSION_LENGTH,
-                   mnemonic,
-                   mnemonic_length,
-                   tmp,
-                   64);
+    cx_hmac_sha512(ELECTRUM_SEED_VERSION, ELECTRUM_SEED_VERSION_LENGTH,
+                   mnemonic, mnemonic_length, tmp, 64);
     return (tmp[0] == version);
 }
 

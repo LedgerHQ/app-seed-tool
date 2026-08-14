@@ -6,6 +6,7 @@ debug/
 dep/
 obj/
 elfs/
+build/
 
 # Unit tests and code coverage
 unit-tests/build/
@@ -14,7 +15,6 @@ unit-tests/coverage.info
 
 # Fuzzing
 fuzzing/build/
-
 
 # Editors
 .idea/

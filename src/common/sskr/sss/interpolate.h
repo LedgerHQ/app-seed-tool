@@ -1,7 +1,7 @@
 //
 //  interpolate.h
 //
-//  Copyright © 2020-2025 by Blockchain Commons, LLC
+//  Copyright © 2020-2026 by Blockchain Commons, LLC
 //  Licensed under the "BSD-2-Clause Plus Patent License"
 //
 
@@ -38,10 +38,10 @@
  *                      consult implementation details for specific error handling)
  */
 cx_err_t interpolate(uint8_t n,
-                     const uint8_t* xi,
+                     const uint8_t *xi,
                      uint8_t yl,
-                     const uint8_t** yij,
+                     const uint8_t **yij,
                      uint8_t x,
-                     uint8_t* result);
+                     uint8_t *result);
 
 #endif /* INTERPOLATE_H */

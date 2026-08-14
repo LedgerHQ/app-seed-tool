@@ -1,7 +1,7 @@
 //
 //  sskr.h
 //
-//  Copyright © 2020-2025 by Blockchain Commons, LLC
+//  Copyright © 2020-2026 by Blockchain Commons, LLC
 //  Licensed under the "BSD-2-Clause Plus Patent License"
 //
 
@@ -10,6 +10,7 @@
 
 #include <stdlib.h>
 #include <stdint.h>
+#include <stdbool.h>
 
 #include "sskr-constants.h"
 #include "group.h"
@@ -34,7 +35,7 @@ int16_t sskr_count_shards(uint8_t group_threshold,
  *                                  and even).
  * @param[in]  master_secret_length Length of the `master_secret` array in bytes.
  * @param[out] shard_len            Pointer to a variable that will be filled with the length of
- *                                  each shard.
+ *                                  each shard, or with 0 on failure.
  * @param[out] output               Pointer to a buffer where the generated shards will be stored.
  * @param[in]  buffer_size          Maximum size of the `output` buffer in bytes.
  * @param[in]  random_generator     Pointer to a function that generates random data (same as in SSS
@@ -51,7 +52,7 @@ int16_t sskr_generate_shards(uint8_t group_threshold,
                              uint8_t *shard_len,
                              uint8_t *output,
                              uint16_t buffer_size,
-                             unsigned char *(*random_generator)(uint8_t *, size_t));
+                             bool (*random_generator)(uint8_t *, size_t));
 
 /**
  * @brief Combines shards to reconstruct a secret.

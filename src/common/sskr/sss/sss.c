@@ -1,14 +1,16 @@
 //
 //  sss.c
 //
-//  Copyright © 2020-2025 by Blockchain Commons, LLC
+//  Copyright © 2020-2026 by Blockchain Commons, LLC
 //  Licensed under the "BSD-2-Clause Plus Patent License"
 //
 
-#include <string.h>
 #include <cx.h>
+#include <string.h>
 
+/* clang-format off */
 #include "sss.h"
+/* clang-format on */
 #include "interpolate.h"
 
 /**
@@ -19,22 +21,24 @@
  *          It enforces constraints to ensure the integrity and security of the
  *          secret sharing process.
  *
- * @param[in] threshold     The minimum number of shares required to recover the secret.
+ * @param[in] threshold     The minimum number of shares required to recover the
+ * secret.
  * @param[in] share_count   The total number of shares to be generated.
  * @param[in] secret_length The length of the secret in bytes.
  *
  * @return                  0 on success, or a negative error code on failure:
- *                          - SSS_ERROR_TOO_MANY_SHARES: if share_count exceeds SSS_MAX_SHARE_COUNT
- *                          - SSS_ERROR_INVALID_THRESHOLD: if threshold is invalid (< 1 or >
- *                            share_count)
- *                          - SSS_ERROR_SECRET_TOO_LONG: if secret_length exceeds
- *                            SSS_MAX_SECRET_SIZE
- *                          - SSS_ERROR_SECRET_TOO_SHORT: if secret_length is less than
- *                            SSS_MIN_SECRET_SIZE
- *                          - SSS_ERROR_SECRET_NOT_EVEN_LEN: if secret_length is not even
+ *                          - SSS_ERROR_TOO_MANY_SHARES: if share_count exceeds
+ * SSS_MAX_SHARE_COUNT
+ *                          - SSS_ERROR_INVALID_THRESHOLD: if threshold is
+ * invalid (< 1 or > share_count)
+ *                          - SSS_ERROR_SECRET_TOO_LONG: if secret_length
+ * exceeds SSS_MAX_SECRET_SIZE
+ *                          - SSS_ERROR_SECRET_TOO_SHORT: if secret_length is
+ * less than SSS_MIN_SECRET_SIZE
+ *                          - SSS_ERROR_SECRET_NOT_EVEN_LEN: if secret_length is
+ * not even
  */
-static int16_t sss_validate_parameters(uint8_t threshold,
-                                       uint8_t share_count,
+static int16_t sss_validate_parameters(uint8_t threshold, uint8_t share_count,
                                        uint8_t secret_length) {
     if (share_count > SSS_MAX_SHARE_COUNT) {
         return SSS_ERROR_TOO_MANY_SHARES;
@@ -51,26 +55,27 @@ static int16_t sss_validate_parameters(uint8_t threshold,
 }
 
 /**
- * @brief Creates a digest used to help validate secret reconstruction (see SLIP-39 docs).
+ * @brief Creates a digest used to help validate secret reconstruction (see
+ * SLIP-39 docs).
  *
- * @details This function takes random data, a shared secret, and calculates a 4-byte
- *          digest using HMAC. This digest can be used to verify the integrity of the
- *          reconstructed secret during Shamir's Secret Sharing (SSS) recovery process.
+ * @details This function takes random data, a shared secret, and calculates a
+ * 4-byte digest using HMAC. This digest can be used to verify the integrity of
+ * the reconstructed secret during Shamir's Secret Sharing (SSS) recovery
+ * process.
  *
  * @param[in]  random_data   Pointer to the array containing the random data.
  * @param[in]  rdlen         Length of the `random_data` array in bytes.
  * @param[in]  shared_secret Pointer to the array containing the shared secret.
  * @param[in]  sslen         Length of the `shared_secret` array in bytes.
- * @param[out] result        Pointer to a 4-byte array where the digest will be stored.
+ * @param[out] result        Pointer to a 4-byte array where the digest will be
+ * stored.
  *
- * @return                   Pointer to the `result` array containing the digest,
- *                           or `NULL` on failure.
+ * @return                   Pointer to the `result` array containing the
+ * digest, or `NULL` on failure.
  */
-uint8_t *sss_create_digest(const uint8_t *random_data,
-                           uint32_t rdlen,
-                           const uint8_t *shared_secret,
-                           uint32_t sslen,
-                           uint8_t *result) {
+uint8_t* sss_create_digest(const uint8_t* random_data, uint32_t rdlen,
+                           const uint8_t* shared_secret, uint32_t sslen,
+                           uint8_t* result) {
     uint8_t buf[32];
 
     cx_hmac_sha256(random_data, rdlen, shared_secret, sslen, buf, sizeof(buf));
@@ -79,23 +84,30 @@ uint8_t *sss_create_digest(const uint8_t *random_data,
         result[j] = buf[j];
     }
 
+    // Four of the thirty-two bytes are the digest; the other twenty-eight are
+    // the rest of an HMAC over the secret, and they were left on the stack.
+    // They are not the secret -- HMAC does not run backwards -- but every
+    // other local in this file is erased, including the digest and the
+    // coordinate arrays a few lines below, and this one had no reason to be
+    // the exception.
+    memzero(buf, sizeof(buf));
+
     return result;
 }
 
-int16_t sss_split_secret(uint8_t threshold,
-                         uint8_t share_count,
-                         const uint8_t *secret,
-                         uint8_t secret_length,
-                         uint8_t *result,
-                         unsigned char *(*random_generator)(uint8_t *, size_t)) {
-    int16_t error = sss_validate_parameters(threshold, share_count, secret_length);
+int16_t sss_split_secret(uint8_t threshold, uint8_t share_count,
+                         const uint8_t* secret, uint8_t secret_length,
+                         uint8_t* result,
+                         bool (*random_generator)(uint8_t*, size_t)) {
+    int16_t error =
+        sss_validate_parameters(threshold, share_count, secret_length);
     if (error) {
         return error;
     }
 
     if (threshold == 1) {
         // just return share_count copies of the secret
-        uint8_t *share = result;
+        uint8_t* share = result;
         for (uint8_t i = 0; i < share_count; ++i, share += secret_length) {
             for (uint8_t j = 0; j < secret_length; ++j) {
                 share[j] = secret[j];
@@ -105,21 +117,37 @@ int16_t sss_split_secret(uint8_t threshold,
     } else {
         uint8_t digest[SSS_MAX_SECRET_SIZE];
         uint8_t x[SSS_MAX_SHARE_COUNT];
-        const uint8_t *y[SSS_MAX_SHARE_COUNT];
+        const uint8_t* y[SSS_MAX_SHARE_COUNT];
         uint8_t n = 0;
-        uint8_t *share = result;
+        uint8_t* share = result;
 
         for (uint8_t i = 0; i < threshold - 2; ++i, share += secret_length) {
-            random_generator(share, secret_length);
+            // A failed draw here leaves `share` holding whatever the previous
+            // stack frame did, which would become a share of the secret. Same
+            // cleanup as the interpolation-failure path below.
+            if (!random_generator(share, secret_length)) {
+                memzero(result, (size_t)share_count * secret_length);
+                memzero(digest, sizeof(digest));
+                memzero(x, sizeof(x));
+                memzero(y, sizeof(y));
+                return SSS_ERROR_RNG_FAILURE;
+            }
             x[n] = i;
             y[n] = share;
             n += 1;
         }
 
         // generate secret_length - 4 bytes worth of random data
-        random_generator(digest + 4, secret_length - 4);
+        if (!random_generator(digest + 4, secret_length - 4)) {
+            memzero(result, (size_t)share_count * secret_length);
+            memzero(digest, sizeof(digest));
+            memzero(x, sizeof(x));
+            memzero(y, sizeof(y));
+            return SSS_ERROR_RNG_FAILURE;
+        }
         // put 4 bytes of digest at the top of the digest array
-        sss_create_digest(digest + 4, secret_length - 4, secret, secret_length, digest);
+        sss_create_digest(digest + 4, secret_length - 4, secret, secret_length,
+                          digest);
         x[n] = SSS_DIGEST_INDEX;
         y[n] = digest;
         n += 1;
@@ -128,8 +156,21 @@ int16_t sss_split_secret(uint8_t threshold,
         y[n] = secret;
         n += 1;
 
-        for (uint8_t i = threshold - 2; i < share_count; ++i, share += secret_length) {
+        for (uint8_t i = threshold - 2; i < share_count;
+             ++i, share += secret_length) {
             if (interpolate(n, x, secret_length, y, i, share) != CX_OK) {
+                // Same failure, same cleanup as sss_recover_secret() does.
+                // The caller's buffer already holds real shares here: the
+                // loop above wrote threshold - 2 of them, and interpolate()
+                // wrote whole shares of its own before the one that failed.
+                // Erase share_count * secret_length -- the capacity sss.h
+                // requires of that buffer, and exactly what the success path
+                // writes -- and no more.
+                memzero(result, (size_t)share_count * secret_length);
+                memzero(digest, sizeof(digest));
+                memzero(x, sizeof(x));
+                memzero(y, sizeof(y));
+
                 return SSS_ERROR_INTERPOLATION_FAILURE;
             }
         }
@@ -141,11 +182,9 @@ int16_t sss_split_secret(uint8_t threshold,
     return share_count;
 }
 
-int16_t sss_recover_secret(uint8_t threshold,
-                           const uint8_t *x,
-                           const uint8_t **shares,
-                           uint8_t share_length,
-                           uint8_t *secret) {
+int16_t sss_recover_secret(uint8_t threshold, const uint8_t* x,
+                           const uint8_t** shares, uint8_t share_length,
+                           uint8_t* secret) {
     int16_t error = sss_validate_parameters(threshold, threshold, share_length);
     if (error) {
         return error;
@@ -162,16 +201,19 @@ int16_t sss_recover_secret(uint8_t threshold,
         return share_length;
     }
 
-    if (interpolate(threshold, x, share_length, shares, SSS_DIGEST_INDEX, digest) != CX_OK ||
-        interpolate(threshold, x, share_length, shares, SSS_SECRET_INDEX, secret) != CX_OK) {
-        memzero(secret, sizeof(digest));
+    if (interpolate(threshold, x, share_length, shares, SSS_DIGEST_INDEX,
+                    digest) != CX_OK ||
+        interpolate(threshold, x, share_length, shares, SSS_SECRET_INDEX,
+                    secret) != CX_OK) {
+        memzero(secret, share_length);
         memzero(digest, sizeof(digest));
         memzero(verify, sizeof(verify));
 
         return SSS_ERROR_INTERPOLATION_FAILURE;
     }
 
-    sss_create_digest(digest + 4, share_length - 4, secret, share_length, verify);
+    sss_create_digest(digest + 4, share_length - 4, secret, share_length,
+                      verify);
 
     for (uint8_t i = 0; i < 4; i++) {
         valid &= digest[i] == verify[i];

@@ -1,6 +1,6 @@
 /*******************************************************************************
  *   Ledger Seed Tool application
- *   (c) 2016-2025 Ledger SAS
+ *   (c) 2016-2026 Ledger SAS
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -15,20 +15,20 @@
  *  limitations under the License.
  ********************************************************************************/
 
+#include "cx_errors.h"
 #include "os.h"
 #include "ox_bn.h"
-#include "cx_errors.h"
 
+/* clang-format off */
 #include "interpolate.h"
+/* clang-format on */
 
 // The irreducible polynomial N(x) = x^8 + x^4 + x^3 + x + 1
-#define SSS_POLYNOMIAL \
-    { 0x01, 0x1B }
+#define SSS_POLYNOMIAL {0x01, 0x1B}
 
 // 2nd Montgomery constant: R2 = x^(2*t*8) mod N(x)
 // t = 1 since the number of bytes of R is 1.
-#define MONTGOMERY_CONSTANT_R2 \
-    { 0x02 }
+#define MONTGOMERY_CONSTANT_R2 {0x02}
 
 // Minimal required bytes for BN storing a GF(256) value
 #define GF2_8_MPI_BYTES 16
@@ -57,9 +57,7 @@
  *                  - CX_INVALID_PARAMETER
  *                  - CX_MEMORY_FULL
  */
-cx_err_t cx_bn_gf2_n_mul(cx_bn_t bn_r,
-                         const cx_bn_t bn_a,
-                         const cx_bn_t bn_b,
+cx_err_t cx_bn_gf2_n_mul(cx_bn_t bn_r, const cx_bn_t bn_a, const cx_bn_t bn_b,
                          const cx_bn_t bn_n,
                          const cx_bn_t bn_h __attribute__((unused))) {
     cx_err_t error = CX_OK;  // By default, until some error occurs
@@ -84,7 +82,7 @@ cx_err_t cx_bn_gf2_n_mul(cx_bn_t bn_r,
         goto end;
     }
 
-    CX_CHECK(cx_bn_set_u32(bn_r, (uint32_t) 0));
+    CX_CHECK(cx_bn_set_u32(bn_r, (uint32_t)0));
 
     // If either operand is zero then result is zero
     if (nbits_a && nbits_b) {
@@ -127,12 +125,8 @@ end:
 }
 #endif
 
-cx_err_t interpolate(uint8_t n,
-                     const uint8_t* xi,
-                     uint8_t yl,
-                     const uint8_t** yij,
-                     uint8_t x,
-                     uint8_t* result) {
+cx_err_t interpolate(uint8_t n, const uint8_t* xi, uint8_t yl,
+                     const uint8_t** yij, uint8_t x, uint8_t* result) {
     const uint8_t N[2] = SSS_POLYNOMIAL;
     const uint8_t R2[1] = MONTGOMERY_CONSTANT_R2;
 
@@ -154,12 +148,12 @@ cx_err_t interpolate(uint8_t n,
     CX_CHECK(cx_bn_alloc_init(&bn_n, GF2_8_MPI_BYTES, N, sizeof(N)));
     CX_CHECK(cx_bn_alloc_init(&bn_r2, GF2_8_MPI_BYTES, R2, sizeof(R2)));
 
-    CX_CHECK(cx_bn_set_u32(bn_x, (uint32_t) x));
+    CX_CHECK(cx_bn_set_u32(bn_x, (uint32_t)x));
     memzero(result, yl);
 
     for (uint8_t i = 0; i < n; i++) {
-        CX_CHECK(cx_bn_set_u32(bn_xc_i, (uint32_t) xi[i]));
-        CX_CHECK(cx_bn_set_u32(bn_lagrange, (uint32_t) 1));
+        CX_CHECK(cx_bn_set_u32(bn_xc_i, (uint32_t)xi[i]));
+        CX_CHECK(cx_bn_set_u32(bn_lagrange, (uint32_t)1));
 
         // calculate the Lagrange basis coefficient for the Lagrange polynomial
         // defined by the x coordinates xi at the value x.
@@ -171,7 +165,7 @@ cx_err_t interpolate(uint8_t n,
         //              j != i  (xi[i]-xi[j])
         for (uint8_t j = 0; j < n; j++) {
             if (j != i) {
-                CX_CHECK(cx_bn_set_u32(bn_tempa, (uint32_t) xi[j]));
+                CX_CHECK(cx_bn_set_u32(bn_tempa, (uint32_t)xi[j]));
 
                 // Calculate the numerator (x - xc[j])
                 CX_CHECK(cx_bn_xor(bn_numerator, bn_x, bn_tempa));
@@ -182,42 +176,56 @@ cx_err_t interpolate(uint8_t n,
                 // Calculate the inverse of the denominator
                 // In GF(2^8) the inverse of x = x^254
                 // bn_tempa = denominator^2
-                CX_CHECK(cx_bn_gf2_n_mul(bn_tempa, bn_tempb, bn_tempb, bn_n, bn_r2));
+                CX_CHECK(
+                    cx_bn_gf2_n_mul(bn_tempa, bn_tempb, bn_tempb, bn_n, bn_r2));
                 // bn_result = denominator^4
-                CX_CHECK(cx_bn_gf2_n_mul(bn_result, bn_tempa, bn_tempa, bn_n, bn_r2));
+                CX_CHECK(cx_bn_gf2_n_mul(bn_result, bn_tempa, bn_tempa, bn_n,
+                                         bn_r2));
                 // bn_tempa = denominator^8
-                CX_CHECK(cx_bn_gf2_n_mul(bn_tempa, bn_result, bn_result, bn_n, bn_r2));
+                CX_CHECK(cx_bn_gf2_n_mul(bn_tempa, bn_result, bn_result, bn_n,
+                                         bn_r2));
                 // bn_tempc = denominator^9
-                CX_CHECK(cx_bn_gf2_n_mul(bn_tempc, bn_tempa, bn_tempb, bn_n, bn_r2));
+                CX_CHECK(
+                    cx_bn_gf2_n_mul(bn_tempc, bn_tempa, bn_tempb, bn_n, bn_r2));
                 // bn_tempb = denominator^16
-                CX_CHECK(cx_bn_gf2_n_mul(bn_tempb, bn_tempa, bn_tempa, bn_n, bn_r2));
+                CX_CHECK(
+                    cx_bn_gf2_n_mul(bn_tempb, bn_tempa, bn_tempa, bn_n, bn_r2));
                 // bn_tempa = denominator^25
-                CX_CHECK(cx_bn_gf2_n_mul(bn_tempa, bn_tempb, bn_tempc, bn_n, bn_r2));
+                CX_CHECK(
+                    cx_bn_gf2_n_mul(bn_tempa, bn_tempb, bn_tempc, bn_n, bn_r2));
                 // bn_tempb = denominator^50
-                CX_CHECK(cx_bn_gf2_n_mul(bn_tempb, bn_tempa, bn_tempa, bn_n, bn_r2));
+                CX_CHECK(
+                    cx_bn_gf2_n_mul(bn_tempb, bn_tempa, bn_tempa, bn_n, bn_r2));
                 // bn_tempc = denominator^100
-                CX_CHECK(cx_bn_gf2_n_mul(bn_tempc, bn_tempb, bn_tempb, bn_n, bn_r2));
+                CX_CHECK(
+                    cx_bn_gf2_n_mul(bn_tempc, bn_tempb, bn_tempb, bn_n, bn_r2));
                 // bn_tempa = denominator^200
-                CX_CHECK(cx_bn_gf2_n_mul(bn_tempa, bn_tempc, bn_tempc, bn_n, bn_r2));
+                CX_CHECK(
+                    cx_bn_gf2_n_mul(bn_tempa, bn_tempc, bn_tempc, bn_n, bn_r2));
                 // bn_tempc = denominator^250
-                CX_CHECK(cx_bn_gf2_n_mul(bn_tempc, bn_tempa, bn_tempb, bn_n, bn_r2));
+                CX_CHECK(
+                    cx_bn_gf2_n_mul(bn_tempc, bn_tempa, bn_tempb, bn_n, bn_r2));
                 // bn_tempb = denominator^254
-                CX_CHECK(cx_bn_gf2_n_mul(bn_tempb, bn_result, bn_tempc, bn_n, bn_r2));
+                CX_CHECK(cx_bn_gf2_n_mul(bn_tempb, bn_result, bn_tempc, bn_n,
+                                         bn_r2));
 
                 // Calculate the Lagrange basis coefficient
-                CX_CHECK(cx_bn_gf2_n_mul(bn_tempa, bn_numerator, bn_lagrange, bn_n, bn_r2));
-                CX_CHECK(cx_bn_gf2_n_mul(bn_lagrange, bn_tempa, bn_tempb, bn_n, bn_r2));
+                CX_CHECK(cx_bn_gf2_n_mul(bn_tempa, bn_numerator, bn_lagrange,
+                                         bn_n, bn_r2));
+                CX_CHECK(cx_bn_gf2_n_mul(bn_lagrange, bn_tempa, bn_tempb, bn_n,
+                                         bn_r2));
             }
         }
 
         for (uint8_t j = 0; j < yl; j++) {
-            CX_CHECK(cx_bn_set_u32(bn_tempa, (uint32_t) yij[i][j]));
-            CX_CHECK(cx_bn_set_u32(bn_tempb, (uint32_t) result[j]));
+            CX_CHECK(cx_bn_set_u32(bn_tempa, (uint32_t)yij[i][j]));
+            CX_CHECK(cx_bn_set_u32(bn_tempb, (uint32_t)result[j]));
 
-            CX_CHECK(cx_bn_gf2_n_mul(bn_tempc, bn_lagrange, bn_tempa, bn_n, bn_r2));
+            CX_CHECK(
+                cx_bn_gf2_n_mul(bn_tempc, bn_lagrange, bn_tempa, bn_n, bn_r2));
             CX_CHECK(cx_bn_xor(bn_result, bn_tempb, bn_tempc));
             CX_CHECK(cx_bn_get_u32(bn_result, &result_u32));
-            result[j] = (uint8_t) result_u32;
+            result[j] = (uint8_t)result_u32;
             result_u32 = 0;
         }
     }

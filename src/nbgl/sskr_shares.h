@@ -1,6 +1,6 @@
 /*******************************************************************************
  *   Ledger Seed Tool application
- *   (c) 2016-2025 Ledger SAS
+ *   (c) 2016-2026 Ledger SAS
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -33,7 +33,7 @@ bool sskr_shares_word_remove(void);
 /*
  * Adds a word in the shares phrase, returns how many words are stored in the share
  */
-size_t sskr_shares_word_add(const char* const buffer);
+size_t sskr_shares_word_add(const char *const buffer);
 
 /*
  * Returns how many words are currently stored in the shares phrase
@@ -48,7 +48,7 @@ bool sskr_shares_complete_check(void);
 /*
  * Check if the currently stored mnemonic generates the same seed as the current device's one
  */
-bool sskr_shares_check(bool* match);
+bool sskr_shares_check(bool *match);
 
 /*
  * Sets the number of SSKR shares
@@ -93,11 +93,19 @@ void sskr_shares_from_bip39_mnemonic(void);
 /*
  * Returns the generated SSKR shares
  */
-char* sskr_shares_get(void);
+char *sskr_shares_get(void);
 
 /*
  * Returns the length of the SSKR shares buffer
  */
 size_t sskr_shares_length_get(void);
+
+/*
+ * The twin of bip39_mnemonic_shrink(), for the shares buffer: drops the last
+ * `size` bytes, erases everything from the new end to the end of the buffer,
+ * and returns the new length. A `size` of 0, or one larger than the current
+ * length, drops everything.
+ */
+size_t sskr_shares_shrink(const size_t size);
 
 #endif  // SCREEN_SIZE_WALLET

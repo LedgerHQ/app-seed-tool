@@ -40,6 +40,24 @@ KEYPAD_POSITIONS = {
             "delete": Position(80, 556),
             "0": Position(240, 556),
             "enter": Position(400, 556),
+        },
+        DeviceType.APEX_P: {
+            # first line
+            "1": Position(50, 190),
+            "2": Position(150, 190),
+            "3": Position(250, 190),
+            # second line
+            "4": Position(50, 250),
+            "5": Position(150, 250),
+            "6": Position(250, 250),
+            # third line
+            "7": Position(50, 310),
+            "8": Position(150, 310),
+            "9": Position(250, 310),
+            # fourth and last line
+            "delete": Position(50, 370),
+            "0": Position(150, 370),
+            "enter": Position(250, 370),
         }
     }
 }

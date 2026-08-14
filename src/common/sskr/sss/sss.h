@@ -1,14 +1,16 @@
 //
 //  sss.h
 //
-//  Copyright © 2020-2025 by Blockchain Commons, LLC
+//  Copyright © 2020-2026 by Blockchain Commons, LLC
 //  Licensed under the "BSD-2-Clause Plus Patent License"
 //
 
 #ifndef SSS_H
 #define SSS_H
 
+#include <stddef.h>
 #include <stdint.h>
+#include <stdbool.h>
 #include "sss-constants.h"
 
 #define SSS_SECRET_INDEX 255
@@ -44,12 +46,21 @@
  *                              - Other negative values may be returned by the `random_generator`
  *                                function.
  */
+// Upstream bc-sskr defines this in sss.c without declaring it anywhere. It is
+// declared here rather than in sss.c so that file stays diffable against
+// upstream: the only change on this side of the port is these four lines.
+uint8_t *sss_create_digest(const uint8_t *random_data,
+                           uint32_t rdlen,
+                           const uint8_t *shared_secret,
+                           uint32_t sslen,
+                           uint8_t *result);
+
 int16_t sss_split_secret(uint8_t threshold,
                          uint8_t share_count,
                          const uint8_t *secret,
                          uint8_t secret_length,
                          uint8_t *result,
-                         unsigned char *(*random_generator)(uint8_t *, size_t));
+                         bool (*random_generator)(uint8_t *, size_t));
 
 /**
  * @brief Recovers a secret from Shamir's Secret Sharing (SSS) shares.

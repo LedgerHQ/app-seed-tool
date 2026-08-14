@@ -1,6 +1,6 @@
 /*******************************************************************************
  *   Ledger Seed Tool application
- *   (c) 2016-2025 Ledger SAS
+ *   (c) 2016-2026 Ledger SAS
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -15,16 +15,22 @@
  *  limitations under the License.
  ********************************************************************************/
 
-#include <string.h>
-#include <os.h>
 #include <cx.h>
+#include <os.h>
+#include <string.h>
 
-#include "../common.h"
-#include "./seed_rom_variables.h"
+// BIP39_MNEMONIC_SIZE_12/18/24, the three lengths bolos_ux_sskr_size_get()
+// accepts below.
 #include "../bip39/common_bip39.h"
+#include "../common.h"
+#include "./common_sskr.h"
+#include "./seed_rom_variables.h"
+#include "./seed_sskr_internal.h"
 #include "./sskr.h"
+#include "constants.h"
 
-// Return the CRC-32 checksum of the input buffer in network byte order (big endian).
+// Return the CRC-32 checksum of the input buffer in network byte order (big
+// endian).
 #if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
 #define crc32_nbo(...) cx_crc32(__VA_ARGS__)
 #elif __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
@@ -33,108 +39,291 @@
 #error "What kind of system is this?"
 #endif
 
-int16_t bolos_ux_sskr_size_get(uint8_t bip39_onboarding_kind,
-                               uint8_t groups_threshold,
-                               unsigned int *group_descriptor,
-                               uint8_t groups_len,
-                               uint8_t *share_len) {
-    sskr_group_descriptor_t groups[SSKR_MAX_GROUP_COUNT];
-    for (uint8_t i = 0; i < groups_len; i++) {
-        groups[i].threshold = *(group_descriptor + i * sizeof(*(group_descriptor)) / groups_len);
-        groups[i].count = *(group_descriptor + 1 + i * sizeof(*(group_descriptor)) / groups_len);
+// The BOLOS randomness source, with its status preserved.
+//
+// The whole lcx_rng.h family -- cx_rng(), cx_rng_no_throw(), cx_rng_u8(),
+// cx_rng_u32() -- returns void or the buffer it was handed, so none of them can
+// report a failed draw. cx_get_random_bytes() (os_random.h) is the same TRNG
+// behind a syscall that returns cx_err_t, and it exists on every SDK this
+// application targets, nanos included. Everything randomness feeds here is
+// load-bearing -- the Shamir coefficients, the digest padding and the share-set
+// identifier -- so a failed draw has to stop generation, not pass through it.
+static bool sskr_rng_bolos(uint8_t* buffer, size_t len) {
+    return cx_get_random_bytes(buffer, len) == CX_OK;
+}
+
+// Largest a full set of serialized shards can be, in bytes, and hence the
+// capacity of every share buffer handed to bolos_ux_sskr_generate(): every
+// group at its maximum member count, each shard holding a maximum-strength
+// value plus its metadata.
+#define SSKR_MAX_SHARE_BUFFER_LENGTH              \
+    (SSKR_MAX_GROUP_COUNT * SSS_MAX_SHARE_COUNT * \
+     (SSKR_MAX_STRENGTH_BYTES + SSKR_METADATA_LENGTH_BYTES))
+
+// See seed_sskr_internal.h. Both entry points below need this, and used to do
+// it inline with two different index expressions -- the same array read two
+// ways. One expression per descriptor layout is the point of this function;
+// having it take the destination's capacity rather than assume
+// SSKR_MAX_GROUP_COUNT is what lets a test reach a group past the first.
+bool bolos_ux_sskr_groups_from_descriptor(const unsigned int* group_descriptor,
+                                          uint8_t groups_len,
+                                          sskr_group_descriptor_t* groups,
+                                          size_t groups_capacity) {
+    if ((size_t)groups_len > groups_capacity) {
+        return false;
     }
 
-    int16_t share_count_expected = sskr_count_shards(groups_threshold, groups, groups_len);
-    *share_len = bip39_onboarding_kind * 4 / 3 + SSKR_METADATA_LENGTH_BYTES;
+    for (uint8_t i = 0; i < groups_len; i++) {
+        groups[i].threshold = (uint8_t)group_descriptor[i * 2];
+        groups[i].count = (uint8_t)group_descriptor[i * 2 + 1];
+    }
+
+    return true;
+}
+
+// The three mnemonic lengths this application offers, and the only values
+// `bip39_type` may take. It is the multiplicand of every length derived from it
+// -- the secret handed to sskr_generate_shards(), the serialized shard length,
+// and through it the size of the buffer a whole set is written into -- so it is
+// worth one place that says what it may be.
+//
+// Deliberately narrow, the same way bip85_bip39_words_valid() is: BIP-39 itself
+// also defines 15 and 21, and bolos_ux_bip39_mnemonic_encode() would encode
+// either of them happily, but no screen in this application asks for one.
+static bool bolos_ux_sskr_bip39_type_valid(unsigned int bip39_type) {
+    return (bip39_type == BIP39_MNEMONIC_SIZE_12) ||
+           (bip39_type == BIP39_MNEMONIC_SIZE_18) ||
+           (bip39_type == BIP39_MNEMONIC_SIZE_24);
+}
+
+// See common_sskr.h. One expression for the serialized shard length, because
+// two things now need it: the buffer sizing below, and the count of ByteWords
+// a review announces before any of them exists.
+uint8_t bolos_ux_sskr_share_length(uint8_t bip39_type) {
+    if (!bolos_ux_sskr_bip39_type_valid(bip39_type)) {
+        return 0;
+    }
+    return bip39_type * 4 / 3 + SSKR_METADATA_LENGTH_BYTES;
+}
+
+// See common_sskr.h. Same reason: bolos_ux_bip39_to_sskr_convert() below
+// decides the header length while building the header, and the review needs
+// the number without building anything.
+uint8_t bolos_ux_sskr_cbor_header_length(uint8_t share_len) {
+    return (share_len <= SSKR_CBOR_SHORT_FORM_MAX_LENGTH)
+               ? SSKR_CBOR_SHORT_FORM_HEADER_LENGTH
+               : SSKR_CBOR_LONG_FORM_HEADER_LENGTH;
+}
+
+// See common_sskr.h.
+uint8_t bolos_ux_sskr_share_wordcount(uint8_t bip39_type) {
+    uint8_t share_len = bolos_ux_sskr_share_length(bip39_type);
+    if (share_len == 0) {
+        return 0;
+    }
+    // One ByteWord per byte of what gets encoded, which is exactly the buffer
+    // bolos_ux_sskr_share_hex_decode() is handed below: header, shard, CRC.
+    return bolos_ux_sskr_cbor_header_length(share_len) + share_len +
+           SSKR_CRC32_LENGTH_BYTES;
+}
+
+int16_t bolos_ux_sskr_size_get(uint8_t bip39_type, uint8_t groups_threshold,
+                               unsigned int* group_descriptor,
+                               uint8_t groups_len, uint8_t* share_len) {
+    // Before anything is derived from it. *share_len is an output the caller
+    // sizes a buffer from, so a bip39_type this function does not recognise has
+    // to leave it at zero rather than at bip39_type * 4 / 3 + 5 of something
+    // arbitrary -- which for a bip39_type above 190 wraps the uint8_t as well.
+    *share_len = 0;
+    if (!bolos_ux_sskr_bip39_type_valid(bip39_type)) {
+        return SSKR_ERROR_INVALID_BIP39_TYPE;
+    }
+
+    sskr_group_descriptor_t groups[SSKR_MAX_GROUP_COUNT];
+    if (!bolos_ux_sskr_groups_from_descriptor(group_descriptor, groups_len,
+                                              groups, SSKR_MAX_GROUP_COUNT)) {
+        return SSKR_ERROR_INVALID_GROUP_LENGTH;
+    }
+
+    int16_t share_count_expected =
+        sskr_count_shards(groups_threshold, groups, groups_len);
+    *share_len = bolos_ux_sskr_share_length(bip39_type);
 
     return share_count_expected;
 }
 
-unsigned int bolos_ux_sskr_combine(unsigned char *sskr_shares_hex,
+unsigned int bolos_ux_sskr_combine(unsigned char* sskr_shares_hex,
                                    unsigned int sskr_shares_hex_length,
                                    unsigned int sskr_shares_count,
-                                   unsigned char *output) {
-    const uint8_t *ptr_sskr_shares[SSKR_MAX_GROUP_COUNT * SSS_MAX_SHARE_COUNT];
-    uint8_t sskr_share_len = sskr_shares_hex[3] & 0x1F;
-    if (sskr_share_len > 23) {
-        sskr_share_len = sskr_shares_hex[4];
+                                   unsigned char* output) {
+    const uint8_t* ptr_sskr_shares[SSKR_MAX_GROUP_COUNT * SSS_MAX_SHARE_COUNT];
+
+    // The count comes from the member-threshold nibble of the entered data, so
+    // it can exceed what this build holds. Reject it before the loop below
+    // fills ptr_sskr_shares[], and before the division by it.
+    if (sskr_shares_count == 0 ||
+        sskr_shares_count > SSKR_MAX_GROUP_COUNT * SSS_MAX_SHARE_COUNT) {
+        memzero(sskr_shares_hex, sskr_shares_hex_length);
+        return 0;
     }
-
-    for (uint8_t i = 0; i < (uint8_t) sskr_shares_count; i++) {
-        ptr_sskr_shares[i] = sskr_shares_hex + (i * sskr_shares_hex_length / sskr_shares_count) +
-                             4 + (sskr_share_len > 23);
-    }
-
-    uint16_t output_len = sskr_combine_shards(ptr_sskr_shares,
-                                              sskr_share_len,
-                                              (uint8_t) sskr_shares_count,
-                                              output,
-                                              SSKR_MAX_STRENGTH_BYTES);
-
-    if (output_len < 1) {
-        memzero(sskr_shares_hex, sizeof(sskr_shares_hex));
+    // The distance from one share to the next, and the only thing that says
+    // how much of the buffer belongs to each. The count bound above constrains
+    // the divisor; nothing so far has constrained the dividend, so without
+    // this every read below is off a buffer of unknown length.
+    //
+    // bolos_ux_sskr_hex_check() derives the same guarantee from the same
+    // quotient -- a stride of at least five with a share count of at least one
+    // leaves bytes 3 and 4 inside the first share -- and that guard was never
+    // carried over here. Every path in the application reaches this function
+    // through hex_check(), which refuses a short frame first, so what this
+    // closes is the contract of the function rather than a reachable path;
+    // see tests/unit/tests/sskr_combine_frame_length.c.
+    const unsigned int stride = sskr_shares_hex_length / sskr_shares_count;
+    if (stride < 5) {
+        memzero(sskr_shares_hex, sskr_shares_hex_length);
         return 0;
     }
 
-    PRINTF("SSKR decoded shares:\n %.*H\n", output_len, output);
-    return (unsigned int) output_len;
+    // The shard length is read out of the low five bits of byte 3 below, which
+    // is only a length if that byte is a CBOR byte-string header. A share is
+    // one; anything else is not a share, and its low five bits mean something
+    // else entirely.
+    if (!SSKR_CBOR_IS_BYTE_STRING(sskr_shares_hex[3])) {
+        memzero(sskr_shares_hex, sskr_shares_hex_length);
+        return 0;
+    }
+
+    // RFC 8949 section 3 gives additional information 0..23 the meaning "this
+    // is the length" and 24 "one length byte follows"; 25..31 are two-, four-
+    // and eight-byte lengths, a reserved value and the indefinite form, none
+    // of which a share may use. Refused for the same reason hex_check()
+    // refuses them: the form is what decides where the shard starts, and a
+    // reserved one carries no length this function could act on. Deriving the
+    // header length from the additional information rather than from the
+    // decoded length is what makes the two agree -- a long form declaring 21
+    // to 23 bytes put the shard at offset 4 here and at offset 5 there.
+    const unsigned int additional_info = sskr_shares_hex[3] & 0x1F;
+    if (additional_info > 24) {
+        memzero(sskr_shares_hex, sskr_shares_hex_length);
+        return 0;
+    }
+    const unsigned int header_len = 4u + (additional_info == 24);
+    uint8_t sskr_share_len =
+        (additional_info == 24) ? sskr_shares_hex[4] : (uint8_t)additional_info;
+
+    // The length comes from the entered data. A serialized shard is
+    // SSKR_METADATA_LENGTH_BYTES plus a SSKR_MIN_STRENGTH_BYTES..
+    // SSKR_MAX_STRENGTH_BYTES value, so refuse anything else here, before
+    // sskr_deserialize_shard() copies it into its fixed-size value field.
+    //
+    // Redundant since sskr_deserialize_shard() started validating value_len
+    // ahead of that copy: everything refused here is refused there too, and
+    // there strictly more (odd value_len). Kept deliberately as defence in
+    // depth -- this bounds data typed on the device before it crosses into
+    // sskr.c, which is kept diffable against upstream bc-sskr. Because it is
+    // redundant, no test can hold it on its own; see
+    // tests/unit/tests/sskr_share_len.c for the enumeration.
+    if (sskr_share_len < SSKR_MIN_SERIALIZED_LENGTH_BYTES ||
+        sskr_share_len > SSKR_METADATA_LENGTH_BYTES + SSKR_MAX_STRENGTH_BYTES) {
+        memzero(sskr_shares_hex, sskr_shares_hex_length);
+        return 0;
+    }
+
+    // The declared shard has to fit in the share it was declared in.
+    // sskr_combine_shards() reads sskr_share_len bytes from each pointer built
+    // below, so on the last share that read ends at
+    // (count - 1) * stride + header_len + sskr_share_len, and the buffer only
+    // guarantees count * stride. The bound above says the length is one a
+    // shard may have, not one this frame can hold: a ten-byte buffer whose
+    // byte 3 declares 21 satisfies it and then hands sskr_combine_shards()
+    // eleven bytes it does not own.
+    //
+    // hex_check() states the same requirement as an equality, declared plus
+    // header plus the four CRC bytes being exactly the stride. Stated here as
+    // the inequality it needs, because this function never looks at the CRC
+    // and has no reason to insist a frame carry one.
+    if (sskr_share_len + header_len > stride) {
+        memzero(sskr_shares_hex, sskr_shares_hex_length);
+        return 0;
+    }
+
+    for (uint8_t i = 0; i < (uint8_t)sskr_shares_count; i++) {
+        ptr_sskr_shares[i] = sskr_shares_hex + (i * stride) + header_len;
+    }
+
+    int16_t output_len = sskr_combine_shards(ptr_sskr_shares, sskr_share_len,
+                                             (uint8_t)sskr_shares_count, output,
+                                             SSKR_MAX_STRENGTH_BYTES);
+
+    if (output_len < 1) {
+        memzero(sskr_shares_hex, sskr_shares_hex_length);
+        return 0;
+    }
+
+    PRINTF("SSKR decoded shares: %d bytes\n", output_len);
+    return (unsigned int)output_len;
 }
 
-void bolos_ux_sskr_to_seed_convert(unsigned char *sskr_shares_hex,
+bool bolos_ux_sskr_to_seed_convert(unsigned char* sskr_shares_hex,
                                    unsigned int sskr_shares_hex_length,
                                    unsigned int sskr_shares_count,
-                                   unsigned char *words_buffer,
-                                   unsigned int *words_buffer_length,
-                                   unsigned char *seed) {
-    PRINTF("SSKR share in hex:\n %.*H\n", sskr_shares_hex_length, sskr_shares_hex);
+                                   unsigned char* words_buffer,
+                                   unsigned int* words_buffer_length,
+                                   unsigned char* seed) {
+    PRINTF("SSKR share in hex: %u bytes\n", sskr_shares_hex_length);
 
     uint8_t seed_buffer[SSKR_MAX_STRENGTH_BYTES] = {0};
-    uint8_t seed_buffer_len = bolos_ux_sskr_combine(sskr_shares_hex,
-                                                    sskr_shares_hex_length,
-                                                    sskr_shares_count,
-                                                    seed_buffer);
+    uint8_t seed_buffer_len =
+        bolos_ux_sskr_combine(sskr_shares_hex, sskr_shares_hex_length,
+                              sskr_shares_count, seed_buffer);
 
-    *words_buffer_length = bolos_ux_bip39_mnemonic_encode(seed_buffer,
-                                                          (uint8_t) seed_buffer_len,
-                                                          words_buffer,
-                                                          *words_buffer_length);
+    *words_buffer_length =
+        bolos_ux_bip39_mnemonic_encode(seed_buffer, (uint8_t)seed_buffer_len,
+                                       words_buffer, *words_buffer_length);
     memzero(seed_buffer, sizeof(seed_buffer));
-    bolos_ux_bip39_mnemonic_to_seed(words_buffer, *words_buffer_length, seed);
+
+    // Only the seed derivation is reported here. Whether the shards combined
+    // at all is a separate question, and the answer is still
+    // *words_buffer_length: a set that could not be combined encodes to an
+    // empty mnemonic, and deriving a seed from an empty mnemonic succeeds --
+    // it just does not mean anything. Callers read both, and they mean
+    // different things to the user.
+    return bolos_ux_bip39_mnemonic_to_seed(words_buffer, *words_buffer_length,
+                                           seed);
 }
 
 unsigned int bolos_ux_sskr_generate(uint8_t groups_threshold,
-                                    unsigned int *group_descriptor,
-                                    uint8_t groups_len,
-                                    unsigned char *seed,
-                                    unsigned int seed_len,
-                                    uint8_t *share_len,
-                                    unsigned char *share_buffer,
+                                    unsigned int* group_descriptor,
+                                    uint8_t groups_len, unsigned char* seed,
+                                    unsigned int seed_len, uint8_t* share_len,
+                                    unsigned char* share_buffer,
                                     unsigned int share_buffer_len,
                                     uint8_t share_len_expected,
                                     int16_t share_count_expected) {
     sskr_group_descriptor_t groups[SSKR_MAX_GROUP_COUNT];
-
-    for (uint8_t i = 0; i < (uint8_t) groups_len; i++) {
-        groups[i].threshold = *(group_descriptor + i * 2);
-        groups[i].count = *(group_descriptor + 1 + i * 2);
+    if (!bolos_ux_sskr_groups_from_descriptor(group_descriptor, groups_len,
+                                              groups, SSKR_MAX_GROUP_COUNT)) {
+        return 0;
+    }
+    // share_buffer_len is a write length, not just a capacity hint: the
+    // failure path below memzero()s the whole of it. No real share buffer is
+    // longer than a full set of maximum-size shards, so refuse anything
+    // longer rather than write past the end of one.
+    if (share_buffer_len > SSKR_MAX_SHARE_BUFFER_LENGTH) {
+        return 0;
     }
 
-    if (!(SSKR_MIN_STRENGTH_BYTES <= seed_len && seed_len <= SSKR_MAX_STRENGTH_BYTES) ||
+    if (!(SSKR_MIN_STRENGTH_BYTES <= seed_len &&
+          seed_len <= SSKR_MAX_STRENGTH_BYTES) ||
         (seed_len % 2 != 0)) {
         return 0;
     }
 
-    PRINTF("SSKR generate input:\n %.*H\n", seed_len, seed);
+    PRINTF("SSKR generate input: %u bytes\n", seed_len);
     // convert seed to SSKR shares
-    int16_t share_count = sskr_generate_shards(groups_threshold,
-                                               groups,
-                                               groups_len,
-                                               seed,
-                                               seed_len,
-                                               share_len,
-                                               share_buffer,
-                                               share_buffer_len,
-                                               cx_rng);
+    int16_t share_count = sskr_generate_shards(
+        groups_threshold, groups, groups_len, seed, seed_len, share_len,
+        share_buffer, share_buffer_len, sskr_rng_bolos);
 
     PRINTF("SSKR share count expected: %d\n", share_count_expected);
     PRINTF("SSKR share count returned: %d\n", share_count);
@@ -143,28 +332,29 @@ unsigned int bolos_ux_sskr_generate(uint8_t groups_threshold,
 
     if ((share_count < 0) || (share_count != share_count_expected) ||
         (*share_len != share_len_expected)) {
-        memzero(&share_buffer, sizeof(share_buffer));
+        memzero(share_buffer, share_buffer_len);
         return 0;
     }
 
-    PRINTF("SSKR generate output:\n %.*H\n", share_buffer_len, share_buffer);
+    PRINTF("SSKR generate output: %u bytes\n", share_buffer_len);
 
     return share_count;
 }
 
-unsigned int bolos_ux_sskr_share_hex_decode(unsigned char *input,
+unsigned int bolos_ux_sskr_share_hex_decode(unsigned char* input,
                                             unsigned int input_len,
-                                            unsigned char *output,
+                                            unsigned char* output,
                                             unsigned int output_len) {
     unsigned int position = 0;
     unsigned int offset = 0;
 
-    for (uint8_t i = 0; i < (uint8_t) input_len; i++) {
+    for (uint8_t i = 0; i < (uint8_t)input_len; i++) {
         offset = SSKR_BYTEWORD_LENGTH * input[i];
         if (position + SSKR_BYTEWORD_LENGTH <= output_len) {
-            memcpy(output + position, SSKR_WORDLIST + offset, SSKR_BYTEWORD_LENGTH);
+            memcpy(output + position, SSKR_WORDLIST + offset,
+                   SSKR_BYTEWORD_LENGTH);
         } else {
-            memzero(output, sizeof(output));
+            memzero(output, output_len);
             return 0;
         }
         position += SSKR_BYTEWORD_LENGTH;
@@ -172,104 +362,140 @@ unsigned int bolos_ux_sskr_share_hex_decode(unsigned char *input,
             output[position++] = ' ';
         }
     }
-    PRINTF("SSKR share:\n %.*s\n", output_len, output);
+    PRINTF("SSKR share: %u bytes\n", output_len);
     return position;
 }
 
-unsigned int bolos_ux_sskr_byteword_to_hex(unsigned char *byteword) {
-    for (unsigned int i = 0; i < SSKR_WORDLIST_LENGTH; i += SSKR_BYTEWORD_LENGTH) {
-        if (os_secure_memcmp((void *) (SSKR_WORDLIST + i), byteword, SSKR_BYTEWORD_LENGTH) == 0) {
-            return i / SSKR_BYTEWORD_LENGTH;
+bool bolos_ux_sskr_byteword_to_hex(const unsigned char* byteword,
+                                   uint8_t* value) {
+    for (unsigned int i = 0; i < SSKR_WORDLIST_LENGTH;
+         i += SSKR_BYTEWORD_LENGTH) {
+        if (os_secure_memcmp((void*)(SSKR_WORDLIST + i), (void*)byteword,
+                             SSKR_BYTEWORD_LENGTH) == 0) {
+            *value = i / SSKR_BYTEWORD_LENGTH;
+            return true;
         }
     }
-    // no match, sry
-    return SSKR_WORDLIST_LENGTH / SSKR_BYTEWORD_LENGTH;
+    // no match
+    return false;
 }
 
-unsigned int bolos_ux_bip39_to_sskr_convert(unsigned char *bip39_words_buffer,
-                                            unsigned int bip39_words_buffer_length,
-                                            unsigned int bip39_onboarding_kind,
-                                            unsigned int *group_descriptor,
-                                            uint8_t *share_count,
-                                            unsigned char *share_words_buffer,
-                                            unsigned int *share_words_buffer_length) {
+unsigned int bolos_ux_bip39_to_sskr_convert(
+    unsigned char* bip39_words_buffer, unsigned int bip39_words_buffer_length,
+    unsigned int bip39_type, unsigned int* group_descriptor,
+    uint8_t* share_count, unsigned char* share_words_buffer,
+    unsigned int* share_words_buffer_length) {
+    // Defined before anything can fail. Every early exit below already sets
+    // it, but the branch that does not run at all -- a mnemonic the decoder
+    // refuses -- used to leave the caller's count at whatever it held, and
+    // both callers keep it in a struct that outlives the call. The count is
+    // how many share screens the review then pages through.
+    *share_count = 0;
+
     // get seed from bip39 mnemonic
-    uint8_t seed_len = bip39_onboarding_kind * 4 / 3;
+    uint8_t seed_len = bip39_type * 4 / 3;
     uint8_t seed_buffer[SSKR_MAX_STRENGTH_BYTES + 1];
 
     if (bolos_ux_bip39_mnemonic_decode(bip39_words_buffer,
-                                       bip39_words_buffer_length,
-                                       seed_buffer,
+                                       bip39_words_buffer_length, seed_buffer,
                                        seed_len + 1) == 1) {
-        memzero(bip39_words_buffer, sizeof(bip39_words_buffer));
+        memzero(bip39_words_buffer, bip39_words_buffer_length);
         uint8_t groups_len = 1;
         uint8_t groups_threshold = 1;
         uint8_t share_len_expected = 0;
-        int16_t share_count_expected = bolos_ux_sskr_size_get(bip39_onboarding_kind,
-                                                              groups_threshold,
-                                                              group_descriptor,
-                                                              groups_len,
-                                                              &share_len_expected);
+        int16_t share_count_expected = bolos_ux_sskr_size_get(
+            bip39_type, groups_threshold, group_descriptor, groups_len,
+            &share_len_expected);
 
-        uint16_t share_hex_buffer_len = share_count_expected * share_len_expected;
-        uint8_t share_hex_buffer[SSKR_MAX_GROUP_COUNT * SSS_MAX_SHARE_COUNT *
-                                 (SSKR_MAX_STRENGTH_BYTES + SSKR_METADATA_LENGTH_BYTES)];
+        // bolos_ux_sskr_size_get() propagates sskr_count_shards()'s negative
+        // error codes as-is for an invalid group descriptor. The product
+        // below is a uint16_t, so a negative count would wrap into a length
+        // far larger than share_hex_buffer, which bolos_ux_sskr_generate()
+        // then memzero()s. Reject the descriptor before that product is
+        // formed.
+        if (share_count_expected < 0 || share_len_expected == 0) {
+            *share_count = 0;
+            memzero(seed_buffer, sizeof(seed_buffer));
+            memzero(bip39_words_buffer, bip39_words_buffer_length);
+            return 0;
+        }
+
+        uint16_t share_hex_buffer_len =
+            share_count_expected * share_len_expected;
+        uint8_t share_hex_buffer[SSKR_MAX_SHARE_BUFFER_LENGTH];
         uint8_t share_len = 0;
-        *share_count = bolos_ux_sskr_generate(groups_threshold,
-                                              group_descriptor,
-                                              groups_len,
-                                              seed_buffer,
-                                              seed_len,
-                                              &share_len,
-                                              share_hex_buffer,
-                                              share_hex_buffer_len,
-                                              share_len_expected,
-                                              share_count_expected);
+        *share_count = bolos_ux_sskr_generate(
+            groups_threshold, group_descriptor, groups_len, seed_buffer,
+            seed_len, &share_len, share_hex_buffer, share_hex_buffer_len,
+            share_len_expected, share_count_expected);
         memzero(seed_buffer, sizeof(seed_buffer));
         if (*share_count > 0) {
             // CBOR Tag #6.40309 is D9 9D75
             // CBOR Major type 2 is 0x40
             // (see https://www.rfc-editor.org/rfc/rfc8949#name-major-types)
             uint8_t cbor[] = {0xD9, 0x9D, 0x75, 0x40, 0x00};
-            size_t cbor_len = sizeof(cbor);
-            if (share_len < 24) {
+            // The length this header will occupy, taken from the same function
+            // bolos_ux_sskr_share_wordcount() reads, so that the number of
+            // words a review promises and the number this loop then writes
+            // cannot disagree about the short/long form boundary.
+            size_t cbor_len = bolos_ux_sskr_cbor_header_length(share_len);
+            if (share_len <= SSKR_CBOR_SHORT_FORM_MAX_LENGTH) {
                 cbor[3] |= (share_len & 0x1F);
-                cbor_len--;
             } else {
                 cbor[3] |= 0x18;
-                cbor[4] = (uint8_t) share_len;
+                cbor[4] = (uint8_t)share_len;
             }
 
             uint32_t checksum = 0;
-            uint8_t checksum_len = sizeof(checksum);
+            uint8_t checksum_len = SSKR_CRC32_LENGTH_BYTES;
 
-            size_t cbor_share_crc_buffer_len = cbor_len + share_len + checksum_len;
-            uint8_t cbor_share_crc_buffer[4 + SSKR_METADATA_LENGTH_BYTES + 1 +
-                                          SSKR_MAX_STRENGTH_BYTES + 4];
+            size_t cbor_share_crc_buffer_len =
+                cbor_len + share_len + checksum_len;
+            /*
+             * SSKR_SHARE_MAX_WIRE_LENGTH is this buffer, named. It was spelled
+             * out as "4 + metadata + 1 + strength + 4", which is the same 46
+             * bytes and the same four terms -- the long-form CBOR header, the
+             * shard, and the CRC -- written twice in the same file. The
+             * assertion below is what says the runtime length can never exceed
+             * it: cbor_share_crc_buffer_len is that sum with the real values,
+             * and every one of them is bounded by a constant here.
+             */
+            uint8_t cbor_share_crc_buffer[SSKR_SHARE_MAX_WIRE_LENGTH];
+            _Static_assert(
+                SSKR_CBOR_LONG_FORM_HEADER_LENGTH + SSKR_METADATA_LENGTH_BYTES +
+                        SSKR_MAX_STRENGTH_BYTES + SSKR_CRC32_LENGTH_BYTES <=
+                    SSKR_SHARE_MAX_WIRE_LENGTH,
+                "the widest header, shard and CRC this loop can "
+                "write do not fit the buffer it writes them into");
 
-            // sskr_words_buffer is space separated bytewords of cbor + share + checksum
+            // sskr_words_buffer is space separated bytewords of cbor + share +
+            // checksum
             *share_words_buffer_length =
-                ((cbor_len + share_len + checksum_len) * (SSKR_BYTEWORD_LENGTH + 1) - 1) *
+                ((cbor_len + share_len + checksum_len) *
+                     (SSKR_BYTEWORD_LENGTH + 1) -
+                 1) *
                 *share_count;
 
             for (uint8_t share = 0; share < *share_count; share++) {
                 memcpy(cbor_share_crc_buffer, cbor, cbor_len);
                 memcpy(cbor_share_crc_buffer + cbor_len,
-                       share_hex_buffer + share_len * share,
-                       share_len);
-                checksum = crc32_nbo(cbor_share_crc_buffer, cbor_len + share_len);
-                memcpy(cbor_share_crc_buffer + cbor_len + share_len, &checksum, checksum_len);
+                       share_hex_buffer + share_len * share, share_len);
+                checksum =
+                    crc32_nbo(cbor_share_crc_buffer, cbor_len + share_len);
+                memcpy(cbor_share_crc_buffer + cbor_len + share_len, &checksum,
+                       checksum_len);
 
                 if (bolos_ux_sskr_share_hex_decode(
-                        cbor_share_crc_buffer,
-                        cbor_share_crc_buffer_len,
-                        share_words_buffer + share * (*share_words_buffer_length / *share_count),
+                        cbor_share_crc_buffer, cbor_share_crc_buffer_len,
+                        share_words_buffer +
+                            share * (*share_words_buffer_length / *share_count),
                         *share_words_buffer_length / *share_count) < 1) {
                     memzero(share_hex_buffer, sizeof(share_hex_buffer));
-                    memzero(cbor_share_crc_buffer, sizeof(cbor_share_crc_buffer));
-                    memzero(share_words_buffer, sizeof(share_words_buffer));
-                    share_words_buffer_length = 0;
-                    memzero(bip39_words_buffer, sizeof(bip39_words_buffer));
+                    memzero(cbor_share_crc_buffer,
+                            sizeof(cbor_share_crc_buffer));
+                    memzero(share_words_buffer, *share_words_buffer_length);
+                    *share_words_buffer_length = 0;
+                    memzero(bip39_words_buffer, bip39_words_buffer_length);
                     return 0;
                 }
                 memzero(cbor_share_crc_buffer, sizeof(cbor_share_crc_buffer));
@@ -283,31 +509,142 @@ unsigned int bolos_ux_bip39_to_sskr_convert(unsigned char *bip39_words_buffer,
     return 1;
 }
 
-unsigned int bolos_ux_sskr_hex_check(unsigned char *sskr_shares_hex,
+unsigned int bolos_ux_sskr_hex_check(unsigned char* sskr_shares_hex,
                                      unsigned int sskr_shares_hex_length,
                                      unsigned int sskr_shares_count) {
     uint8_t cbor[] = {0xD9, 0x9D, 0x75};  // CBOR Tag #6.40309 is D9 9D75
     uint32_t checksum = 0;
     uint8_t checksum_len = sizeof(checksum);
 
+    // Every check this function performs -- CBOR tag, metadata shared by all
+    // shares, CRC-32 -- sits inside the loop below, so a zero count would fall
+    // straight through to the accepting return and report data nothing had
+    // looked at as valid. The count comes from the member-threshold nibble of
+    // the entered data and stays zero when the CBOR additional-info byte is one
+    // of the reserved values 25-31, which the share entry screens deliberately
+    // let through so that this function rejects them. Refuse by default here,
+    // the same way bolos_ux_sskr_combine() does.
+    if (sskr_shares_count == 0) {
+        memzero(sskr_shares_hex, sskr_shares_hex_length);
+        return 0;
+    }
+
+    // The distance from one share to the next, computed once here rather than
+    // re-derived at each use below. Both of its operands come from the caller,
+    // and the length handed to cx_crc32() is this minus checksum_len on
+    // unsigned int: one below checksum_len that subtraction wraps to
+    // 0xFFFFFFFF, which is a four-gigabyte read from the share buffer. The
+    // bound is <= and not <, because at exactly checksum_len the subtraction
+    // is well defined and gives zero -- there would be no byte left to
+    // checksum, and the four bytes read as a stored CRC would be the CBOR tag.
+    //
+    // Redundant with the arithmetic of both entry paths, which cannot produce
+    // a stride below 8: sskr_shares_check() (nbgl/sskr_shares.c) only calls
+    // this function once sskr_shares_complete_check() holds, which needs every
+    // share to have reached shares.final_size -- which
+    // bolos_ux_sskr_entry_header_update() sets to four header bytes plus the
+    // declared shard length plus the four of the CRC, so at least 8 -- and
+    // needs as many shares as the count says; the BAGL screens do the same
+    // arithmetic with bip39_type standing in for final_size. Kept for the
+    // same reason as
+    // the sskr_share_len bound in bolos_ux_sskr_combine() above: this is where
+    // data typed on the device turns into an offset. Because it is redundant,
+    // the test that holds it calls this function directly; see
+    // tests/unit/tests/sskr_hex_check_guards.c.
+    const unsigned int stride = sskr_shares_hex_length / sskr_shares_count;
+    if (stride <= checksum_len) {
+        memzero(sskr_shares_hex, sskr_shares_hex_length);
+        return 0;
+    }
+
+    // What every share of one group must agree on is its metadata, not a fixed
+    // count of bytes: the CBOR tag and byte-string header, the two-byte
+    // identifier, group-threshold/group-count, and
+    // group-index/member-threshold. The header is four bytes for a shard under
+    // 24 bytes -- the short form, which is every 128-bit seed -- and five
+    // above it, which moves every field after it along by one. group-index
+    // therefore sits at byte 7 for a 12-word seed and at byte 8 for an 18- or
+    // 24-word one, and a comparison of a constant 8 bytes covered it at the
+    // first size only. Derived here the way bolos_ux_sskr_combine() derives it
+    // above, from the additional-information nibble alone.
+    //
+    // Reading byte 3 is in bounds because of the stride bound: a stride above
+    // checksum_len with a share count of at least one leaves at least five
+    // bytes in the buffer. It happens before the loop has checked any share's
+    // CBOR tag, which only means that a first frame that is not a shard at all
+    // gives a wrong length here, never an out-of-range one -- and the tag
+    // comparison in the loop refuses it either way.
+    //
+    // Byte 3 has to be a CBOR byte-string header for its low five bits to be
+    // the additional information the form is derived from. Refused here rather
+    // than folded into the loop below because that form is what decides how
+    // many bytes of metadata the loop compares. Only the first share's byte is
+    // tested, and that is enough: the metadata comparison in the loop covers
+    // byte 3, so every later share has to carry the same one.
+    if (!SSKR_CBOR_IS_BYTE_STRING(sskr_shares_hex[3])) {
+        memzero(sskr_shares_hex, sskr_shares_hex_length);
+        return 0;
+    }
+
+    // The other half of that initial byte. RFC 8949 section 3 gives additional
+    // information 0..23 the meaning "this is the length", 24 "one length byte
+    // follows", and reserves 25..31 (two/four/eight-byte length, reserved,
+    // indefinite) -- none of which a share may use, and none of which carries a
+    // length this function could act on.
+    //
+    // Until now nothing here refused them. What kept them out was a side
+    // effect one layer up: bolos_ux_sskr_entry_header_update() only writes the
+    // share count for additional information below or equal to 24, so a
+    // reserved value left it at zero, and the count-of-zero bound above
+    // refused the frame. That works, and it is not what this function is
+    // documented to do -- a caller arriving here with a count of its own would
+    // have been given a frame nothing had checked the shape of.
+    const unsigned int additional_info = sskr_shares_hex[3] & 0x1F;
+    if (additional_info > 24) {
+        memzero(sskr_shares_hex, sskr_shares_hex_length);
+        return 0;
+    }
+    const unsigned int header_len = 4u + (additional_info == 24);
+    const unsigned int metadata_len = header_len + 4u;
+
+    // ...and that comparison has to stay inside the share it starts from. At
+    // its widest it is 9 bytes, so a shorter stride would read into the next
+    // share, and past the buffer entirely on the last one. This cannot be
+    // folded into the bound above: metadata_len is not known until byte 3 has
+    // been read, and reading byte 3 is what that bound makes safe.
+    if (stride < metadata_len) {
+        memzero(sskr_shares_hex, sskr_shares_hex_length);
+        return 0;
+    }
+
+    // The declared length has to be the one the frame actually arrived in. A
+    // share is a CBOR byte string of `declared` bytes wrapped in `header_len`
+    // bytes of tag and header, followed by four bytes of CRC32, so the three
+    // add up to the stride or the frame is not the share it says it is.
+    //
+    // Reading byte 4 for the long form is in bounds: the stride bound above is
+    // strictly greater than checksum_len, so at least five bytes of the first
+    // share are present.
+    const unsigned int declared =
+        (additional_info < 24) ? additional_info : sskr_shares_hex[4];
+    if (declared + header_len + checksum_len != stride) {
+        memzero(sskr_shares_hex, sskr_shares_hex_length);
+        return 0;
+    }
+
     for (unsigned int i = 0; i < sskr_shares_count; i++) {
-        checksum = crc32_nbo(sskr_shares_hex + i * (sskr_shares_hex_length / sskr_shares_count),
-                             (sskr_shares_hex_length / sskr_shares_count) - checksum_len);
-        // First 8 bytes of all shares in group should be same
-        // Test checksum
-        if ((os_secure_memcmp(cbor,
-                              sskr_shares_hex + i * sskr_shares_hex_length / sskr_shares_count,
-                              3) != 0) ||
+        checksum =
+            crc32_nbo(sskr_shares_hex + i * stride, stride - checksum_len);
+        // Test the CBOR tag, the metadata shared by every share, and the
+        // checksum
+        if ((os_secure_memcmp(cbor, sskr_shares_hex + i * stride, 3) != 0) ||
             (i > 0 &&
-             os_secure_memcmp(sskr_shares_hex,
-                              sskr_shares_hex + i * sskr_shares_hex_length / sskr_shares_count,
-                              8) != 0) ||
-            (os_secure_memcmp(&checksum,
-                              sskr_shares_hex +
-                                  ((sskr_shares_hex_length / sskr_shares_count) * (i + 1)) -
-                                  checksum_len,
-                              checksum_len) != 0)) {
-            memzero(sskr_shares_hex, sizeof(sskr_shares_hex));
+             os_secure_memcmp(sskr_shares_hex, sskr_shares_hex + i * stride,
+                              metadata_len) != 0) ||
+            (os_secure_memcmp(
+                 &checksum, sskr_shares_hex + (stride * (i + 1)) - checksum_len,
+                 checksum_len) != 0)) {
+            memzero(sskr_shares_hex, sskr_shares_hex_length);
             checksum = 0;
             return 0;
         };
@@ -317,10 +654,12 @@ unsigned int bolos_ux_sskr_hex_check(unsigned char *sskr_shares_hex,
     return 1;
 }
 
-unsigned int bolos_ux_sskr_idx_strcpy(unsigned int index, unsigned char *buffer) {
+unsigned int bolos_ux_sskr_idx_strcpy(unsigned int index,
+                                      unsigned char* buffer) {
     if (index < SSKR_WORDLIST_LENGTH / SSKR_BYTEWORD_LENGTH && buffer) {
         size_t word_length = SSKR_BYTEWORD_LENGTH;
-        memcpy(buffer, SSKR_WORDLIST + SSKR_BYTEWORD_LENGTH * index, word_length);
+        memcpy(buffer, SSKR_WORDLIST + SSKR_BYTEWORD_LENGTH * index,
+               word_length);
         buffer[word_length] = 0;  // EOS
         return word_length;
     }
@@ -329,12 +668,12 @@ unsigned int bolos_ux_sskr_idx_strcpy(unsigned int index, unsigned char *buffer)
     return 0;
 }
 
-unsigned int bolos_ux_sskr_get_word_idx_starting_with(const unsigned char *prefix,
-                                                      const unsigned int prefixlength) {
+unsigned int bolos_ux_sskr_get_word_idx_starting_with(
+    const unsigned char* prefix, const unsigned int prefixlength) {
     unsigned int i;
     for (i = 0; i < SSKR_WORDLIST_LENGTH / SSKR_BYTEWORD_LENGTH; i++) {
         unsigned int j = 0;
-        while (j < (unsigned int) (SSKR_BYTEWORD_LENGTH) && j < prefixlength &&
+        while (j < (unsigned int)(SSKR_BYTEWORD_LENGTH) && j < prefixlength &&
                SSKR_WORDLIST[SSKR_BYTEWORD_LENGTH * i + j] == prefix[j]) {
             j++;
         }
@@ -346,13 +685,13 @@ unsigned int bolos_ux_sskr_get_word_idx_starting_with(const unsigned char *prefi
     return SSKR_WORDLIST_LENGTH / SSKR_BYTEWORD_LENGTH;
 }
 
-unsigned int bolos_ux_sskr_get_word_count_starting_with(const unsigned char *prefix,
-                                                        const unsigned int prefixlength) {
+unsigned int bolos_ux_sskr_get_word_count_starting_with(
+    const unsigned char* prefix, const unsigned int prefixlength) {
     unsigned int i;
     unsigned int count = 0;
     for (i = 0; i < SSKR_WORDLIST_LENGTH / SSKR_BYTEWORD_LENGTH; i++) {
         unsigned int j = 0;
-        while (j < (unsigned int) (SSKR_BYTEWORD_LENGTH) && j < prefixlength &&
+        while (j < (unsigned int)(SSKR_BYTEWORD_LENGTH) && j < prefixlength &&
                SSKR_WORDLIST[SSKR_BYTEWORD_LENGTH * i + j] == prefix[j]) {
             j++;
         }
@@ -370,21 +709,22 @@ unsigned int bolos_ux_sskr_get_word_count_starting_with(const unsigned char *pre
 
 // allocate at most 26 letters for next possibilities
 // algorithm considers the SSKR words are alphabetically ordered in the wordlist
-unsigned int bolos_ux_sskr_get_word_next_letters_starting_with(const unsigned char *prefix,
-                                                               unsigned int prefixlength,
-                                                               unsigned char *next_letters_buffer) {
+unsigned int bolos_ux_sskr_get_word_next_letters_starting_with(
+    const unsigned char* prefix, unsigned int prefixlength,
+    unsigned char* next_letters_buffer) {
     unsigned int i;
     unsigned int letter_count = 0;
     for (i = 0; i < SSKR_WORDLIST_LENGTH / SSKR_BYTEWORD_LENGTH; i++) {
         unsigned int j = 0;
-        while (j < (unsigned int) (SSKR_BYTEWORD_LENGTH) && j < prefixlength &&
+        while (j < (unsigned int)(SSKR_BYTEWORD_LENGTH) && j < prefixlength &&
                SSKR_WORDLIST[SSKR_BYTEWORD_LENGTH * i + j] == prefix[j]) {
             j++;
         }
         if (j == prefixlength) {
-            if (j < (unsigned int) (SSKR_BYTEWORD_LENGTH)) {
+            if (j < (unsigned int)(SSKR_BYTEWORD_LENGTH)) {
                 // j is inc during previous loop, don't touch it
-                unsigned char next_letter = SSKR_WORDLIST[SSKR_BYTEWORD_LENGTH * i + j];
+                unsigned char next_letter =
+                    SSKR_WORDLIST[SSKR_BYTEWORD_LENGTH * i + j];
                 // add the first next_letter inconditionnally
                 if (letter_count == 0) {
                     next_letters_buffer[0] = next_letter;
@@ -410,43 +750,47 @@ unsigned int bolos_ux_sskr_get_word_next_letters_starting_with(const unsigned ch
 #if defined(HAVE_NBGL)
 #include <nbgl_layout.h>
 
-size_t bolos_ux_sskr_fill_with_candidates(const unsigned char *startingChars,
+size_t bolos_ux_sskr_fill_with_candidates(const unsigned char* startingChars,
                                           const size_t startingCharsLength,
                                           char wordCandidatesBuffer[],
-                                          const char *wordIndexorBuffer[]) {
-    PRINTF("Calculating nb of words starting with '%s' (size is '%d')\n",
-           startingChars,
+                                          const char* wordIndexorBuffer[]) {
+    PRINTF("Calculating nb of words starting with a %u-character prefix\n",
            startingCharsLength);
     const size_t nbMatchingWords =
-        MIN(bolos_ux_sskr_get_word_count_starting_with(startingChars, startingCharsLength),
+        MIN(bolos_ux_sskr_get_word_count_starting_with(startingChars,
+                                                       startingCharsLength),
             NB_MAX_SUGGESTION_BUTTONS);
-    PRINTF("'%d' words start with '%s'\n", nbMatchingWords, startingChars);
+    PRINTF("'%d' words start with the given prefix\n", nbMatchingWords);
     if (nbMatchingWords == 0) {
         return 0;
     }
-    size_t matchingWordIndex =
-        bolos_ux_sskr_get_word_idx_starting_with(startingChars, startingCharsLength);
+    size_t matchingWordIndex = bolos_ux_sskr_get_word_idx_starting_with(
+        startingChars, startingCharsLength);
     size_t offset = 0;
     for (size_t i = 0; i < nbMatchingWords; i++) {
-        unsigned char *const wordDest = (unsigned char *) (&wordCandidatesBuffer[0] + offset);
-        const size_t wordSize = bolos_ux_sskr_idx_strcpy(matchingWordIndex, wordDest);
+        unsigned char* const wordDest =
+            (unsigned char*)(&wordCandidatesBuffer[0] + offset);
+        const size_t wordSize =
+            bolos_ux_sskr_idx_strcpy(matchingWordIndex, wordDest);
         matchingWordIndex++;
         *(wordDest + wordSize) = '\0';
         offset += wordSize + 1;  // + trailing '\0' size
-        wordIndexorBuffer[i] = (char *) wordDest;
+        wordIndexorBuffer[i] = (char*)wordDest;
     }
     return nbMatchingWords;
 }
 
-uint32_t bolos_ux_sskr_get_keyboard_mask(const unsigned char *prefix,
+uint32_t bolos_ux_sskr_get_keyboard_mask(const unsigned char* prefix,
                                          const unsigned int prefixLength) {
-    uint32_t existing_mask = 1 << 28;  // Starting with the 'return' keypad activated
+    uint32_t existing_mask =
+        1 << 28;  // Starting with the 'return' keypad activated
     unsigned char next_letters[ALPHABET_LENGTH] = {0};
-    PRINTF("Looking for letter candidates following '%s'\n", prefix);
-    const size_t nb_letters =
-        bolos_ux_sskr_get_word_next_letters_starting_with(prefix, prefixLength, next_letters);
+    PRINTF("Looking for letter candidates following a %u-character prefix\n",
+           prefixLength);
+    const size_t nb_letters = bolos_ux_sskr_get_word_next_letters_starting_with(
+        prefix, prefixLength, next_letters);
     next_letters[nb_letters] = '\0';
-    PRINTF("Next letters are in: %s\n", next_letters);
+    PRINTF("Found %u next-letter candidates\n", nb_letters);
     for (int i = 0; i < ALPHABET_LENGTH; i++) {
         for (size_t j = 0; j < nb_letters; j++) {
             if (KBD_LETTERS[i] == next_letters[j]) {

@@ -1,7 +1,7 @@
 # Unit tests
 
-It is important to unit test your functions.  
-This also allows you to document how your functions work.  
+It is important to unit test your functions.
+This also allows you to document how your functions work.
 We use the library [**cmocka**](https://cmocka.org/#features)
 
 ## Requirement
@@ -13,7 +13,7 @@ Don't worry, you don't necessarily need to install the `cmocka library` because 
 
 ## Add new test
 
-Create new file into `tests` folder and follow [this initiation](https://cmocka.org/talks/cmocka_unit_testing_and_mocking.pdf)  
+Create new file into `tests` folder and follow [this initiation](https://cmocka.org/talks/cmocka_unit_testing_and_mocking.pdf)
 
 Now go to the `CMakeLists.txt` file and add your test with the specific file you want to test.
 

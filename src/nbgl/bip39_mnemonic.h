@@ -1,6 +1,6 @@
 /*******************************************************************************
  *   Ledger Seed Tool application
- *   (c) 2016-2025 Ledger SAS
+ *   (c) 2016-2026 Ledger SAS
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -47,7 +47,7 @@ bool bip39_mnemonic_complete_check(void);
 /*
  * Check if the currently stored mnemonic generates the same seed as the current device's one
  */
-bool bip39_mnemonic_check(bool* match);
+bool bip39_mnemonic_check(bool *match);
 
 /*
  * Erase all information and reset the indexes
@@ -63,21 +63,39 @@ bool bip39_mnemonic_word_remove(void);
 /*
  * Adds a word in the passphrase, returns how many words are stored in the mnemonic
  */
-size_t bip39_mnemonic_word_add(const char* const buffer, const size_t size);
+size_t bip39_mnemonic_word_add(const char *const buffer, const size_t size);
 
 /*
  * Generate BIP39 mnemonic from SSKR shares
+ *
+ * Returns whether the shards combined into a mnemonic. `derived` is set to
+ * whether the seed derivation that follows succeeded, which is a different
+ * question with a different answer for the user: unusable shares on one side,
+ * a derivation that did not complete on the other.
  */
-void bip39_mnemonic_from_sskr_shares(unsigned char* seed);
+bool bip39_mnemonic_from_sskr_shares(unsigned char *seed, bool *derived);
 
+/*
+ * Encode BIP39 mnemonic from hex input
+ */
+void bip39_mnemonic_encode(const uint8_t *seed, uint8_t seed_len);
 /*
  * Returns the mnemonic passphrase
  */
-char* bip39_mnemonic_get(void);
+char *bip39_mnemonic_get(void);
 
 /*
  * Returns length of the mnemonic passphrase
  */
 size_t bip39_mnemonic_length_get(void);
+
+/*
+ * Drops the last `size` bytes of the mnemonic and erases everything from the
+ * new end to the end of the buffer, returning the new length. A `size` of 0, or
+ * one larger than the current length, drops everything. word_remove() is its
+ * only caller in the application; it is declared here so that the compiler
+ * checks that caller, the definition and the unit suite against one another.
+ */
+size_t bip39_mnemonic_shrink(const size_t size);
 
 #endif  // SCREEN_SIZE_WALLET

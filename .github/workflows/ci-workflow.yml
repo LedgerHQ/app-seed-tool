@@ -10,17 +10,44 @@ on:
     tags:
       - '**'
   pull_request:
-    paths-ignore:
-      - '.github/workflows/*.yml'
 
 jobs:
+  # The manifest and the two matrices below are three lists of devices that have
+  # to agree, and nothing used to make them. They had already drifted: nanos was
+  # taken out of CI in 10/2025 and left in ledger_app.toml, so the repository
+  # advertised a device no pipeline compiled. This job is what notices next time.
+  declared_devices:
+    name: Declared devices match the CI matrices
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6
+      - name: Install PyYAML
+        run: pip install --disable-pip-version-check pyyaml
+      - name: Compare ledger_app.toml against the build and test matrices
+        run: python3 .github/scripts/check_declared_devices.py
+
   ledger_app_build:
     name: Build application using the reusable workflow
     uses: LedgerHQ/ledger-app-workflows/.github/workflows/reusable_build.yml@v1
     with:
       upload_app_binaries_artifact: compiled_app_binaries
-      run_for_devices: '["nanox", "nanosp", "stax", "flex"]'
+      run_for_devices: '["nanox", "nanosp", "stax", "flex", "apex_p"]'
 
+  # The device list below used to be a subset of the one above: nanox and
+  # nanosp were built on every pull request and then never run. That is not two
+  # devices missing, it is one of the two interface stacks -- everything under
+  # src/bagl -- never exercised end to end, while the other one, src/nbgl, was
+  # covered by nine test files.
+  #
+  # nanos is deliberately absent, from both lists and now from ledger_app.toml
+  # as well. It was removed from the build matrix on purpose ("Remove nanos from
+  # tests", 10/2025); the manifest kept declaring it for another two app
+  # versions -- the last Nano S release is 1.7.4, where every other device went
+  # on to 1.8.0 -- so the declaration was withdrawn to match what is actually
+  # published. The src/bagl and TARGET_NANOS code is untouched and still
+  # compiles; only the support claim is gone. declared_devices above keeps the
+  # three lists in agreement from here on.
   ledger_app_test_function:
     name: Run ragger tests using the reusable workflow
     needs: ledger_app_build
@@ -28,5 +55,5 @@ jobs:
     with:
       download_app_binaries_artifact: compiled_app_binaries
       test_dir: tests/functional
-      run_for_devices: '["stax", "flex"]'
-
+      post_stack_consumption: false
+      run_for_devices: '["nanox", "nanosp", "stax", "flex", "apex_p"]'

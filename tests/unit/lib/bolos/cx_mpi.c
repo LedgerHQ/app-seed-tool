@@ -615,6 +615,16 @@ uint32_t cx_mpi_cnt_bits(const cx_mpi_t *x)
   // Convert a cx_mpi_t into big-endian bytes form:
   len = BN_bn2bin(x, a);
 
+  // A zero bignum has no significant byte at all: BN_bn2bin() writes nothing
+  // and returns 0, leaving 'a' untouched. The scan below would then read it
+  // uninitialised and, since 'len' is unsigned, walk past the end of the
+  // buffer: 'len--' turns 0 into UINT32_MAX and the loop's only exit
+  // condition can no longer be met. Zero has no bits either way the count is
+  // read, so return early.
+  if (len == 0) {
+    return 0;
+  }
+
   p = a;
   while (*p == 0) {
     p++;
@@ -1163,6 +1173,19 @@ cx_err_t cx_mpi_next_prime(cx_mpi_t *x)
       break;
     }
   } while (is_prime == 0);
+
+  return error;
+}
+
+cx_err_t cx_mpi_gf2_n_mul(cx_mpi_t *r, const cx_mpi_t *a, const cx_mpi_t *b,
+                          const cx_mpi_t *n,
+                          const cx_mpi_t *h __attribute__((unused)))
+{
+  cx_err_t error = CX_OK; // By default, until some error occurs
+
+  if (!BN_GF2m_mod_mul(r, a, b, n, local_bn_ctx)) {
+    error = CX_INTERNAL_ERROR;
+  }
 
   return error;
 }

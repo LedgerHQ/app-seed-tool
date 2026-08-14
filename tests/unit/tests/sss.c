@@ -6,20 +6,20 @@
 *     toe priority custom gauge jacket theme arrest bargain
 *     gloom wide ill fit eagle prepare capable fish limb
 *     cigar reform other priority speak rough imitate
-* 
+*
 * The set of 2-of-3 shares as SSKR ByteWords are:
 *     tuna acid epic hard data love wolf able acid able
 *     duty surf belt task judo legs ruby cost belt pose
 *     ruby logo iron vows luck bald user lazy tuna belt
 *     guru buzz limp exam obey kept task cash saga pool
 *     love brag roof owls news junk
-* 
+*
 *     tuna acid epic hard data love wolf able acid acid
 *     barn peck luau keys each duty waxy quad open bias
 *     what cusp zaps math kick dark join nail legs oboe
 *     also twin yank road very blue gray saga oboe city
 *     gear beta quad draw knob main
-* 
+*
 *     tuna acid epic hard data love wolf able acid also
 *     fund able city road whiz zone claw high frog work
 *     deli slot gush cats kiwi gyro numb puma join fund
@@ -219,13 +219,13 @@ static void test_sss_split(void **state) {
     const uint8_t share_count = 3;
     const uint8_t seed_length = sizeof(seed);
     uint8_t result[seed_length * share_count];
- 
+
     int16_t ret_val = sss_split_secret(threshold,
                                           share_count,
                                           seed,
                                           seed_length,
                                           result,
-                                          cx_rng);
+                                          test_rng);
 
     assert_int_equal(ret_val, share_count);
     assert_memory_equal(result, shares, sizeof(result));
@@ -236,7 +236,7 @@ static void test_sss_split(void **state) {
                                   seed,
                                   seed_length,
                                   result,
-                                  cx_rng);
+                                  test_rng);
 
     assert_int_equal(ret_val, SSS_ERROR_INVALID_THRESHOLD);
 }

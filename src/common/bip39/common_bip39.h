@@ -1,6 +1,6 @@
 /*******************************************************************************
  *   Ledger Seed Tool application
- *   (c) 2016-2025 Ledger SAS
+ *   (c) 2016-2026 Ledger SAS
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -16,6 +16,18 @@
  ********************************************************************************/
 
 #pragma once
+
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+
+// Hashes an over-long mnemonic down to 64 bytes in its own frame, so that the
+// pbkdf2 call in bolos_ux_bip39_mnemonic_to_seed() does not carry this one's
+// locals. Kept out of line and with external linkage for that reason -- static
+// would let the compiler undo it -- which is an argument against `static`, not
+// against a prototype.
+unsigned int bolos_ux_bip39_mnemonic_to_seed_hash_length128(unsigned char *mnemonic,
+                                                            unsigned int mnemonic_length);
 
 // BIP39 helpers
 #include "./seed_rom_variables.h"
@@ -37,7 +49,13 @@ unsigned int bolos_ux_bip39_mnemonic_check(const unsigned char *mnemonic,
                                            unsigned int mnemonic_length);
 
 // passphrase will be prefixed with "MNEMONIC" from BIP39, the passphrase content shall start @ 8
-void bolos_ux_bip39_mnemonic_to_seed(const unsigned char *mnemonic,
+//
+// Returns false, with the 64 bytes of `seed` zeroed, when the PBKDF2 call
+// underneath reports an error. That call fills its output block by block, so a
+// failure part way through leaves a partly derived buffer that nothing
+// downstream could tell from a real seed; refusing here is what keeps it from
+// being HMAC'd and compared as one.
+bool bolos_ux_bip39_mnemonic_to_seed(const unsigned char *mnemonic,
                                      const unsigned int mnemonic_length,
                                      unsigned char *seed /*, unsigned char *workBuffer*/);
 

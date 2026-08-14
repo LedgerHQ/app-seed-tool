@@ -7,6 +7,9 @@ from ragger.conftest import configuration
 from ragger.firmware.touch.use_cases import UseCaseHomeExt, UseCaseViewDetails, UseCaseChoice
 from ragger.firmware.touch.layouts import CenteredFooter, LetterOnlyKeyboard, Suggestions, ChoiceList
 from keypad import Keypad
+import reviews
+import explanations
+from choicelist import MENU_RECOVER
 
 @fixture(scope='session')
 def set_seed():
@@ -14,11 +17,11 @@ def set_seed():
     configuration.OPTIONAL.CUSTOM_SEED = "fly mule excess resource treat plunge nose soda reflect adult ramp planet"
 
 def nanos_sskr_128bit(backend, navigator):
-    backend.wait_for_text_on_screen("Check BIP39", 5)
-    backend.wait_for_text_on_screen("recovery phras", 1)
+    backend.wait_for_text_on_screen("Check Phrase", 5)
+    backend.wait_for_text_on_screen("on this Ledger", 1)
     navigator.navigate([NavInsID.RIGHT_CLICK], screen_change_before_first_instruction=False)
-    backend.wait_for_text_on_screen("Check SSKR", 5)
-    backend.wait_for_text_on_screen("recovery phras", 1)
+    backend.wait_for_text_on_screen("Recover", 5)
+    backend.wait_for_text_on_screen("from Backup", 1)
     instructions = [
         NavInsID.BOTH_CLICK,
         NavInsID.BOTH_CLICK,
@@ -825,24 +828,24 @@ def nanos_sskr_128bit(backend, navigator):
         NavInsID.BOTH_CLICK
     ]
     navigator.navigate(instructions, screen_change_before_first_instruction=False)
-    backend.wait_for_text_on_screen("SSKR Phrase", 5)
-    backend.wait_for_text_on_screen("is correct", 1)
+    backend.wait_for_text_on_screen("SSKR Shares", 5)
+    backend.wait_for_text_on_screen("are correct", 1)
     navigator.navigate([NavInsID.RIGHT_CLICK], screen_change_before_first_instruction=False)
     backend.wait_for_text_on_screen("Quit", 1)
     navigator.navigate([NavInsID.RIGHT_CLICK], screen_change_before_first_instruction=False)
-    backend.wait_for_text_on_screen("Recover", 1)
-    backend.wait_for_text_on_screen("BIP39 phrase", 1)
+    backend.wait_for_text_on_screen("Show", 1)
+    backend.wait_for_text_on_screen("the Phrase", 1)
     navigator.navigate([NavInsID.BOTH_CLICK], screen_change_before_first_instruction=False)
-    backend.wait_for_text_on_screen("BIP39 Phrase", 1)
+    backend.wait_for_text_on_screen("Your Phrase", 1)
     backend.wait_for_text_on_screen("fly mule excess", 1)
     navigator.navigate([NavInsID.RIGHT_CLICK], screen_change_before_first_instruction=False)
-    backend.wait_for_text_on_screen("BIP39 Phrase", 1)
+    backend.wait_for_text_on_screen("Your Phrase", 1)
     backend.wait_for_text_on_screen(" resource treat plunge", 1)
     navigator.navigate([NavInsID.RIGHT_CLICK], screen_change_before_first_instruction=False)
-    backend.wait_for_text_on_screen("BIP39 Phrase", 1)
+    backend.wait_for_text_on_screen("Your Phrase", 1)
     backend.wait_for_text_on_screen(" nose soda reflect", 1)
     navigator.navigate([NavInsID.RIGHT_CLICK], screen_change_before_first_instruction=False)
-    backend.wait_for_text_on_screen("BIP39 Phrase", 1)
+    backend.wait_for_text_on_screen("Your Phrase", 1)
     backend.wait_for_text_on_screen(" adult ramp planet", 1)
     navigator.navigate([NavInsID.RIGHT_CLICK], screen_change_before_first_instruction=False)
     backend.wait_for_text_on_screen("Quit", 1)
@@ -852,39 +855,39 @@ def all_eink_sskr_128bit(backend, device):
                    "tuna next keep gyro paid claw able acid acid gray quad kiln wall kept deli mild epic race fuel dice blue game yank fern bulb gear jade navy cost"]
 
     home_page = UseCaseHomeExt(backend, device)
-#    select_tool = ChoiceList(backend, device)
-    select_footer = CenteredFooter(backend, device)
     keyboard = LetterOnlyKeyboard(backend, device)
     suggestion = Suggestions(backend, device)
     check_result = CenteredFooter(backend, device)
     keypad = Keypad(backend, device)
     review = UseCaseViewDetails(backend, device)
     choice = UseCaseChoice(backend, device)
+    genericbuttons = ChoiceList(backend, device)
 
     backend.wait_for_text_on_screen("Seed Tool", 10)
     home_page.action()
-    backend.wait_for_text_on_screen("SSKR Check", 5)
-#    select_tool.choose(6)
-#   Workaround for https://github.com/LedgerHQ/ragger/issues/247
-    if device.type == DeviceType.STAX:
-        backend.finger_touch(212, 510, 1)
-    elif device.type == DeviceType.FLEX:
-        backend.finger_touch(240, 420, 1)
-    backend.wait_for_text_on_screen("Enter Share 1 Word 1", 5)
-    words = configuration.OPTIONAL.CUSTOM_SEED
+    backend.wait_for_text_on_screen("Recover from Backup", 5)
+    genericbuttons.choose(MENU_RECOVER)
+    explanations.pass_explanation(
+        backend, device, explanations.EXPLAIN_RECOVER, "Enter Share 1 Word 1",
+        action=True)
     for shard in sskr_shards:
         for word in shard.split():
             keyboard.write(word[:3])
             suggestion.choose(1)
-    backend.wait_for_text_on_screen("Valid Secret", 5)
-    backend.wait_for_text_on_screen("Recovery Phrase", 1)
+    backend.wait_for_text_on_screen("Valid", 5)
+    backend.wait_for_text_on_screen("SSKR Shares", 1)
     check_result.tap()
-    backend.wait_for_text_on_screen("Recover BIP39", 5)
-    choice.confirm()
-    backend.wait_for_text_on_screen("BIP39 Phrase", 5)
+    # What used to be an offer -- "Recover BIP39 Phrase?" -- is now the warning
+    # that stands in front of a rebuilt phrase, and it is the only screen on
+    # this path that does: there is no review here for it to be the last page
+    # of. Its second sentence is the one this flow never said out loud, that
+    # what appears is what the entered shares rebuild and not necessarily the
+    # phrase this Ledger holds.
+    reviews.accept_warning(backend, device, "A Recovery Phrase")
+    backend.wait_for_text_on_screen("Recovery Phrase", 5)
     backend.wait_for_text_on_screen("fly mule excess", 1)
     backend.wait_for_text_on_screen("resource treat plunge", 1)
-    backend.wait_for_text_on_screen("nose soda reflect adult",1)
+    backend.wait_for_text_on_screen("nose soda reflect adult", 1)
     backend.wait_for_text_on_screen("ramp planet", 1)
     review.exit()
     backend.wait_for_text_on_screen("Seed Tool", 5)
@@ -901,4 +904,6 @@ def test_sskr_128bit(device, backend, navigator, set_seed):
     elif device.type == DeviceType.STAX:
         all_eink_sskr_128bit(backend, device)
     elif device.type == DeviceType.FLEX:
+        all_eink_sskr_128bit(backend, device)
+    elif device.type == DeviceType.APEX_P:
         all_eink_sskr_128bit(backend, device)

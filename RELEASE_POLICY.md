@@ -8,10 +8,10 @@ and Z is incremented if a release contains only bugfixes and other minor
 changes.
 
 Releases are tagged on the develop branch and will not be maintained separately.
-Releases may be made if the amount of commits or severity of bugs justify it, or 
+Releases may be made if the amount of commits or severity of bugs justify it, or
 in the event of security issues.
 
-The goal of a release is to provide assets such as compiled app binaries. If you 
+The goal of a release is to provide assets such as compiled app binaries. If you
 want the newest features, just use the latest commit on the develop branch.
 We try our best to keep it deployable at all times.
 
@@ -34,14 +34,14 @@ While on the develop branch:
 
 - Push the commit and tag to GitHub.
 
-- Pushing the tag will trigger the "Release Workflow" GitHub Action. This action will build the application 
-for all device types, package the binaries and then create a release page at https://github.com/aido/app-seed-tool/releases 
+- Pushing the tag will trigger the "Release Workflow" GitHub Action. This action will build the application
+for all device types, package the binaries and then create a release page at https://github.com/aido/app-seed-tool/releases
 
 Changelog template
 ------------------
 
 All notable changes to this project will be documented in this file.
- 
+
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 

@@ -1,0 +1,122 @@
+name: Unit test configuration matrix
+
+# Sweeps the cmocka unit test suite (tests/unit) across build configurations
+# that unit_tests.yml does not cover: ASan, UBSan, -O2, -Os, -fsigned-char
+# and -funsigned-char. The default configuration (Debug, -O0) is already
+# exercised by unit_tests.yml on every pull request, so it is intentionally
+# not repeated here.
+#
+# Each matrix entry builds OpenSSL (a unit test dependency, fetched and
+# compiled from source by tests/unit/CMakeLists.txt) once with no special
+# flags, then reconfigures using -DPRECOMPILED_DEPENDENCIES_DIR to reuse
+# that build unchanged and apply the job-specific flags only to the actual
+# test suite. Without this, CMAKE_C_FLAGS/CMAKE_EXE_LINKER_FLAGS passed to
+# the top-level cmake invocation would also apply to OpenSSL's build,
+# needlessly recompiling a third-party dependency with flags it was never
+# meant to receive.
+#
+# The -O2/-Os entries use CMAKE_BUILD_TYPE=Release with CMAKE_C_FLAGS_RELEASE
+# instead of CMAKE_C_FLAGS, and the default Debug build type used by the
+# other entries. tests/unit/CMakeLists.txt hardcodes -O0 into
+# CMAKE_C_FLAGS_DEBUG, which is applied after CMAKE_C_FLAGS on the actual
+# compile command line -- passing an -O level via CMAKE_C_FLAGS under the
+# default Debug build type would silently lose to that -O0 (the last -O
+# flag on the command line wins). Release sidesteps that line entirely.
+#
+# Sidestepping it used to cost the warning flags too, since they sat on that
+# same CMAKE_C_FLAGS_DEBUG line: these two entries, the only ones compiled
+# with optimisation and so the only ones where -Wmaybe-uninitialized and its
+# neighbours can say anything at all, were the two that reported no
+# diagnostic. tests/unit/CMakeLists.txt now carries the same warning list on
+# CMAKE_C_FLAGS_RELEASE, appending to it rather than replacing it, so the
+# -DCMAKE_C_FLAGS_RELEASE below still decides the -O level on its own and no
+# flag is repeated here.
+#
+# This sweep is heavier than unit_tests.yml (6 OpenSSL builds + 6 full test
+# builds), so it does not run on every pull request; it runs on push to the
+# integration branches and on demand.
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - bip85
+      - develop
+
+jobs:
+  unit_tests_matrix:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder-lite:latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: ASan
+            build_type: Debug
+            cflags: "-fsanitize=address -fno-omit-frame-pointer"
+            ldflags: "-fsanitize=address"
+          - name: UBSan
+            build_type: Debug
+            cflags: "-fsanitize=undefined -fno-sanitize-recover=all"
+            ldflags: "-fsanitize=undefined"
+          - name: "-O2"
+            build_type: Release
+            cflags: "-O2"
+            ldflags: ""
+          - name: "-Os"
+            build_type: Release
+            cflags: "-Os"
+            ldflags: ""
+          - name: "-fsigned-char"
+            build_type: Debug
+            cflags: "-fsigned-char"
+            ldflags: ""
+          - name: "-funsigned-char"
+            build_type: Debug
+            cflags: "-funsigned-char"
+            ldflags: ""
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6
+
+      - name: Build OpenSSL dependency (no matrix flags)
+        working-directory: tests/unit
+        run: |
+          cmake -Bbuild-deps -H.
+          make -C build-deps openssl -j"$(nproc)"
+
+      - name: Configure unit tests with matrix flags
+        working-directory: tests/unit
+        run: |
+          if [ "${{ matrix.build_type }}" = "Release" ]; then
+            # CMAKE_C_FLAGS_DEBUG hardcodes -O0 (tests/unit/CMakeLists.txt) and
+            # is applied after CMAKE_C_FLAGS on the actual compile command, so
+            # -O0 would silently win over an -O level passed via CMAKE_C_FLAGS
+            # under the default Debug build type (last -O flag on the command
+            # line wins). Switching to Release and setting
+            # CMAKE_C_FLAGS_RELEASE directly avoids that Debug-only line
+            # entirely, so the matrix flag is the only -O level applied.
+            cmake -Bbuild -H. \
+              -DPRECOMPILED_DEPENDENCIES_DIR="$(pwd)/build-deps/install" \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_C_FLAGS_RELEASE="${{ matrix.cflags }}" \
+              -DCMAKE_EXE_LINKER_FLAGS="${{ matrix.ldflags }}"
+          else
+            cmake -Bbuild -H. \
+              -DPRECOMPILED_DEPENDENCIES_DIR="$(pwd)/build-deps/install" \
+              -DCMAKE_C_FLAGS="${{ matrix.cflags }}" \
+              -DCMAKE_EXE_LINKER_FLAGS="${{ matrix.ldflags }}"
+          fi
+
+      - name: Build unit tests
+        working-directory: tests/unit
+        run: make -C build -j"$(nproc)"
+
+      - name: Run unit tests
+        working-directory: tests/unit
+        env:
+          CTEST_OUTPUT_ON_FAILURE: 1
+        run: ctest --test-dir build

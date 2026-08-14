@@ -10,9 +10,6 @@ on:
     tags:
       - '**'
   pull_request:
-    paths-ignore:
-      - '.github/workflows/*.yml'
-      - 'tests/*'
 
 jobs:
   job_lint:
@@ -20,20 +17,39 @@ jobs:
     uses: LedgerHQ/ledger-app-workflows/.github/workflows/reusable_lint.yml@v1
     with:
       source: 'src'
-      extensions: 'h,c'
-      version: 11
 
   misspell:
     name: Check misspellings
+    uses: LedgerHQ/ledger-app-workflows/.github/workflows/reusable_spell_check.yml@v1
+    with:
+      ignore_words_list: ontop
+
+  secret_free_traces:
+    name: No string conversion in a trace statement
     runs-on: ubuntu-latest
     steps:
-    - name: Clone
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-    - name: Check misspellings
-      uses: codespell-project/actions-codespell@v2
-      with:
-        builtin: clear,rare
-        check_filenames: true
-        ignore_words_list: ontop
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6
+
+      # PRINTF is compiled out at DEBUG=0, which is the default and what is
+      # released -- but at DEBUG=1 it leaves the Nano targets over SEPROXYHAL,
+      # readable by whichever host the device is plugged into, and everything
+      # this application handles is the seed or a piece of it. The rule is
+      # that no secret reaches a trace at any debug level, so what is checked
+      # here is not the argument, which a grep cannot follow, but the
+      # conversion: %s and %.*s are the two that take a pointer to data the
+      # caller owns. Print a length instead, the way sskr_shares.c and
+      # bip39_mnemonic.c already do.
+      #
+      # No allowlist, because src/ needs none: there is no %s and no %.*s
+      # anywhere in it, in a trace or outside one. If a constant string ever
+      # has to be traced, add it here explicitly and keep the list short --
+      # every entry is a place secret content can come back unnoticed.
+      - name: Refuse %s and %.*s in src/
+        run: |
+          if grep -rnE '%\.\*s|%s' src/; then
+            echo "::error::a string conversion reached a trace statement in src/"
+            echo "::error::print a length instead; see src/nbgl/sskr_shares.c"
+            exit 1
+          fi
+          echo "src/ is clean: no %s, no %.*s"
