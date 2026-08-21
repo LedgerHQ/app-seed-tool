@@ -73,8 +73,6 @@ typedef struct bolos_ux_context {
 #endif                      // defined(TARGET_NANOX) || defined(TARGET_NANOS2)
     char pin_digit_buffer;  // digit to be displayed
 
-    appmain_t flow_end_callback;
-
     // slider management / menu list management
     unsigned int hslider3_before;
     unsigned int hslider3_current;
